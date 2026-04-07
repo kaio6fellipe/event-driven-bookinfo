@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookinfo — Product Page Mockup</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-hover: #222531;
+            --border: #2a2d3a;
+            --text: #e4e4e7;
+            --text-muted: #8b8d98;
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --star-filled: #f59e0b;
+            --star-empty: #3f4150;
+            --radius: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        /* Navigation */
+        nav {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 56px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .nav-brand svg {
+            width: 24px;
+            height: 24px;
+            color: var(--accent);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1.5rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            padding: 0.5rem 0;
+            transition: color 0.15s;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            color: var(--text);
+        }
+
+        .nav-links a.active {
+            border-bottom: 2px solid var(--accent);
+        }
+
+        .nav-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        /* Main layout */
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Product list page */
+        .page-header {
+            margin-bottom: 2rem;
+        }
+
+        .page-header h1 {
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .page-header p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .product-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+        }
+
+        .product-card:hover {
+            border-color: var(--accent);
+            background: var(--surface-hover);
+        }
+
+        .product-card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .product-card .author {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .product-card .meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .product-card .rating-summary {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        /* Stars */
+        .stars {
+            display: inline-flex;
+            gap: 2px;
+        }
+
+        .star {
+            width: 16px;
+            height: 16px;
+        }
+
+        .star-filled {
+            color: var(--star-filled);
+        }
+
+        .star-empty {
+            color: var(--star-empty);
+        }
+
+        .rating-count {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Product detail page */
+        .breadcrumb {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        .breadcrumb a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .product-detail {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        .detail-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+        }
+
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .detail-header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .badge {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent);
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        /* HTMX indicator */
+        .htmx-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--accent);
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px dashed var(--accent);
+            border-radius: 4px;
+            padding: 0.15rem 0.5rem;
+            margin-left: 0.5rem;
+            opacity: 0.8;
+        }
+
+        .htmx-indicator::before {
+            content: "htmx";
+            font-weight: 600;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Details table */
+        .details-grid {
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            gap: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+
+        .details-grid dt {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .details-grid dd {
+            color: var(--text);
+        }
+
+        /* Section header */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section-header h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Reviews */
+        .review {
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .review:last-child {
+            border-bottom: none;
+        }
+
+        .review-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .reviewer {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .reviewer-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .reviewer-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .review-date {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .review-text {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* Rating form */
+        .rating-form {
+            background: var(--surface-hover);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            margin-top: 1rem;
+        }
+
+        .rating-form h3 {
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.35rem;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.6rem 0.75rem;
+            color: var(--text);
+            font-size: 0.875rem;
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .star-input {
+            display: flex;
+            gap: 4px;
+        }
+
+        .star-input .star {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .star-input .star:hover {
+            transform: scale(1.2);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.25rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: background 0.15s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        /* Notification banner */
+        .notification-banner {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: var(--radius);
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.875rem;
+        }
+
+        .notification-banner svg {
+            color: var(--success);
+            flex-shrink: 0;
+        }
+
+        .notification-banner .event-flow {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        /* Architecture annotation */
+        .arch-annotation {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1rem 1.25rem;
+            font-size: 0.8rem;
+            max-width: 320px;
+            z-index: 50;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+        }
+
+        .arch-annotation h4 {
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+            color: var(--accent);
+        }
+
+        .arch-annotation .flow {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .arch-annotation .flow .arrow {
+            color: var(--accent);
+            padding-left: 1rem;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1.5rem;
+        }
+
+        .tab {
+            padding: 0.75rem 1.25rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: color 0.15s, border-color 0.15s;
+        }
+
+        .tab:hover {
+            color: var(--text);
+        }
+
+        .tab.active {
+            color: var(--text);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Loading skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .skeleton-line {
+            height: 16px;
+            margin-bottom: 8px;
+        }
+
+        .skeleton-line:last-child {
+            width: 60%;
+        }
+
+        /* SVG icons inline */
+        .icon-sm { width: 16px; height: 16px; }
+        .icon-md { width: 20px; height: 20px; }
+
+        /* Page switcher */
+        .page-switcher {
+            position: fixed;
+            top: 70px;
+            right: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            z-index: 50;
+        }
+
+        .page-switcher button {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .page-switcher button:hover,
+        .page-switcher button.active {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+    </style>
+</head>
+<body>
+
+<!-- Page switcher -->
+<div class="page-switcher">
+    <button class="active" onclick="showPage('list')">Product List</button>
+    <button onclick="showPage('detail')">Product Detail</button>
+    <button onclick="showPage('submit-success')">After Submit</button>
+    <button onclick="showPage('loading')">HTMX Loading</button>
+</div>
+
+<!-- Navigation -->
+<nav>
+    <a href="#" class="nav-brand">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+        </svg>
+        Bookinfo
+    </a>
+    <ul class="nav-links">
+        <li><a href="#" class="active">Products</a></li>
+        <li><a href="#">API Docs</a></li>
+    </ul>
+    <div class="nav-status">
+        <span class="status-dot"></span>
+        All services healthy
+    </div>
+</nav>
+
+<!-- PAGE: Product List -->
+<div id="page-list" class="container tab-content active">
+    <div class="page-header">
+        <h1>Products</h1>
+        <p>Browse the bookstore catalog</p>
+    </div>
+
+    <div class="product-grid">
+        <div class="product-card" onclick="showPage('detail')">
+            <h3>The Comedy of Errors</h3>
+            <div class="author">William Shakespeare</div>
+            <div class="rating-summary">
+                <div class="stars">
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                </div>
+                <span class="rating-count">(2 reviews)</span>
+            </div>
+            <div class="meta">
+                <span>Paperback</span>
+                <span>200 pages</span>
+                <span>1595</span>
+            </div>
+        </div>
+
+        <div class="product-card">
+            <h3>Hamlet</h3>
+            <div class="author">William Shakespeare</div>
+            <div class="rating-summary">
+                <div class="stars">
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                </div>
+                <span class="rating-count">(1 review)</span>
+            </div>
+            <div class="meta">
+                <span>Hardcover</span>
+                <span>350 pages</span>
+                <span>1600</span>
+            </div>
+        </div>
+
+        <div class="product-card">
+            <h3>Macbeth</h3>
+            <div class="author">William Shakespeare</div>
+            <div class="rating-summary">
+                <div class="stars">
+                    <svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                </div>
+                <span class="rating-count">(no reviews)</span>
+            </div>
+            <div class="meta">
+                <span>Paperback</span>
+                <span>140 pages</span>
+                <span>1606</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PAGE: Product Detail -->
+<div id="page-detail" class="container tab-content">
+    <div class="breadcrumb">
+        <a href="#" onclick="showPage('list')">Products</a> / The Comedy of Errors
+    </div>
+
+    <!-- Book Details (HTMX partial: GET /partials/details/0) -->
+    <div class="detail-section" style="margin-bottom: 1.25rem;">
+        <div class="detail-header">
+            <div>
+                <h1>The Comedy of Errors
+                    <span class="htmx-indicator">partial/details</span>
+                </h1>
+                <div class="author" style="margin-top: 0.25rem;">William Shakespeare</div>
+            </div>
+            <span class="badge">Paperback</span>
+        </div>
+        <dl class="details-grid">
+            <dt>Publisher</dt>
+            <dd>PublishersA</dd>
+            <dt>Language</dt>
+            <dd>English</dd>
+            <dt>Pages</dt>
+            <dd>200</dd>
+            <dt>Year</dt>
+            <dd>1595</dd>
+            <dt>ISBN-10</dt>
+            <dd>1234567890</dd>
+            <dt>ISBN-13</dt>
+            <dd>123-1234567890</dd>
+        </dl>
+    </div>
+
+    <!-- Reviews section (HTMX partial: GET /partials/reviews/0) -->
+    <div class="detail-section" style="margin-bottom: 1.25rem;">
+        <div class="section-header">
+            <h2>Reviews
+                <span class="htmx-indicator">partial/reviews</span>
+            </h2>
+            <div class="rating-summary">
+                <div class="stars">
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                </div>
+                <span class="rating-count">4.0 avg (2 reviews)</span>
+            </div>
+        </div>
+
+        <div class="review">
+            <div class="review-header">
+                <div class="reviewer">
+                    <div class="reviewer-avatar">R1</div>
+                    <div>
+                        <div class="reviewer-name">Reviewer1</div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div class="stars">
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    </div>
+                    <span class="review-date">2 days ago</span>
+                </div>
+            </div>
+            <div class="review-text">
+                An extremely entertaining play by Shakespeare. The slapstick humour is refreshing!
+            </div>
+        </div>
+
+        <div class="review">
+            <div class="review-header">
+                <div class="reviewer">
+                    <div class="reviewer-avatar">R2</div>
+                    <div>
+                        <div class="reviewer-name">Reviewer2</div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div class="stars">
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    </div>
+                    <span class="review-date">5 days ago</span>
+                </div>
+            </div>
+            <div class="review-text">
+                Absolutely fun and entertaining. The play is great and very witty.
+            </div>
+        </div>
+    </div>
+
+    <!-- Rating form (HTMX partial: rating-form) -->
+    <div class="detail-section">
+        <div class="rating-form" style="background: transparent; border: none; padding: 0;">
+            <h3>Submit a Rating
+                <span class="htmx-indicator">partial/rating-form</span>
+            </h3>
+            <div class="form-group">
+                <label>Your name</label>
+                <input type="text" placeholder="Enter your name" value="">
+            </div>
+            <div class="form-group">
+                <label>Rating</label>
+                <div class="star-input">
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Review (optional)</label>
+                <textarea placeholder="Write your review..."></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="showPage('submit-success')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                Submit Rating
+            </button>
+            <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.75rem;">
+                Submits via Argo Events webhook
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- PAGE: After submission (shows event-driven flow) -->
+<div id="page-submit-success" class="container tab-content">
+    <div class="breadcrumb">
+        <a href="#" onclick="showPage('list')">Products</a> / <a href="#" onclick="showPage('detail')">The Comedy of Errors</a>
+    </div>
+
+    <div class="notification-banner">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+        <div>
+            <div><strong>Rating submitted successfully!</strong> Your rating is being processed.</div>
+            <div class="event-flow">Event flow: webhook POST &rarr; EventSource &rarr; Kafka &rarr; Sensor &rarr; ratings-service + notification-service</div>
+        </div>
+    </div>
+
+    <!-- Same detail page but with updated reviews section swapped via HTMX -->
+    <div class="detail-section" style="margin-bottom: 1.25rem;">
+        <div class="detail-header">
+            <div>
+                <h1>The Comedy of Errors</h1>
+                <div class="author" style="margin-top: 0.25rem;">William Shakespeare</div>
+            </div>
+            <span class="badge">Paperback</span>
+        </div>
+        <dl class="details-grid">
+            <dt>Publisher</dt>
+            <dd>PublishersA</dd>
+            <dt>Language</dt>
+            <dd>English</dd>
+            <dt>Pages</dt>
+            <dd>200</dd>
+            <dt>Year</dt>
+            <dd>1595</dd>
+            <dt>ISBN-10</dt>
+            <dd>1234567890</dd>
+            <dt>ISBN-13</dt>
+            <dd>123-1234567890</dd>
+        </dl>
+    </div>
+
+    <!-- Reviews section - now shows 3 reviews -->
+    <div class="detail-section" style="border-color: var(--success); margin-bottom: 1.25rem;">
+        <div class="section-header">
+            <h2>Reviews
+                <span class="htmx-indicator">swapped via hx-swap</span>
+            </h2>
+            <div class="rating-summary">
+                <div class="stars">
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                </div>
+                <span class="rating-count">4.0 avg (3 reviews)</span>
+            </div>
+        </div>
+
+        <!-- New review highlighted -->
+        <div class="review" style="background: rgba(99, 102, 241, 0.05); margin: 0 -1.5rem; padding: 1rem 1.5rem; border-left: 3px solid var(--accent);">
+            <div class="review-header">
+                <div class="reviewer">
+                    <div class="reviewer-avatar" style="background: var(--accent); color: white;">Y</div>
+                    <div>
+                        <div class="reviewer-name">You <span style="font-size: 0.75rem; color: var(--accent); font-weight: 400;">new</span></div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div class="stars">
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    </div>
+                    <span class="review-date">just now</span>
+                </div>
+            </div>
+            <div class="review-text">Great comedy, Shakespeare at his finest!</div>
+        </div>
+
+        <div class="review">
+            <div class="review-header">
+                <div class="reviewer">
+                    <div class="reviewer-avatar">R1</div>
+                    <div><div class="reviewer-name">Reviewer1</div></div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div class="stars">
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    </div>
+                    <span class="review-date">2 days ago</span>
+                </div>
+            </div>
+            <div class="review-text">An extremely entertaining play by Shakespeare. The slapstick humour is refreshing!</div>
+        </div>
+
+        <div class="review">
+            <div class="review-header">
+                <div class="reviewer">
+                    <div class="reviewer-avatar">R2</div>
+                    <div><div class="reviewer-name">Reviewer2</div></div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div class="stars">
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    </div>
+                    <span class="review-date">5 days ago</span>
+                </div>
+            </div>
+            <div class="review-text">Absolutely fun and entertaining. The play is great and very witty.</div>
+        </div>
+    </div>
+</div>
+
+<!-- PAGE: HTMX Loading state -->
+<div id="page-loading" class="container tab-content">
+    <div class="breadcrumb">
+        <a href="#" onclick="showPage('list')">Products</a> / The Comedy of Errors
+    </div>
+
+    <div class="detail-section" style="margin-bottom: 1.25rem;">
+        <div class="detail-header">
+            <div>
+                <h1>The Comedy of Errors
+                    <span class="htmx-indicator" style="background: rgba(245, 158, 11, 0.1); border-color: var(--warning); color: var(--warning);">loading...</span>
+                </h1>
+                <div class="author" style="margin-top: 0.25rem;">William Shakespeare</div>
+            </div>
+        </div>
+        <div style="padding: 0.5rem 0;">
+            <div class="skeleton skeleton-line" style="width: 80%;"></div>
+            <div class="skeleton skeleton-line" style="width: 65%;"></div>
+            <div class="skeleton skeleton-line" style="width: 50%;"></div>
+            <div class="skeleton skeleton-line" style="width: 70%;"></div>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; font-style: italic;">
+            hx-get="/partials/details/0" hx-trigger="load" hx-swap="innerHTML"
+            <br>
+            productpage &rarr; details-service GET /v1/details/0
+        </p>
+    </div>
+
+    <div class="detail-section" style="margin-bottom: 1.25rem;">
+        <div class="section-header">
+            <h2>Reviews
+                <span class="htmx-indicator" style="background: rgba(245, 158, 11, 0.1); border-color: var(--warning); color: var(--warning);">loading...</span>
+            </h2>
+        </div>
+        <div style="padding: 0.5rem 0;">
+            <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem;">
+                <div class="skeleton" style="width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;"></div>
+                <div style="flex: 1;">
+                    <div class="skeleton skeleton-line" style="width: 120px; height: 14px;"></div>
+                    <div class="skeleton skeleton-line" style="width: 200px; height: 12px;"></div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+                <div class="skeleton" style="width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;"></div>
+                <div style="flex: 1;">
+                    <div class="skeleton skeleton-line" style="width: 140px; height: 14px;"></div>
+                    <div class="skeleton skeleton-line" style="width: 180px; height: 12px;"></div>
+                </div>
+            </div>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; font-style: italic;">
+            hx-get="/partials/reviews/0" hx-trigger="load" hx-swap="innerHTML"
+            <br>
+            productpage &rarr; reviews-service GET /v1/reviews/0 &rarr; ratings-service GET /v1/ratings/0
+        </p>
+    </div>
+
+    <div class="detail-section">
+        <div class="section-header">
+            <h2>Submit a Rating</h2>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted);">
+            Rating form loads after reviews. Uses <code style="background: var(--surface-hover); padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.75rem;">hx-post="/partials/rating"</code> to submit.
+            <br><br>
+            On submit: POST &rarr; Argo Events webhook EventSource &rarr; Kafka &rarr; Sensor &rarr; HTTP Trigger to ratings-service + notification-service.
+            <br>
+            After success: <code style="background: var(--surface-hover); padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.75rem;">hx-swap="outerHTML"</code> replaces the reviews section with fresh data.
+        </p>
+    </div>
+</div>
+
+<!-- Architecture annotation -->
+<div class="arch-annotation">
+    <h4>HTMX Interaction Model</h4>
+    <div class="flow">
+        <span>Browser loads /products/0</span>
+        <span class="arrow">&rarr; Server renders layout + shell</span>
+        <span class="arrow">&rarr; HTMX fires hx-get="/partials/details/0"</span>
+        <span class="arrow">&rarr; HTMX fires hx-get="/partials/reviews/0"</span>
+        <span style="margin-top: 0.5rem;">User submits rating</span>
+        <span class="arrow">&rarr; hx-post="/partials/rating" (to EventSource webhook)</span>
+        <span class="arrow">&rarr; On 200: hx-swap reviews partial with fresh data</span>
+    </div>
+</div>
+
+<script>
+    function showPage(page) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.getElementById('page-' + page).classList.add('active');
+        document.querySelectorAll('.page-switcher button').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+    }
+</script>
+
+</body>
+</html>

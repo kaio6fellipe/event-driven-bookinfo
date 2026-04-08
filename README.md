@@ -158,6 +158,14 @@ open http://localhost:8080
 
 By default all services use the in-memory storage backend. To use PostgreSQL, set `STORAGE_BACKEND=postgres` and `DATABASE_URL=<dsn>` for each backend service. Note: the in-memory backend does not support multiple replicas (state is pod-local).
 
+**Or use Docker Compose** (PostgreSQL backend, all services with one command):
+
+```bash
+make run          # Start all services + PostgreSQL, seed databases
+make run-logs     # Tail logs
+make stop         # Stop and remove containers
+```
+
 ---
 
 ## Makefile Targets
@@ -204,12 +212,14 @@ make docker-build SERVICE=ratings
 # Build all images
 make docker-build-all
 
-# Run with docker-compose (memory backend, all services)
-docker compose -f test/e2e/docker-compose.yml up
+# Run all services with PostgreSQL (recommended for local dev)
+make run          # builds images, starts postgres + all services, seeds databases
+make run-logs     # tail service logs
+make stop         # stop and remove containers (keeps data)
+make clean-data   # stop and remove containers + postgres data volume
 
-# Run with PostgreSQL backend
-docker compose -f test/e2e/docker-compose.yml \
-               -f test/e2e/docker-compose.postgres.yml up
+# Or run directly with docker-compose (memory backend, for E2E tests)
+docker compose -f test/e2e/docker-compose.yml up
 ```
 
 Images are tagged `event-driven-bookinfo/<service>:latest` locally. Released images are pushed to GitHub Container Registry:

@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: book-added-sensor
+spec:
+  eventBusName: kafka
+  dependencies:
+    - name: book-added-dep
+      eventSourceName: book-added
+      eventName: book-added
+  triggers:
+    - template:
+        name: create-detail
+        http:
+          url: http://details/v1/details
+          method: POST
+          headers:
+            Content-Type: application/json
+          payload:
+            - src:
+                dependencyName: book-added-dep
+                dataKey: body
+              dest: ""
+      retryStrategy:
+        steps: 3
+        duration: 2s
+    - template:
+        name: notify-book-added
+        http:
+          url: http://notification/v1/notifications
+          method: POST
+          headers:
+            Content-Type: application/json
+          payload:
+            - src:
+                dependencyName: book-added-dep
+                dataKey: body.title
+              dest: subject
+            - src:
+                dependencyName: book-added-dep
+                value: "New book added"
+              dest: body
+            - src:
+                dependencyName: book-added-dep
+                value: "system@bookinfo"
+              dest: recipient
+            - src:
+                dependencyName: book-added-dep
+                value: "email"
+              dest: channel
+      retryStrategy:
+        steps: 3
+        duration: 2s

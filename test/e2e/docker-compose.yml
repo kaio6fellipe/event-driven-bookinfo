@@ -1,0 +1,64 @@
+services:
+  ratings:
+    build:
+      context: ../..
+      dockerfile: build/Dockerfile.ratings
+    ports:
+      - "8083:8080"
+      - "9093:9090"
+    environment:
+      SERVICE_NAME: ratings
+      STORAGE_BACKEND: memory
+
+  details:
+    build:
+      context: ../..
+      dockerfile: build/Dockerfile.details
+    ports:
+      - "8081:8080"
+      - "9091:9090"
+    environment:
+      SERVICE_NAME: details
+      STORAGE_BACKEND: memory
+
+  reviews:
+    build:
+      context: ../..
+      dockerfile: build/Dockerfile.reviews
+    ports:
+      - "8082:8080"
+      - "9092:9090"
+    environment:
+      SERVICE_NAME: reviews
+      STORAGE_BACKEND: memory
+      RATINGS_SERVICE_URL: http://ratings:8080
+    depends_on:
+      - ratings
+
+  notification:
+    build:
+      context: ../..
+      dockerfile: build/Dockerfile.notification
+    ports:
+      - "8084:8080"
+      - "9094:9090"
+    environment:
+      SERVICE_NAME: notification
+      STORAGE_BACKEND: memory
+
+  productpage:
+    build:
+      context: ../..
+      dockerfile: build/Dockerfile.productpage
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      SERVICE_NAME: productpage
+      DETAILS_SERVICE_URL: http://details:8080
+      REVIEWS_SERVICE_URL: http://reviews:8080
+      RATINGS_SERVICE_URL: http://ratings:8080
+    depends_on:
+      - details
+      - reviews
+      - ratings

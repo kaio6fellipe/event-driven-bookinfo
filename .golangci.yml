@@ -1,0 +1,57 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - gosec
+    - revive
+    - gocyclo
+    - misspell
+    - unconvert
+  settings:
+    gocyclo:
+      min-complexity: 15
+    revive:
+      rules:
+        - name: exported
+          severity: warning
+        - name: var-naming
+          severity: warning
+        - name: error-return
+          severity: warning
+        - name: error-naming
+          severity: warning
+        - name: unused-parameter
+          severity: warning
+    gosec:
+      excludes:
+        - G115
+  exclusions:
+    rules:
+      - path: "_test\\.go"
+        linters:
+          - errcheck
+          - gosec
+          - gocyclo
+          - revive
+      - path: "_test\\.go"
+        text: "exported"
+        linters:
+          - revive
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/kaio6fellipe/event-driven-bookinfo
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly

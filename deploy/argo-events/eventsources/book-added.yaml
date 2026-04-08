@@ -1,0 +1,11 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: book-added
+spec:
+  eventBusName: kafka
+  webhook:
+    book-added:
+      port: "12000"
+      endpoint: /book-added
+      method: POST

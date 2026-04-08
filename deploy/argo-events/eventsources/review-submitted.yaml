@@ -1,0 +1,11 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: review-submitted
+spec:
+  eventBusName: kafka
+  webhook:
+    review-submitted:
+      port: "12001"
+      endpoint: /review-submitted
+      method: POST

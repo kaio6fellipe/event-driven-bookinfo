@@ -1,0 +1,103 @@
+{{define "content"}}
+
+{{if .Detail}}
+
+<div class="breadcrumb">
+    <a href="/">Products</a> / {{.Detail.Title}}
+</div>
+
+<div class="detail-section" style="margin-bottom: 1.25rem;"
+     id="details-section"
+     hx-get="/partials/details/{{.Detail.ID}}"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+    <div class="detail-header">
+        <div>
+            <h1>{{.Detail.Title}}</h1>
+            <div class="author">{{.Detail.Author}}</div>
+        </div>
+        <span class="badge">{{.Detail.Type}}</span>
+    </div>
+    <div class="skeleton skeleton-line" style="width: 80%;"></div>
+    <div class="skeleton skeleton-line" style="width: 65%;"></div>
+    <div class="skeleton skeleton-line" style="width: 50%;"></div>
+</div>
+
+<div class="detail-section" style="margin-bottom: 1.25rem;">
+    <div class="section-header">
+        <h2>Reviews</h2>
+    </div>
+    <div id="reviews-section"
+         hx-get="/partials/reviews/{{.Detail.ID}}"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <div class="skeleton skeleton-line" style="width: 70%;"></div>
+        <div class="skeleton skeleton-line" style="width: 55%;"></div>
+    </div>
+</div>
+
+<div class="detail-section">
+    <div class="rating-form" style="background: transparent; border: none; padding: 0;">
+        <h3>Submit a Review</h3>
+        <div id="rating-form-section">
+            <form hx-post="/partials/rating"
+                  hx-target="#rating-form-section"
+                  hx-swap="innerHTML">
+                <input type="hidden" name="product_id" value="{{.Detail.ID}}">
+                <div class="form-group">
+                    <label for="reviewer">Your name</label>
+                    <input type="text" id="reviewer" name="reviewer" required placeholder="Enter your name">
+                </div>
+                <div class="form-group">
+                    <label for="stars">Rating</label>
+                    <select id="stars" name="stars" required>
+                        <option value="5">5 Stars</option>
+                        <option value="4">4 Stars</option>
+                        <option value="3">3 Stars</option>
+                        <option value="2">2 Stars</option>
+                        <option value="1">1 Star</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="text">Review (optional)</label>
+                    <textarea id="text" name="text" placeholder="Write your review..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                    Submit Review
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{{else}}
+
+<div class="page-header">
+    <h1>Products</h1>
+    <p>Browse the bookstore catalog</p>
+</div>
+
+{{if .Products}}
+<div class="product-grid">
+    {{range .Products}}
+    <a href="/products/{{.ID}}" class="product-card">
+        <h3>{{.Title}}</h3>
+        <div class="author">{{.Author}}</div>
+        <div class="meta">
+            <span>{{.Type}}</span>
+            <span>{{.Pages}} pages</span>
+            <span>{{.Year}}</span>
+        </div>
+    </a>
+    {{end}}
+</div>
+{{else}}
+<div class="empty-state">
+    <p>No products yet. Add a book via the details service API, then refresh this page.</p>
+</div>
+{{end}}
+
+{{end}}
+
+{{end}}

@@ -1,0 +1,46 @@
+{{if .Success}}
+<div class="notification-banner">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+    <div>
+        <strong>Review submitted successfully!</strong> You gave {{.Stars}} star{{if gt .Stars 1}}s{{end}}.
+    </div>
+</div>
+{{if .ProductID}}
+<div hx-get="/partials/reviews/{{.ProductID}}"
+     hx-trigger="load"
+     hx-target="#reviews-section"
+     hx-swap="innerHTML">
+</div>
+{{end}}
+{{else}}
+<div class="error-banner" style="background: rgba(217, 48, 37, 0.1); border: 1px solid rgba(217, 48, 37, 0.3); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; color: #f87171;">
+    Failed to submit: {{.Error}}
+</div>
+<form hx-post="/partials/rating"
+      hx-target="#rating-form-section"
+      hx-swap="innerHTML">
+    <input type="hidden" name="product_id" value="{{.ProductID}}">
+    <div class="form-group">
+        <label for="reviewer">Your name</label>
+        <input type="text" id="reviewer" name="reviewer" required placeholder="Enter your name">
+    </div>
+    <div class="form-group">
+        <label for="stars">Rating</label>
+        <select id="stars" name="stars" required>
+            <option value="5">5 Stars</option>
+            <option value="4">4 Stars</option>
+            <option value="3">3 Stars</option>
+            <option value="2">2 Stars</option>
+            <option value="1">1 Star</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="text">Review (optional)</label>
+        <textarea id="text" name="text" placeholder="Write your review..."></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        Submit Review
+    </button>
+</form>
+{{end}}

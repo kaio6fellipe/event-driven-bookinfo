@@ -1,0 +1,301 @@
+version: 2
+
+project_name: event-driven-bookinfo
+
+builds:
+  - id: productpage
+    binary: productpage
+    main: ./services/productpage/cmd/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+  - id: details
+    binary: details
+    main: ./services/details/cmd/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+  - id: reviews
+    binary: reviews
+    main: ./services/reviews/cmd/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+  - id: ratings
+    binary: ratings
+    main: ./services/ratings/cmd/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+  - id: notification
+    binary: notification
+    main: ./services/notification/cmd/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+archives:
+  - id: productpage
+    builds:
+      - productpage
+    name_template: "productpage_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+
+  - id: details
+    builds:
+      - details
+    name_template: "details_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+
+  - id: reviews
+    builds:
+      - reviews
+    name_template: "reviews_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+
+  - id: ratings
+    builds:
+      - ratings
+    name_template: "ratings_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+
+  - id: notification
+    builds:
+      - notification
+    name_template: "notification_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+
+dockers:
+  - id: productpage-amd64
+    ids:
+      - productpage
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:{{ .Tag }}-amd64"
+    dockerfile: Dockerfile.productpage
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=productpage"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+  - id: productpage-arm64
+    ids:
+      - productpage
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:{{ .Tag }}-arm64"
+    dockerfile: Dockerfile.productpage
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=productpage"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+  - id: details-amd64
+    ids:
+      - details
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/details:{{ .Tag }}-amd64"
+    dockerfile: Dockerfile.details
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=details"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+  - id: details-arm64
+    ids:
+      - details
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/details:{{ .Tag }}-arm64"
+    dockerfile: Dockerfile.details
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=details"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+  - id: reviews-amd64
+    ids:
+      - reviews
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/reviews:{{ .Tag }}-amd64"
+    dockerfile: Dockerfile.reviews
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=reviews"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+  - id: reviews-arm64
+    ids:
+      - reviews
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/reviews:{{ .Tag }}-arm64"
+    dockerfile: Dockerfile.reviews
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=reviews"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+  - id: ratings-amd64
+    ids:
+      - ratings
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/ratings:{{ .Tag }}-amd64"
+    dockerfile: Dockerfile.ratings
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=ratings"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+  - id: ratings-arm64
+    ids:
+      - ratings
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/ratings:{{ .Tag }}-arm64"
+    dockerfile: Dockerfile.ratings
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=ratings"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+  - id: notification-amd64
+    ids:
+      - notification
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/notification:{{ .Tag }}-amd64"
+    dockerfile: Dockerfile.notification
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=notification"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+  - id: notification-arm64
+    ids:
+      - notification
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/notification:{{ .Tag }}-arm64"
+    dockerfile: Dockerfile.notification
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=notification"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+docker_manifests:
+  - name_template: "ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:{{ .Tag }}"
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:{{ .Tag }}-amd64"
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:{{ .Tag }}-arm64"
+
+  - name_template: "ghcr.io/kaio6fellipe/event-driven-bookinfo/details:{{ .Tag }}"
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/details:{{ .Tag }}-amd64"
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/details:{{ .Tag }}-arm64"
+
+  - name_template: "ghcr.io/kaio6fellipe/event-driven-bookinfo/reviews:{{ .Tag }}"
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/reviews:{{ .Tag }}-amd64"
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/reviews:{{ .Tag }}-arm64"
+
+  - name_template: "ghcr.io/kaio6fellipe/event-driven-bookinfo/ratings:{{ .Tag }}"
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/ratings:{{ .Tag }}-amd64"
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/ratings:{{ .Tag }}-arm64"
+
+  - name_template: "ghcr.io/kaio6fellipe/event-driven-bookinfo/notification:{{ .Tag }}"
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/notification:{{ .Tag }}-amd64"
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/notification:{{ .Tag }}-arm64"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^style:"
+      - "Merge pull request"
+      - "Merge branch"
+  groups:
+    - title: "New Features"
+      regexp: "^feat"
+      order: 0
+    - title: "Bug Fixes"
+      regexp: "^fix"
+      order: 1
+    - title: "Performance"
+      regexp: "^perf"
+      order: 2
+    - title: "Build & CI"
+      regexp: "^(build|ci)"
+      order: 3
+    - title: "Refactoring"
+      regexp: "^refactor"
+      order: 4
+    - title: "Other"
+      order: 999

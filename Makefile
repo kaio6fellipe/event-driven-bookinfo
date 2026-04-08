@@ -6,14 +6,14 @@ SERVICES := productpage details reviews ratings notification
 # ─── Build ──────────────────────────────────────────────────────────────────
 
 .PHONY: build
-build: ## Build a single service: make build SERVICE=<name>
+build: ##@Build Build a single service: make build SERVICE=<name>
 ifndef SERVICE
 	$(error SERVICE is not set. Usage: make build SERVICE=<name>)
 endif
 	CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/$(SERVICE) ./services/$(SERVICE)/cmd/
 
 .PHONY: build-all
-build-all: ## Build all 5 services
+build-all: ##@Build Build all 5 services
 	@for svc in $(SERVICES); do \
 		echo "Building $$svc..."; \
 		CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/$$svc ./services/$$svc/cmd/ || exit 1; \
@@ -23,34 +23,34 @@ build-all: ## Build all 5 services
 # ─── Test ───────────────────────────────────────────────────────────────────
 
 .PHONY: test
-test: ## Run all tests
+test: ##@Test Run all tests
 	go test ./...
 
 .PHONY: test-cover
-test-cover: ## Run tests with coverage report
+test-cover: ##@Test Run tests with coverage report
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 
 .PHONY: test-race
-test-race: ## Run tests with race detector
+test-race: ##@Test Run tests with race detector
 	go test -race -count=1 ./...
 
 # ─── Quality ────────────────────────────────────────────────────────────────
 
 .PHONY: lint
-lint: ## Run golangci-lint
+lint: ##@Quality Run golangci-lint
 	golangci-lint run ./...
 
 .PHONY: fmt
-fmt: ## Format all Go source files
+fmt: ##@Quality Format all Go source files
 	gofmt -w .
 
 .PHONY: vet
-vet: ## Run go vet
+vet: ##@Quality Run go vet
 	go vet ./...
 
 .PHONY: mod-tidy
-mod-tidy: ## Tidy go module dependencies
+mod-tidy: ##@Quality Tidy go module dependencies
 	go mod tidy
 
 # ─── Security ──────────────────────────────────────────────────────────────
@@ -58,16 +58,16 @@ mod-tidy: ## Tidy go module dependencies
 GOVULNCHECK := $(shell go env GOPATH)/bin/govulncheck
 
 .PHONY: vuln
-vuln: ## Scan Go dependencies for known CVEs (requires govulncheck)
+vuln: ##@Security Scan Go dependencies for known CVEs (requires govulncheck)
 	@command -v $(GOVULNCHECK) >/dev/null 2>&1 || { echo "Installing govulncheck..."; go install golang.org/x/vuln/cmd/govulncheck@latest; }
 	$(GOVULNCHECK) ./...
 
 .PHONY: gitleaks
-gitleaks: ## Scan git history for leaked secrets (requires gitleaks)
+gitleaks: ##@Security Scan git history for leaked secrets (requires gitleaks)
 	gitleaks detect --source . -v
 
 .PHONY: trivy
-trivy: ## Scan Docker images for vulnerabilities (requires trivy)
+trivy: ##@Security Scan Docker images for vulnerabilities (requires trivy)
 	@for svc in $(SERVICES); do \
 		echo "Scanning event-driven-bookinfo/$$svc:latest..."; \
 		trivy image --severity HIGH,CRITICAL event-driven-bookinfo/$$svc:latest || exit 1; \
@@ -76,14 +76,14 @@ trivy: ## Scan Docker images for vulnerabilities (requires trivy)
 # ─── Docker ─────────────────────────────────────────────────────────────────
 
 .PHONY: docker-build
-docker-build: ## Build Docker image for one service: make docker-build SERVICE=<name>
+docker-build: ##@Docker Build Docker image for one service: make docker-build SERVICE=<name>
 ifndef SERVICE
 	$(error SERVICE is not set. Usage: make docker-build SERVICE=<name>)
 endif
 	docker build -f build/Dockerfile.$(SERVICE) -t event-driven-bookinfo/$(SERVICE):latest .
 
 .PHONY: docker-build-all
-docker-build-all: ## Build Docker images for all 5 services
+docker-build-all: ##@Docker Build Docker images for all 5 services
 	@for svc in $(SERVICES); do \
 		echo "Building Docker image for $$svc..."; \
 		docker build -f build/Dockerfile.$$svc -t event-driven-bookinfo/$$svc:latest . || exit 1; \
@@ -112,7 +112,7 @@ PRODUCTPAGE_HTTP_PORT  := 8080
 PRODUCTPAGE_ADMIN_PORT := 9090
 
 .PHONY: run
-run: ## Start all services via docker compose (detached, builds images)
+run: ##@Run Start all services via docker compose (detached, builds images)
 	@printf "\n$(BOLD)Starting bookinfo services...$(NC)\n\n"
 	@docker compose up -d --build
 	@printf "\n$(BOLD)Waiting for services to be healthy...$(NC)\n\n"
@@ -151,15 +151,15 @@ run: ## Start all services via docker compose (detached, builds images)
 	@$(MAKE) --no-print-directory seed
 
 .PHONY: stop
-stop: ## Stop all services and remove containers (keeps data)
+stop: ##@Run Stop all services and remove containers (keeps data)
 	docker compose down
 
 .PHONY: clean-data
-clean-data: ## Stop all services and remove postgres data volume
+clean-data: ##@Run Stop all services and remove postgres data volume
 	docker compose down -v
 
 .PHONY: seed
-seed: ## Seed postgres with sample data (idempotent)
+seed: ##@Run Seed postgres with sample data (idempotent)
 	@printf "\n$(BOLD)Seeding databases...$(NC)\n\n"
 	@for svc in details ratings reviews notification; do \
 		seed_file="services/$$svc/seeds/seed.sql"; \
@@ -171,29 +171,29 @@ seed: ## Seed postgres with sample data (idempotent)
 	@printf "\n"
 
 .PHONY: migrate
-migrate: ## Re-run database migrations (restarts backend services)
+migrate: ##@Run Re-run database migrations (restarts backend services)
 	@printf "\n$(BOLD)Running migrations...$(NC)\n\n"
 	docker compose restart ratings details reviews notification
 	@printf "\n  Migrations applied (services restarted).\n\n"
 
 .PHONY: run-logs
-run-logs: ## Tail logs from all services (Ctrl+C to stop)
+run-logs: ##@Run Tail logs from all services (Ctrl+C to stop)
 	docker compose logs -f
 
 # ─── E2E ────────────────────────────────────────────────────────────────────
 
 .PHONY: e2e
-e2e: ## Run E2E tests via docker-compose
+e2e: ##@Test Run E2E tests via docker-compose
 	bash test/e2e/run-tests.sh
 
 .PHONY: e2e-postgres
-e2e-postgres: ## Run E2E tests with PostgreSQL backend
+e2e-postgres: ##@Test Run E2E tests with PostgreSQL backend
 	COMPOSE_FILE="docker-compose.yml docker-compose.postgres.yml" bash test/e2e/run-tests.sh
 
 # ─── Cleanup ────────────────────────────────────────────────────────────────
 
 .PHONY: clean
-clean: ## Remove build output directories
+clean: ##@Cleanup Remove build output directories
 	rm -rf bin/ dist/
 
 # ─── Kubernetes (local) ──────────────────────────────────────────────────────
@@ -220,7 +220,7 @@ define k8s-guard
 endef
 
 .PHONY: k8s-cluster
-k8s-cluster: ## Create k3d cluster with port mappings for Gateway + observability
+k8s-cluster: ##@Kubernetes Create k3d cluster with port mappings for Gateway + observability
 	@if k3d cluster list $(K8S_CLUSTER) >/dev/null 2>&1; then \
 		printf "$(GREEN)Cluster '$(K8S_CLUSTER)' already exists.$(NC)\n"; \
 	else \
@@ -239,7 +239,7 @@ k8s-cluster: ## Create k3d cluster with port mappings for Gateway + observabilit
 	@printf "\n$(GREEN)$(BOLD)Cluster '$(K8S_CLUSTER)' ready.$(NC)\n\n"
 
 .PHONY: stop-k8s
-stop-k8s: ## Delete k3d cluster and all resources
+stop-k8s: ##@Kubernetes Delete k3d cluster and all resources
 	@if k3d cluster list $(K8S_CLUSTER) >/dev/null 2>&1; then \
 		printf "$(BOLD)Deleting cluster '$(K8S_CLUSTER)'...$(NC)\n"; \
 		k3d cluster delete $(K8S_CLUSTER); \
@@ -249,7 +249,7 @@ stop-k8s: ## Delete k3d cluster and all resources
 	fi
 
 .PHONY: k8s-platform
-k8s-platform: ## Install platform: Envoy Gateway, Strimzi, Kafka, Argo Events
+k8s-platform: ##@Kubernetes Install platform: Envoy Gateway, Strimzi, Kafka, Argo Events
 	$(k8s-guard)
 	@printf "\n$(BOLD)═══ Platform Layer ═══$(NC)\n\n"
 	@$(KUBECTL) create namespace $(K8S_NS_PLATFORM) --dry-run=client -o yaml | $(KUBECTL) apply -f -
@@ -289,7 +289,7 @@ k8s-platform: ## Install platform: Envoy Gateway, Strimzi, Kafka, Argo Events
 	@printf "\n$(GREEN)$(BOLD)Platform layer complete.$(NC)\n\n"
 
 .PHONY: k8s-observability
-k8s-observability: ## Install observability: Prometheus, Grafana, Tempo, Loki, Alloy
+k8s-observability: ##@Kubernetes Install observability: Prometheus, Grafana, Tempo, Loki, Alloy
 	$(k8s-guard)
 	@printf "\n$(BOLD)═══ Observability Layer ═══$(NC)\n\n"
 	@$(KUBECTL) create namespace $(K8S_NS_OBSERVABILITY) --dry-run=client -o yaml | $(KUBECTL) apply -f -
@@ -328,7 +328,7 @@ k8s-observability: ## Install observability: Prometheus, Grafana, Tempo, Loki, A
 	@printf "\n$(GREEN)$(BOLD)Observability layer complete.$(NC)\n\n"
 
 .PHONY: k8s-deploy
-k8s-deploy: ## Build images, import to k3d, deploy apps + Argo Events + HTTPRoutes
+k8s-deploy: ##@Kubernetes Build images, import to k3d, deploy apps + Argo Events + HTTPRoutes
 	$(k8s-guard)
 	@printf "\n$(BOLD)═══ Application Layer ═══$(NC)\n\n"
 	@$(KUBECTL) create namespace $(K8S_NS_BOOKINFO) --dry-run=client -o yaml | $(KUBECTL) apply -f -
@@ -364,7 +364,7 @@ k8s-deploy: ## Build images, import to k3d, deploy apps + Argo Events + HTTPRout
 	@printf "\n$(GREEN)$(BOLD)Application layer complete.$(NC)\n\n"
 
 .PHONY: k8s-seed
-k8s-seed: ## Seed databases in k8s PostgreSQL
+k8s-seed: ##@Kubernetes Seed databases in k8s PostgreSQL
 	$(k8s-guard)
 	@printf "\n$(BOLD)Seeding databases...$(NC)\n\n"
 	@for svc in details ratings reviews notification; do \
@@ -378,7 +378,7 @@ k8s-seed: ## Seed databases in k8s PostgreSQL
 	@printf "\n"
 
 .PHONY: run-k8s
-run-k8s: ## Full local k8s setup: cluster -> platform -> observability -> deploy
+run-k8s: ##@Kubernetes Full local k8s setup: cluster -> platform -> observability -> deploy
 	@printf "\n$(BOLD)$(CYAN)════════════════════════════════════════$(NC)\n"
 	@printf "$(BOLD)$(CYAN)  Bookinfo Local Kubernetes Environment  $(NC)\n"
 	@printf "$(BOLD)$(CYAN)════════════════════════════════════════$(NC)\n\n"
@@ -390,7 +390,7 @@ run-k8s: ## Full local k8s setup: cluster -> platform -> observability -> deploy
 	@$(MAKE) --no-print-directory k8s-status
 
 .PHONY: k8s-rebuild
-k8s-rebuild: ## Fast iteration: rebuild images, reimport, rollout restart
+k8s-rebuild: ##@Kubernetes Fast iteration: rebuild images, reimport, rollout restart
 	$(k8s-guard)
 	@printf "\n$(BOLD)Rebuilding and redeploying...$(NC)\n\n"
 	@for svc in $(SERVICES); do \
@@ -413,7 +413,7 @@ k8s-rebuild: ## Fast iteration: rebuild images, reimport, rollout restart
 	@printf "\n$(GREEN)$(BOLD)Rebuild complete.$(NC)\n\n"
 
 .PHONY: k8s-status
-k8s-status: ## Show pod status and access URLs
+k8s-status: ##@Kubernetes Show pod status and access URLs
 	$(k8s-guard)
 	@printf "\n$(BOLD)Pod Status:$(NC)\n\n"
 	@$(KUBECTL) get pods -n $(K8S_NS_BOOKINFO) -o wide 2>/dev/null || true
@@ -432,18 +432,39 @@ k8s-status: ## Show pod status and access URLs
 	@printf "\n"
 
 .PHONY: k8s-logs
-k8s-logs: ## Tail logs from bookinfo namespace
+k8s-logs: ##@Kubernetes Tail logs from bookinfo namespace
 	$(k8s-guard)
 	$(KUBECTL) logs -n $(K8S_NS_BOOKINFO) -l part-of=event-driven-bookinfo -f --max-log-requests=10
 
 # ─── Help ───────────────────────────────────────────────────────────────────
 
 .PHONY: help
-help: ## List all available targets
+help: ##@Help List all available targets
 	@echo "Usage: make <target> [SERVICE=<name>]"
 	@echo ""
 	@echo "Services: $(SERVICES)"
 	@echo ""
-	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
-		| sort \
-		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*?##@[a-zA-Z]+ .*$$' $(MAKEFILE_LIST) \
+		| awk 'BEGIN {FS = ":.*?##@"}; \
+		{ \
+			split($$2, a, " "); \
+			group = a[1]; \
+			desc = substr($$2, length(a[1]) + 2); \
+			targets[NR] = $$1; \
+			descs[NR] = desc; \
+			groups[NR] = group; \
+			if (!(group in seen_group)) { \
+				seen_group[group] = 1; \
+				order[++n] = group; \
+			} \
+		} \
+		END { \
+			for (i = 1; i <= n; i++) { \
+				g = order[i]; \
+				printf "\n\033[1m%s:\033[0m\n", g; \
+				for (j = 1; j <= NR; j++) { \
+					if (groups[j] == g) \
+						printf "  \033[36m%-20s\033[0m %s\n", targets[j], descs[j]; \
+				} \
+			} \
+		}'

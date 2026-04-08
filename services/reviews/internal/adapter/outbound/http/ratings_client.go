@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
 )
 
@@ -29,7 +31,8 @@ func NewRatingsClient(baseURL string) *RatingsClient {
 	return &RatingsClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
-			Timeout: 5 * time.Second,
+			Timeout:   5 * time.Second,
+			Transport: otelhttp.NewTransport(http.DefaultTransport),
 		},
 	}
 }

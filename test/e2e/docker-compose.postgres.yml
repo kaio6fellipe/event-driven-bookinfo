@@ -7,7 +7,7 @@ services:
     volumes:
       - ./init-databases.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-ONLY", "pg_isready", "-U", "bookinfo"]
+      test: ["CMD", "pg_isready", "-U", "bookinfo"]
       interval: 2s
       timeout: 5s
       retries: 5

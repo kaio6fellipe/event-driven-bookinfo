@@ -3,6 +3,7 @@ package migrations
 
 import "embed"
 
-//go:embed *.sql
 // FS contains the embedded SQL migration files for the ratings service.
+//
+//go:embed *.sql
 var FS embed.FS

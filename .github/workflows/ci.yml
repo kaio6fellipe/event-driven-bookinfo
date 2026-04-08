@@ -21,13 +21,27 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.25"
-          cache: false
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           version: latest
           args: --timeout=5m
+
+  vet:
+    name: Vet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Run go vet
+        run: make vet
 
   test:
     name: Test
@@ -41,19 +55,25 @@ jobs:
         with:
           go-version: "1.25"
 
-      - name: Run tests with race detector and coverage
-        run: go test -race -coverprofile=coverage.out ./...
+      - name: Run tests with race detector
+        run: make test-race
+
+      - name: Run tests with coverage
+        run: make test-cover
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: coverage.out
+          path: |
+            coverage.out
+            coverage.html
           retention-days: 7
 
   build:
     name: Build
     runs-on: ubuntu-latest
+    needs: [lint, vet, test]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,8 +84,25 @@ jobs:
           go-version: "1.25"
 
       - name: Build all services
-        run: |
-          for svc in productpage details reviews ratings notification; do
-            echo "Building $svc..."
-            CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/$svc ./services/$svc/cmd/
-          done
+        run: make build-all
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: bin/
+          retention-days: 7
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build all Docker images
+        run: make docker-build-all

@@ -196,6 +196,7 @@ func (h *Handler) partialReviews(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 	logger := logging.FromContext(r.Context())
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB limit
 	if err := r.ParseForm(); err != nil {
 		w.WriteHeader(http.StatusOK)
 		_ = h.templates.ExecuteTemplate(w, "rating-form.html", map[string]any{

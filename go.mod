@@ -2,6 +2,8 @@ module github.com/kaio6fellipe/event-driven-bookinfo
 
 go 1.25.0
 
+toolchain go1.26.2
+
 require (
 	github.com/google/uuid v1.6.0
 	github.com/grafana/pyroscope-go v1.2.8

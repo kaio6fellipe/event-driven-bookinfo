@@ -96,6 +96,10 @@ docker-build-all: ## Build Docker images for all 5 services
 e2e: ## Run E2E tests via docker-compose
 	bash test/e2e/run-tests.sh
 
+.PHONY: e2e-postgres
+e2e-postgres: ## Run E2E tests with PostgreSQL backend
+	COMPOSE_FILE="docker-compose.yml docker-compose.postgres.yml" bash test/e2e/run-tests.sh
+
 # ─── Cleanup ────────────────────────────────────────────────────────────────
 
 .PHONY: clean

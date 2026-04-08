@@ -55,9 +55,12 @@ mod-tidy: ## Tidy go module dependencies
 
 # ─── Security ──────────────────────────────────────────────────────────────
 
+GOVULNCHECK := $(shell go env GOPATH)/bin/govulncheck
+
 .PHONY: vuln
 vuln: ## Scan Go dependencies for known CVEs (requires govulncheck)
-	govulncheck ./...
+	@command -v $(GOVULNCHECK) >/dev/null 2>&1 || { echo "Installing govulncheck..."; go install golang.org/x/vuln/cmd/govulncheck@latest; }
+	$(GOVULNCHECK) ./...
 
 .PHONY: trivy
 trivy: ## Scan Docker images for vulnerabilities (requires trivy)

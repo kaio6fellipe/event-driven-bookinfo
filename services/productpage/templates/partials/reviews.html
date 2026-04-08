@@ -1,0 +1,16 @@
+<!-- file: services/productpage/templates/partials/reviews.html -->
+{{if .}}
+{{range .}}
+<div class="review">
+    <span class="reviewer">{{.Reviewer}}</span>
+    {{if gt .Count 0}}
+    <span class="rating">
+        (avg: {{printf "%.1f" .Average}} / {{.Count}} ratings)
+    </span>
+    {{end}}
+    <p class="text">{{.Text}}</p>
+</div>
+{{end}}
+{{else}}
+<p>No reviews yet.</p>
+{{end}}

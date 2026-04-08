@@ -1,0 +1,55 @@
+<!-- file: services/productpage/templates/productpage.html -->
+{{define "content"}}
+<h1>Bookinfo</h1>
+
+<p>Select a product to view its details, or <a href="/">view all products</a>.</p>
+
+{{if .Detail}}
+<section>
+    <h2>Book Details</h2>
+    <div id="details-section"
+         hx-get="/partials/details/{{.Detail.ID}}"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <p class="loading">Loading details...</p>
+    </div>
+</section>
+
+<section>
+    <h2>Reviews</h2>
+    <div id="reviews-section"
+         hx-get="/partials/reviews/{{.Detail.ID}}"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <p class="loading">Loading reviews...</p>
+    </div>
+</section>
+
+<section>
+    <h2>Submit a Rating</h2>
+    <div id="rating-form-section">
+        <div class="rating-form">
+            <form hx-post="/partials/rating"
+                  hx-target="#rating-result"
+                  hx-swap="innerHTML">
+                <input type="hidden" name="product_id" value="{{.Detail.ID}}">
+                <label for="reviewer">Your Name</label>
+                <input type="text" id="reviewer" name="reviewer" required placeholder="Enter your name">
+                <label for="stars">Rating</label>
+                <select id="stars" name="stars" required>
+                    <option value="5">5 Stars</option>
+                    <option value="4">4 Stars</option>
+                    <option value="3">3 Stars</option>
+                    <option value="2">2 Stars</option>
+                    <option value="1">1 Star</option>
+                </select>
+                <button type="submit">Submit Rating</button>
+            </form>
+            <div id="rating-result"></div>
+        </div>
+    </div>
+</section>
+{{else}}
+<p>No product selected. Please provide a product ID in the URL.</p>
+{{end}}
+{{end}}

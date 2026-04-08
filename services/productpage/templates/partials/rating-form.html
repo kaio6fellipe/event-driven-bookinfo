@@ -1,0 +1,6 @@
+<!-- file: services/productpage/templates/partials/rating-form.html -->
+{{if .Success}}
+<p class="success">Rating submitted successfully! ({{.Stars}} stars)</p>
+{{else}}
+<p class="error">Failed to submit rating: {{.Error}}</p>
+{{end}}

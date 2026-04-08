@@ -1,0 +1,38 @@
+<!-- file: services/productpage/templates/layout.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookinfo - Product Page</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: #333; max-width: 960px; margin: 0 auto; padding: 20px; }
+        h1 { margin-bottom: 20px; color: #1a1a1a; }
+        h2 { margin: 20px 0 10px; color: #2a2a2a; }
+        .product-detail { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .product-detail dt { font-weight: bold; color: #555; }
+        .product-detail dd { margin-bottom: 10px; margin-left: 0; }
+        .review { border: 1px solid #e0e0e0; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
+        .review .reviewer { font-weight: bold; color: #1a73e8; }
+        .review .text { margin-top: 8px; }
+        .rating { color: #f4b400; font-size: 1.2em; }
+        .rating-form { background: #f0f4ff; padding: 20px; border-radius: 8px; margin-top: 20px; }
+        .rating-form label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .rating-form input, .rating-form select { padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; width: 100%; }
+        .rating-form button { background: #1a73e8; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        .rating-form button:hover { background: #1557b0; }
+        .loading { color: #888; font-style: italic; }
+        .error { color: #d93025; }
+        .success { color: #188038; padding: 10px; background: #e6f4ea; border-radius: 4px; }
+        a { color: #1a73e8; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .product-list { list-style: none; }
+        .product-list li { padding: 10px; border-bottom: 1px solid #e0e0e0; }
+    </style>
+</head>
+<body>
+    {{block "content" .}}{{end}}
+</body>
+</html>

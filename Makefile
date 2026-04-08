@@ -90,6 +90,63 @@ docker-build-all: ## Build Docker images for all 5 services
 	done
 	@echo "All Docker images built successfully."
 
+# ─── Run ───────────────────────────────────────────────────────────────────
+
+# Port assignments for local development
+RATINGS_HTTP_PORT      := 8081
+RATINGS_ADMIN_PORT     := 9091
+DETAILS_HTTP_PORT      := 8082
+DETAILS_ADMIN_PORT     := 9092
+REVIEWS_HTTP_PORT      := 8083
+REVIEWS_ADMIN_PORT     := 9093
+NOTIFICATION_HTTP_PORT := 8084
+NOTIFICATION_ADMIN_PORT:= 9094
+PRODUCTPAGE_HTTP_PORT  := 8080
+PRODUCTPAGE_ADMIN_PORT := 9090
+
+# start-service: launch a service in the background if its HTTP port is not already in use
+# Usage: $(call start-service,name,http_port,admin_port,extra_env)
+define start-service
+	@if curl -sf http://localhost:$(2)/healthz > /dev/null 2>&1 || curl -sf http://localhost:$(3)/healthz > /dev/null 2>&1; then \
+		echo "$(1) already running on :$(2)"; \
+	else \
+		echo "Starting $(1) on :$(2) (admin :$(3))..."; \
+		SERVICE_NAME=$(1) HTTP_PORT=$(2) ADMIN_PORT=$(3) $(4) \
+			go run ./services/$(1)/cmd/ > /tmp/bookinfo-$(1).log 2>&1 & \
+		echo "  PID: $$!  Log: /tmp/bookinfo-$(1).log"; \
+	fi
+endef
+
+.PHONY: run
+run: ## Start all services locally (background, memory backend)
+	$(call start-service,ratings,$(RATINGS_HTTP_PORT),$(RATINGS_ADMIN_PORT),)
+	$(call start-service,details,$(DETAILS_HTTP_PORT),$(DETAILS_ADMIN_PORT),)
+	@sleep 1
+	$(call start-service,reviews,$(REVIEWS_HTTP_PORT),$(REVIEWS_ADMIN_PORT),RATINGS_SERVICE_URL=http://localhost:$(RATINGS_HTTP_PORT))
+	$(call start-service,notification,$(NOTIFICATION_HTTP_PORT),$(NOTIFICATION_ADMIN_PORT),)
+	@sleep 1
+	$(call start-service,productpage,$(PRODUCTPAGE_HTTP_PORT),$(PRODUCTPAGE_ADMIN_PORT),DETAILS_SERVICE_URL=http://localhost:$(DETAILS_HTTP_PORT) REVIEWS_SERVICE_URL=http://localhost:$(REVIEWS_HTTP_PORT))
+	@echo ""
+	@echo "All services starting. Check health:"
+	@echo "  curl http://localhost:$(RATINGS_ADMIN_PORT)/healthz"
+	@echo "  curl http://localhost:$(DETAILS_ADMIN_PORT)/healthz"
+	@echo "  curl http://localhost:$(REVIEWS_ADMIN_PORT)/healthz"
+	@echo "  curl http://localhost:$(NOTIFICATION_ADMIN_PORT)/healthz"
+	@echo "  curl http://localhost:$(PRODUCTPAGE_ADMIN_PORT)/healthz"
+
+.PHONY: stop
+stop: ## Stop all locally running services
+	@echo "Stopping bookinfo services..."
+	@for port in $(PRODUCTPAGE_HTTP_PORT) $(PRODUCTPAGE_ADMIN_PORT) \
+	             $(REVIEWS_HTTP_PORT) $(REVIEWS_ADMIN_PORT) \
+	             $(NOTIFICATION_HTTP_PORT) $(NOTIFICATION_ADMIN_PORT) \
+	             $(DETAILS_HTTP_PORT) $(DETAILS_ADMIN_PORT) \
+	             $(RATINGS_HTTP_PORT) $(RATINGS_ADMIN_PORT); do \
+		pid=$$(lsof -ti :$$port 2>/dev/null); \
+		if [ -n "$$pid" ]; then kill $$pid 2>/dev/null || true; fi; \
+	done
+	@echo "All services stopped."
+
 # ─── E2E ────────────────────────────────────────────────────────────────────
 
 .PHONY: e2e

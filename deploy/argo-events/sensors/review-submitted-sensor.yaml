@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: review-submitted-sensor
+spec:
+  eventBusName: kafka
+  dependencies:
+    - name: review-submitted-dep
+      eventSourceName: review-submitted
+      eventName: review-submitted
+  triggers:
+    - template:
+        name: create-review
+        http:
+          url: http://reviews/v1/reviews
+          method: POST
+          headers:
+            Content-Type: application/json
+          payload:
+            - src:
+                dependencyName: review-submitted-dep
+                dataKey: body
+              dest: ""
+      retryStrategy:
+        steps: 3
+        duration: 2s
+    - template:
+        name: notify-review-submitted
+        http:
+          url: http://notification/v1/notifications
+          method: POST
+          headers:
+            Content-Type: application/json
+          payload:
+            - src:
+                dependencyName: review-submitted-dep
+                dataKey: body.title
+              dest: subject
+            - src:
+                dependencyName: review-submitted-dep
+                value: "New review submitted"
+              dest: body
+            - src:
+                dependencyName: review-submitted-dep
+                value: "system@bookinfo"
+              dest: recipient
+            - src:
+                dependencyName: review-submitted-dep
+                value: "email"
+              dest: channel
+      retryStrategy:
+        steps: 3
+        duration: 2s

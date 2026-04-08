@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Go hexagonal architecture monorepo implementing Istio's Bookinfo sample as an **event-driven e-commerce system**. All services are written in Go with hexagonal architecture (ports & adapters), full observability (structured logging, distributed tracing, metrics, continuous profiling), and event-driven writes via Argo Events + Kafka.
+Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review system with event-driven architecture**. Services are plain REST APIs — all event-driven complexity (Kafka consumers, retries, DLQ) is abstracted by Argo Events EventSources and Sensors. Full observability: structured logging, distributed tracing, metrics, continuous profiling.
 
 **Module**: `github.com/kaio6fellipe/event-driven-bookinfo`
 

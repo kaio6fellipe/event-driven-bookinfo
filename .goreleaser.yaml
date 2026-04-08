@@ -272,30 +272,4 @@ docker_manifests:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/notification:{{ .Tag }}-arm64"
 
 changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-      - "^chore:"
-      - "^style:"
-      - "Merge pull request"
-      - "Merge branch"
-  groups:
-    - title: "New Features"
-      regexp: "^feat"
-      order: 0
-    - title: "Bug Fixes"
-      regexp: "^fix"
-      order: 1
-    - title: "Performance"
-      regexp: "^perf"
-      order: 2
-    - title: "Build & CI"
-      regexp: "^(build|ci)"
-      order: 3
-    - title: "Refactoring"
-      regexp: "^refactor"
-      order: 4
-    - title: "Other"
-      order: 999
+  use: github

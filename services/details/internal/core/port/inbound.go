@@ -14,4 +14,7 @@ type DetailService interface {
 
 	// AddDetail creates and stores a new book detail.
 	AddDetail(ctx context.Context, title, author string, year int, bookType string, pages int, publisher, language, isbn10, isbn13 string) (*domain.Detail, error)
+
+	// ListDetails returns all book details.
+	ListDetails(ctx context.Context) ([]*domain.Detail, error)
 }

@@ -43,8 +43,9 @@ func NewHandler(
 
 // RegisterRoutes registers all productpage routes on the given mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	// HTML page
-	mux.HandleFunc("GET /", h.productPage)
+	// HTML pages
+	mux.HandleFunc("GET /", h.homePage)
+	mux.HandleFunc("GET /products/{id}", h.productPage)
 
 	// JSON API
 	mux.HandleFunc("GET /v1/products/{id}", h.apiGetProduct)
@@ -55,29 +56,55 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /partials/rating", h.partialRatingSubmit)
 }
 
+func (h *Handler) homePage(w http.ResponseWriter, r *http.Request) {
+	details, err := h.detailsClient.ListDetails(r.Context())
+
+	var products []model.ProductDetail
+	if err == nil {
+		for _, d := range details {
+			products = append(products, model.ProductDetail{
+				ID:     d.ID,
+				Title:  d.Title,
+				Author: d.Author,
+				Year:   d.Year,
+				Type:   d.Type,
+				Pages:  d.Pages,
+			})
+		}
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	h.templates.ExecuteTemplate(w, "layout.html", struct {
+		Products []model.ProductDetail
+		Detail   *model.ProductDetail
+	}{Products: products})
+}
+
 func (h *Handler) productPage(w http.ResponseWriter, r *http.Request) {
-	productID := r.URL.Query().Get("id")
+	productID := r.PathValue("id")
+
+	detail, err := h.detailsClient.GetDetail(r.Context(), productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
 
 	data := struct {
-		Detail *model.ProductDetail
-	}{}
-
-	if productID != "" {
-		detail, err := h.detailsClient.GetDetail(r.Context(), productID)
-		if err == nil {
-			data.Detail = &model.ProductDetail{
-				ID:        detail.ID,
-				Title:     detail.Title,
-				Author:    detail.Author,
-				Year:      detail.Year,
-				Type:      detail.Type,
-				Pages:     detail.Pages,
-				Publisher: detail.Publisher,
-				Language:  detail.Language,
-				ISBN10:    detail.ISBN10,
-				ISBN13:    detail.ISBN13,
-			}
-		}
+		Products []model.ProductDetail
+		Detail   *model.ProductDetail
+	}{
+		Detail: &model.ProductDetail{
+			ID:        detail.ID,
+			Title:     detail.Title,
+			Author:    detail.Author,
+			Year:      detail.Year,
+			Type:      detail.Type,
+			Pages:     detail.Pages,
+			Publisher: detail.Publisher,
+			Language:  detail.Language,
+			ISBN10:    detail.ISBN10,
+			ISBN13:    detail.ISBN13,
+		},
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -181,6 +208,7 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 	productID := r.FormValue("product_id")
 	reviewer := r.FormValue("reviewer")
 	starsStr := r.FormValue("stars")
+	reviewText := r.FormValue("text")
 
 	stars, err := strconv.Atoi(starsStr)
 	if err != nil {
@@ -203,10 +231,17 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if reviewText != "" {
+		if err := h.reviewsClient.SubmitReview(r.Context(), productID, reviewer, reviewText); err != nil {
+			logger.Warn("failed to submit review", "error", err)
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	h.templates.ExecuteTemplate(w, "rating-form.html", map[string]any{
-		"Success": true,
-		"Stars":   stars,
+		"Success":   true,
+		"Stars":     stars,
+		"ProductID": productID,
 	})
 }
 

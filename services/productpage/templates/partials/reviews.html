@@ -1,16 +1,30 @@
-<!-- file: services/productpage/templates/partials/reviews.html -->
 {{if .}}
 {{range .}}
 <div class="review">
-    <span class="reviewer">{{.Reviewer}}</span>
-    {{if gt .Count 0}}
-    <span class="rating">
-        (avg: {{printf "%.1f" .Average}} / {{.Count}} ratings)
-    </span>
-    {{end}}
-    <p class="text">{{.Text}}</p>
+    <div class="review-header">
+        <div class="reviewer">
+            <div class="reviewer-avatar">{{slice .Reviewer 0 1}}</div>
+            <div>
+                <div class="reviewer-name">{{.Reviewer}}</div>
+            </div>
+        </div>
+        {{if gt .Count 0}}
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div class="stars">
+                {{$a := .Average}}
+                {{if ge $a 1.0}}<svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>{{else}}<svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>{{end}}
+                {{if ge $a 2.0}}<svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>{{else}}<svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>{{end}}
+                {{if ge $a 3.0}}<svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>{{else}}<svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>{{end}}
+                {{if ge $a 4.0}}<svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>{{else}}<svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>{{end}}
+                {{if ge $a 5.0}}<svg class="star star-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>{{else}}<svg class="star star-empty" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>{{end}}
+            </div>
+            <span class="rating-count">{{printf "%.1f" .Average}}</span>
+        </div>
+        {{end}}
+    </div>
+    <div class="review-text">{{.Text}}</div>
 </div>
 {{end}}
 {{else}}
-<p>No reviews yet.</p>
+<p style="color: var(--text-muted); font-size: 0.9rem; padding: 0.5rem 0;">No reviews yet.</p>
 {{end}}

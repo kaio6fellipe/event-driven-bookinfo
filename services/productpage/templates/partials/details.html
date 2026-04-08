@@ -1,23 +1,21 @@
-<!-- file: services/productpage/templates/partials/details.html -->
-<div class="product-detail">
-    <dl>
-        <dt>Title</dt>
-        <dd>{{.Title}}</dd>
-        <dt>Author</dt>
-        <dd>{{.Author}}</dd>
-        <dt>Year</dt>
-        <dd>{{.Year}}</dd>
-        <dt>Type</dt>
-        <dd>{{.Type}}</dd>
-        <dt>Pages</dt>
-        <dd>{{.Pages}}</dd>
-        <dt>Publisher</dt>
-        <dd>{{.Publisher}}</dd>
-        <dt>Language</dt>
-        <dd>{{.Language}}</dd>
-        <dt>ISBN-10</dt>
-        <dd>{{.ISBN10}}</dd>
-        <dt>ISBN-13</dt>
-        <dd>{{.ISBN13}}</dd>
-    </dl>
+<div class="detail-header">
+    <div>
+        <h1>{{.Title}}</h1>
+        <div class="author">{{.Author}}</div>
+    </div>
+    <span class="badge">{{.Type}}</span>
 </div>
+<dl class="details-grid">
+    <dt>Publisher</dt>
+    <dd>{{.Publisher}}</dd>
+    <dt>Language</dt>
+    <dd>{{.Language}}</dd>
+    <dt>Pages</dt>
+    <dd>{{.Pages}}</dd>
+    <dt>Year</dt>
+    <dd>{{.Year}}</dd>
+    <dt>ISBN-10</dt>
+    <dd>{{.ISBN10}}</dd>
+    <dt>ISBN-13</dt>
+    <dd>{{.ISBN13}}</dd>
+</dl>

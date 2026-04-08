@@ -4,6 +4,7 @@ package memory
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/core/domain"
@@ -42,4 +43,20 @@ func (r *DetailRepository) Save(_ context.Context, detail *domain.Detail) error 
 
 	r.details[detail.ID] = *detail
 	return nil
+}
+
+// FindAll returns all stored details.
+func (r *DetailRepository) FindAll(_ context.Context) ([]*domain.Detail, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	result := make([]*domain.Detail, 0, len(r.details))
+	for _, d := range r.details {
+		detail := d
+		result = append(result, &detail)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Title < result[j].Title
+	})
+	return result, nil
 }

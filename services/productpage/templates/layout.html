@@ -1,38 +1,494 @@
-<!-- file: services/productpage/templates/layout.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bookinfo - Product Page</title>
+    <title>Bookinfo — Product Page</title>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: #333; max-width: 960px; margin: 0 auto; padding: 20px; }
-        h1 { margin-bottom: 20px; color: #1a1a1a; }
-        h2 { margin: 20px 0 10px; color: #2a2a2a; }
-        .product-detail { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        .product-detail dt { font-weight: bold; color: #555; }
-        .product-detail dd { margin-bottom: 10px; margin-left: 0; }
-        .review { border: 1px solid #e0e0e0; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
-        .review .reviewer { font-weight: bold; color: #1a73e8; }
-        .review .text { margin-top: 8px; }
-        .rating { color: #f4b400; font-size: 1.2em; }
-        .rating-form { background: #f0f4ff; padding: 20px; border-radius: 8px; margin-top: 20px; }
-        .rating-form label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .rating-form input, .rating-form select { padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; width: 100%; }
-        .rating-form button { background: #1a73e8; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
-        .rating-form button:hover { background: #1557b0; }
-        .loading { color: #888; font-style: italic; }
-        .error { color: #d93025; }
-        .success { color: #188038; padding: 10px; background: #e6f4ea; border-radius: 4px; }
-        a { color: #1a73e8; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .product-list { list-style: none; }
-        .product-list li { padding: 10px; border-bottom: 1px solid #e0e0e0; }
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-hover: #222531;
+            --border: #2a2d3a;
+            --text: #e4e4e7;
+            --text-muted: #8b8d98;
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --star-filled: #f59e0b;
+            --star-empty: #3f4150;
+            --radius: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        /* Navigation */
+        nav {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 56px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .nav-brand svg {
+            width: 24px;
+            height: 24px;
+            color: var(--accent);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1.5rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            padding: 0.5rem 0;
+            transition: color 0.15s;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            color: var(--text);
+        }
+
+        .nav-links a.active {
+            border-bottom: 2px solid var(--accent);
+        }
+
+        .nav-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        /* Main layout */
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Product list page */
+        .page-header {
+            margin-bottom: 2rem;
+        }
+
+        .page-header h1 {
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .page-header p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .product-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            text-decoration: none;
+            display: block;
+            color: var(--text);
+        }
+
+        .product-card:hover {
+            border-color: var(--accent);
+            background: var(--surface-hover);
+        }
+
+        .product-card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .product-card .author {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .product-card .meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Stars */
+        .stars {
+            display: inline-flex;
+            gap: 2px;
+        }
+
+        .star {
+            width: 16px;
+            height: 16px;
+        }
+
+        .star-filled {
+            color: var(--star-filled);
+        }
+
+        .star-empty {
+            color: var(--star-empty);
+        }
+
+        .rating-count {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Product detail page */
+        .breadcrumb {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        .breadcrumb a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .product-detail {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        .detail-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+        }
+
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .detail-header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .detail-header .author {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 0.25rem;
+        }
+
+        .badge {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent);
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        /* Details table */
+        .details-grid {
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            gap: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+
+        .details-grid dt {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .details-grid dd {
+            color: var(--text);
+        }
+
+        /* Section header */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section-header h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+
+        .rating-summary {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Reviews */
+        .review {
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .review:last-child {
+            border-bottom: none;
+        }
+
+        .review-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .reviewer {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .reviewer-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .reviewer-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .review-text {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* Rating form */
+        .rating-form {
+            background: var(--surface-hover);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            margin-top: 1rem;
+        }
+
+        .rating-form h3 {
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.35rem;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.6rem 0.75rem;
+            color: var(--text);
+            font-size: 0.875rem;
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .form-group select option {
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.25rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: background 0.15s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        /* Notification banner */
+        .notification-banner {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: var(--radius);
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.875rem;
+        }
+
+        .notification-banner svg {
+            color: var(--success);
+            flex-shrink: 0;
+        }
+
+        .error-banner {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: var(--radius);
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            color: #f87171;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state p {
+            margin-bottom: 1rem;
+        }
+
+        pre {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1rem;
+            overflow-x: auto;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 1rem;
+        }
+
+        /* Loading skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .skeleton-line {
+            height: 16px;
+            margin-bottom: 8px;
+        }
     </style>
 </head>
 <body>
+
+<nav>
+    <a href="/" class="nav-brand">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+        </svg>
+        Bookinfo
+    </a>
+    <ul class="nav-links">
+        <li><a href="/" class="active">Products</a></li>
+    </ul>
+    <div class="nav-status">
+        <span class="status-dot"></span>
+        All services healthy
+    </div>
+</nav>
+
+<div class="container">
     {{block "content" .}}{{end}}
+</div>
+
 </body>
 </html>

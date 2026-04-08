@@ -21,8 +21,34 @@ func NewHandler(svc port.DetailService) *Handler {
 
 // RegisterRoutes registers the details routes on the given mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /v1/details", h.listDetails)
 	mux.HandleFunc("GET /v1/details/{id}", h.getDetail)
 	mux.HandleFunc("POST /v1/details", h.addDetail)
+}
+
+func (h *Handler) listDetails(w http.ResponseWriter, r *http.Request) {
+	details, err := h.svc.ListDetails(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to list details"})
+		return
+	}
+
+	resp := make([]DetailResponse, 0, len(details))
+	for _, d := range details {
+		resp = append(resp, DetailResponse{
+			ID:        d.ID,
+			Title:     d.Title,
+			Author:    d.Author,
+			Year:      d.Year,
+			Type:      d.Type,
+			Pages:     d.Pages,
+			Publisher: d.Publisher,
+			Language:  d.Language,
+			ISBN10:    d.ISBN10,
+			ISBN13:    d.ISBN13,
+		})
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) getDetail(w http.ResponseWriter, r *http.Request) {

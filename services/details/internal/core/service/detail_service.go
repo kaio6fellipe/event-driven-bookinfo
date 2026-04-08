@@ -41,3 +41,8 @@ func (s *DetailService) AddDetail(ctx context.Context, title, author string, yea
 
 	return detail, nil
 }
+
+// ListDetails returns all stored book details.
+func (s *DetailService) ListDetails(ctx context.Context) ([]*domain.Detail, error) {
+	return s.repo.FindAll(ctx)
+}

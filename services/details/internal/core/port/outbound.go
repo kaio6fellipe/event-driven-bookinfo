@@ -14,4 +14,7 @@ type DetailRepository interface {
 
 	// Save persists a detail.
 	Save(ctx context.Context, detail *domain.Detail) error
+
+	// FindAll returns all stored details.
+	FindAll(ctx context.Context) ([]*domain.Detail, error)
 }

@@ -146,7 +146,8 @@ run: ## Start all services via docker compose (detached, builds images)
 	else \
 		printf "  $(RED)Some services failed to start.$(NC) Run $(CYAN)make run-logs$(NC) to check.\n"; \
 	fi; \
-	printf "  Logs: $(CYAN)make run-logs$(NC)\n\n"
+	printf "  Logs: $(CYAN)make run-logs$(NC)\n"; \
+	printf "  App:  $(CYAN)http://localhost:$(PRODUCTPAGE_HTTP_PORT)$(NC)\n\n"
 
 .PHONY: stop
 stop: ## Stop all services and remove containers

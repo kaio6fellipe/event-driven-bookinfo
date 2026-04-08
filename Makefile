@@ -92,7 +92,14 @@ docker-build-all: ## Build Docker images for all 5 services
 
 # ─── Run ───────────────────────────────────────────────────────────────────
 
-# Port assignments for local development
+# Colors
+GREEN  := \033[0;32m
+RED    := \033[0;31m
+CYAN   := \033[0;36m
+BOLD   := \033[1m
+NC     := \033[0m
+
+# Port assignments (must match docker-compose.yml host ports)
 RATINGS_HTTP_PORT      := 8081
 RATINGS_ADMIN_PORT     := 9091
 DETAILS_HTTP_PORT      := 8082
@@ -104,56 +111,13 @@ NOTIFICATION_ADMIN_PORT:= 9094
 PRODUCTPAGE_HTTP_PORT  := 8080
 PRODUCTPAGE_ADMIN_PORT := 9090
 
-# Colors
-GREEN  := \033[0;32m
-RED    := \033[0;31m
-YELLOW := \033[1;33m
-CYAN   := \033[0;36m
-BOLD   := \033[1m
-NC     := \033[0m
-
-# start-service: launch a service in the background if its HTTP port is not already in use
-# Usage: $(call start-service,name,http_port,admin_port,extra_env)
-define start-service
-	@if curl -sf http://localhost:$(3)/healthz > /dev/null 2>&1; then \
-		printf "  $(CYAN)$(1)$(NC) already running on :$(2)\n"; \
-	else \
-		printf "  Starting $(CYAN)$(1)$(NC) on :$(2) (admin :$(3))...\n"; \
-		SERVICE_NAME=$(1) HTTP_PORT=$(2) ADMIN_PORT=$(3) $(4) \
-			go run ./services/$(1)/cmd/ > /tmp/bookinfo-$(1).log 2>&1 & \
-	fi
-endef
-
-# wait-healthy: poll a service's admin healthz endpoint with timeout
-# Usage: $(call wait-healthy,name,admin_port)
-define wait-healthy
-	@timeout=15; elapsed=0; \
-	while [ $$elapsed -lt $$timeout ]; do \
-		if curl -sf http://localhost:$(2)/healthz > /dev/null 2>&1; then \
-			break; \
-		fi; \
-		sleep 1; \
-		elapsed=$$((elapsed + 1)); \
-	done
-endef
-
 .PHONY: run
-run: ## Start all services locally (background, memory backend)
+run: ## Start all services via docker compose (detached, builds images)
 	@printf "\n$(BOLD)Starting bookinfo services...$(NC)\n\n"
-	$(call start-service,ratings,$(RATINGS_HTTP_PORT),$(RATINGS_ADMIN_PORT),)
-	$(call start-service,details,$(DETAILS_HTTP_PORT),$(DETAILS_ADMIN_PORT),)
-	$(call wait-healthy,ratings,$(RATINGS_ADMIN_PORT))
-	$(call wait-healthy,details,$(DETAILS_ADMIN_PORT))
-	$(call start-service,reviews,$(REVIEWS_HTTP_PORT),$(REVIEWS_ADMIN_PORT),RATINGS_SERVICE_URL=http://localhost:$(RATINGS_HTTP_PORT))
-	$(call start-service,notification,$(NOTIFICATION_HTTP_PORT),$(NOTIFICATION_ADMIN_PORT),)
-	$(call wait-healthy,reviews,$(REVIEWS_ADMIN_PORT))
-	$(call wait-healthy,notification,$(NOTIFICATION_ADMIN_PORT))
-	$(call start-service,productpage,$(PRODUCTPAGE_HTTP_PORT),$(PRODUCTPAGE_ADMIN_PORT),DETAILS_SERVICE_URL=http://localhost:$(DETAILS_HTTP_PORT) REVIEWS_SERVICE_URL=http://localhost:$(REVIEWS_HTTP_PORT))
-	$(call wait-healthy,productpage,$(PRODUCTPAGE_ADMIN_PORT))
-	@printf "\n$(BOLD)Service Status$(NC)\n"
-	@printf "  %-14s %-10s %-10s %s\n" "SERVICE" "API" "ADMIN" "STATUS"
-	@printf "  %-14s %-10s %-10s %s\n" "──────────────" "──────────" "──────────" "──────"
-	@for entry in \
+	@docker compose up -d --build
+	@printf "\n$(BOLD)Waiting for services to be healthy...$(NC)\n\n"
+	@failed=0; \
+	for entry in \
 		"ratings:$(RATINGS_HTTP_PORT):$(RATINGS_ADMIN_PORT)" \
 		"details:$(DETAILS_HTTP_PORT):$(DETAILS_ADMIN_PORT)" \
 		"reviews:$(REVIEWS_HTTP_PORT):$(REVIEWS_ADMIN_PORT)" \
@@ -162,33 +126,35 @@ run: ## Start all services locally (background, memory backend)
 	do \
 		name=$${entry%%:*}; rest=$${entry#*:}; \
 		http=$${rest%%:*}; admin=$${rest#*:}; \
-		if curl -sf http://localhost:$$admin/healthz > /dev/null 2>&1; then \
+		elapsed=0; ready=0; \
+		while [ $$elapsed -lt 15 ]; do \
+			if curl -sf http://localhost:$$admin/healthz > /dev/null 2>&1; then \
+				ready=1; break; \
+			fi; \
+			sleep 1; elapsed=$$((elapsed + 1)); \
+		done; \
+		if [ $$ready -eq 1 ]; then \
 			printf "  $(GREEN)%-14s$(NC) :%-9s :%-9s $(GREEN)healthy$(NC)\n" "$$name" "$$http" "$$admin"; \
 		else \
-			printf "  $(RED)%-14s$(NC) :%-9s :%-9s $(RED)failed$(NC)  (check /tmp/bookinfo-$$name.log)\n" "$$name" "$$http" "$$admin"; \
+			printf "  $(RED)%-14s$(NC) :%-9s :%-9s $(RED)failed$(NC)  (docker compose logs $$name)\n" "$$name" "$$http" "$$admin"; \
+			failed=1; \
 		fi; \
-	done
-	@printf "\n  Logs: /tmp/bookinfo-{service}.log\n\n"
+	done; \
+	printf "\n"; \
+	if [ $$failed -eq 0 ]; then \
+		printf "  $(GREEN)$(BOLD)All services healthy!$(NC)\n"; \
+	else \
+		printf "  $(RED)Some services failed to start.$(NC) Run $(CYAN)make run-logs$(NC) to check.\n"; \
+	fi; \
+	printf "  Logs: $(CYAN)make run-logs$(NC)\n\n"
 
 .PHONY: stop
-stop: ## Stop all locally running services
-	@echo "Stopping bookinfo services..."
-	@for port in $(PRODUCTPAGE_HTTP_PORT) $(PRODUCTPAGE_ADMIN_PORT) \
-	             $(REVIEWS_HTTP_PORT) $(REVIEWS_ADMIN_PORT) \
-	             $(NOTIFICATION_HTTP_PORT) $(NOTIFICATION_ADMIN_PORT) \
-	             $(DETAILS_HTTP_PORT) $(DETAILS_ADMIN_PORT) \
-	             $(RATINGS_HTTP_PORT) $(RATINGS_ADMIN_PORT); do \
-		pid=$$(lsof -ti :$$port 2>/dev/null); \
-		if [ -n "$$pid" ]; then kill $$pid 2>/dev/null || true; fi; \
-	done
-	@echo "All services stopped."
-
-BOOKINFO_SERVICES_LIST := ratings details reviews notification productpage
+stop: ## Stop all services and remove containers
+	docker compose down
 
 .PHONY: run-logs
-run-logs: ## Tail logs from all running services (Ctrl+C to stop)
-	@tail -f $(foreach svc,$(BOOKINFO_SERVICES_LIST),/tmp/bookinfo-$(svc).log) 2>/dev/null || \
-		printf "$(RED)No log files found.$(NC) Run $(CYAN)make run$(NC) first.\n"
+run-logs: ## Tail logs from all services (Ctrl+C to stop)
+	docker compose logs -f
 
 # ─── E2E ────────────────────────────────────────────────────────────────────
 

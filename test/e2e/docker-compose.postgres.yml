@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: bookinfo
+      POSTGRES_PASSWORD: bookinfo
+    volumes:
+      - ./init-databases.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "bookinfo"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+
+  ratings:
+    environment:
+      STORAGE_BACKEND: postgres
+      DATABASE_URL: postgres://bookinfo:bookinfo@postgres:5432/bookinfo_ratings?sslmode=disable
+      RUN_MIGRATIONS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  details:
+    environment:
+      STORAGE_BACKEND: postgres
+      DATABASE_URL: postgres://bookinfo:bookinfo@postgres:5432/bookinfo_details?sslmode=disable
+      RUN_MIGRATIONS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  reviews:
+    environment:
+      STORAGE_BACKEND: postgres
+      DATABASE_URL: postgres://bookinfo:bookinfo@postgres:5432/bookinfo_reviews?sslmode=disable
+      RUN_MIGRATIONS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  notification:
+    environment:
+      STORAGE_BACKEND: postgres
+      DATABASE_URL: postgres://bookinfo:bookinfo@postgres:5432/bookinfo_notification?sslmode=disable
+      RUN_MIGRATIONS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy

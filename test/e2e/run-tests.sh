@@ -9,14 +9,21 @@ NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Build compose args from COMPOSE_FILE env var (default: just docker-compose.yml)
+COMPOSE_FILES="${COMPOSE_FILE:-docker-compose.yml}"
+COMPOSE_ARGS=""
+for f in $COMPOSE_FILES; do
+    COMPOSE_ARGS="$COMPOSE_ARGS -f $SCRIPT_DIR/$f"
+done
+
 # Start docker-compose
 echo -e "${YELLOW}Starting services...${NC}"
-docker compose -f "$SCRIPT_DIR/docker-compose.yml" up -d --build
+docker compose $COMPOSE_ARGS up -d --build
 
 # Cleanup on exit
 cleanup() {
     echo -e "\n${YELLOW}Stopping services...${NC}"
-    docker compose -f "$SCRIPT_DIR/docker-compose.yml" down -v
+    docker compose $COMPOSE_ARGS down -v
 }
 trap cleanup EXIT
 

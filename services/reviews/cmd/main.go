@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/config"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/database"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/metrics"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/profiling"
@@ -19,7 +20,10 @@ import (
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/inbound/http"
 	ratingshttp "github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/http"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/memory"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/postgres"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/port"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/service"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/migrations"
 )
 
 func main() {
@@ -63,8 +67,35 @@ func main() {
 	)
 	_ = reviewsSubmitted
 
-	// Wire hex arch
-	repo := memory.NewReviewRepository()
+	// Wire hex arch — select adapter based on storage backend
+	var repo port.ReviewRepository
+	var readinessChecks []func() error
+
+	switch cfg.StorageBackend {
+	case "postgres":
+		pool, err := database.NewPool(ctx, cfg.DatabaseURL)
+		if err != nil {
+			logger.Error("failed to create database pool", "error", err)
+			os.Exit(1)
+		}
+		defer pool.Close()
+
+		if cfg.RunMigrations {
+			if err := database.RunMigrations(cfg.DatabaseURL, migrations.FS); err != nil {
+				logger.Error("failed to run migrations", "error", err)
+				os.Exit(1)
+			}
+			logger.Info("database migrations applied")
+		}
+
+		repo = postgres.NewReviewRepository(pool)
+		readinessChecks = append(readinessChecks, database.HealthCheck(pool))
+		logger.Info("using postgres storage backend")
+	default:
+		repo = memory.NewReviewRepository()
+		logger.Info("using memory storage backend")
+	}
+
 	ratingsURL := envOrDefault("RATINGS_SERVICE_URL", "http://localhost:8080")
 	ratingsClient := ratingshttp.NewRatingsClient(ratingsURL)
 	svc := service.NewReviewService(repo, ratingsClient)
@@ -74,7 +105,7 @@ func main() {
 		h.RegisterRoutes(mux)
 	}
 
-	if err := server.Run(ctx, cfg, registerRoutes, metricsHandler); err != nil {
+	if err := server.Run(ctx, cfg, registerRoutes, metricsHandler, readinessChecks...); err != nil {
 		logger.Error("server error", "error", err)
 		os.Exit(1)
 	}

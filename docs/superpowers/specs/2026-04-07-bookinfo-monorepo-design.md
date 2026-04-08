@@ -37,7 +37,7 @@ The original Bookinfo is polyglot (Python, Ruby, Java, Node.js). We rewrite all 
 | Business metrics | Per-service custom counters/gauges via OTel API | Domain-level observability |
 | Runtime metrics | OTel runtime instrumentation | Goroutines, GC, memory exposed automatically |
 | Frontend | Go + html/template + HTMX | Single binary, no JS toolchain, fits Go monorepo |
-| Event-driven writes | Argo Events (webhook EventSources -> Kafka EventBus -> Sensors -> HTTP triggers) | Async writes, sync reads. Realistic e-commerce pattern |
+| Event-driven writes | Argo Events (webhook EventSources -> Kafka EventBus -> Sensors -> HTTP triggers) | Async writes, sync reads. Cloud-agnostic, K8s-native. Validated against EventBridge/Eventarc — see [Event-Driven Architecture Evaluation](#event-driven-architecture-evaluation) |
 | OTel trace propagation | Graceful degradation — extract traceparent from CloudEvent extensions if present, otherwise start new trace | Works with upstream Argo Events today, full E2E tracing when PR #3961 merges |
 | Reviews versioning | Dropped (single version, always includes ratings) | Istio traffic routing demo not in scope |
 | Storage backend | Swappable via `STORAGE_BACKEND` env var: `memory` (default) or `postgres` | Hex arch showcase — same outbound port, two adapters. In-memory for zero-dep local dev/tests, Postgres for production persistence |
@@ -503,6 +503,74 @@ productpage additionally needs:
 | production | 3 | higher limits (cpu 1, mem 512Mi) | postgres | HPA (min 3, max 10, target 70% CPU), LOG_LEVEL=warn, DATABASE_URL from Secret |
 
 **Note**: dev overlay uses `memory` backend with 1 replica. Staging and production use `postgres` with horizontal scaling. HPA is only enabled when using `postgres` backend.
+
+---
+
+## Event-Driven Architecture Evaluation
+
+This section validates the choice of Argo Events over managed alternatives (AWS EventBridge, GCP Eventarc) for the event-driven write path. The evaluation focuses on transactional e-commerce requirements — at-least-once delivery with application-level idempotency — not workflow orchestration.
+
+### Context and Constraints
+
+- **Deployment target**: Managed Kubernetes (GKE/EKS/AKS), cloud-agnostic
+- **Consistency model**: At-least-once delivery + application-level idempotency (standard e-commerce bar)
+- **Event replay**: Nice-to-have for debugging — Kafka retention (configurable up to infinite via `retention.ms=-1`) is sufficient; no need for purpose-built archive/replay UI
+- **Decision stance**: Argo Events preferred for K8s-native + cloud-agnostic, but validated against alternatives
+
+### Feature Comparison Matrix
+
+| Capability | AWS EventBridge | GCP Eventarc | Argo Events (Kafka EventBus) |
+|---|---|---|---|
+| **Delivery guarantee** | At-least-once | At-least-once (Pub/Sub) | At-least-once (`atLeastOnce: true`) |
+| **DLQ** | Native (SQS DLQ per rule) | Native (Pub/Sub DLQ per subscription) | Built-in `dlqTrigger` per sensor trigger |
+| **Retry + backoff** | 185 retries over 24h, exponential | Pub/Sub exponential backoff (10s→600s) | Configurable: steps, duration, factor, jitter |
+| **Content-based filtering** | 6 match types (prefix, suffix, numeric range, exists, anything-but, IP) | Attribute-based only (type, source, subject) — no body filtering | Expression-based on JSON body fields + data filters with path/type/comparator |
+| **Schema registry** | Native (auto-discovery, versioning) | No native registry (CloudEvents format enforced) | **None** |
+| **Event replay** | Native Archive + Replay (time-based, up to indefinite) | Pub/Sub Seek (snapshot or timestamp) | **None built-in** — Kafka retention + manual offset management |
+| **Event transformation** | Input transformers, input paths + templates | Minimal (no native transformation) | Payload mapping (src/dest field mapping in sensors) |
+| **Observability** | CloudWatch metrics + X-Ray tracing | Cloud Monitoring + Cloud Trace | Prometheus metrics on controller — no native distributed tracing through pipeline |
+| **Cross-region/account** | Native cross-account and cross-region routing | Cross-project via Pub/Sub topics | **None** — single cluster scope |
+| **Throughput** | ~10K events/sec/region (soft, raiseable) | Pub/Sub throughput (effectively unlimited) | Kafka throughput (partition-based, very high) |
+| **Saga/orchestration** | No native (use Step Functions) | No native (use GCP Workflows) | No native (use Argo Workflows) |
+| **Idempotency** | App responsibility | App responsibility | App responsibility |
+| **Integration breadth** | 200+ AWS sources + 35+ SaaS + API destinations | 130+ GCP sources (Audit Log, Pub/Sub, direct) + Eventarc Advanced 3rd party | 20+ EventSource types (webhook, Kafka, SNS, SQS, Pub/Sub, AMQP, Redis, GitHub, etc.) |
+| **Operational overhead** | Fully managed, 99.99% SLA | Fully managed, 99.95% SLA | **Self-managed**: controller, EventBus (Kafka), CRDs, upgrades |
+| **Security** | IAM policies, KMS encryption, VPC endpoints | IAM, CMEK, VPC Service Controls | K8s RBAC, Secrets, TLS configurable on EventBus |
+| **Pricing** | $1/M events (custom bus), AWS events free | Pub/Sub pricing (~$40/TiB) | **Free** (OSS) — but you pay for Kafka infrastructure |
+| **CNCF status** | N/A (proprietary) | N/A (proprietary) | CNCF Incubating (Argo project) |
+
+### Critical Gaps in Argo Events
+
+| Gap | Severity | Mitigation |
+|---|---|---|
+| **No schema registry** | Medium | Use CloudEvents spec + JSON schema validation in Go handlers. Services define DTOs with strict parsing. |
+| **No built-in event replay UI** | Low | Kafka retention (`retention.ms=-1` for infinite) + tooling (kcat, Kafka UI, Redpanda Console) for offset-based replay |
+| **No distributed tracing through pipeline** | Medium | Graceful degradation — extract `traceparent` from CloudEvent extensions when present (PR #3961), otherwise start new trace. Already addressed in this spec. |
+| **Operational burden** | Medium | Use Strimzi or Redpanda Operator for Kafka lifecycle on K8s. Argo Events controller is lightweight (single pod). |
+| **Single cluster scope** | N/A | Not relevant for this project's requirements |
+
+### What Argo Events Covers Adequately
+
+1. **At-least-once delivery** — `atLeastOnce: true` on sensor triggers matches EventBridge and Eventarc guarantees. None of the three provide exactly-once.
+2. **DLQ** — `dlqTrigger` with independent retry strategy is functionally equivalent to EventBridge SQS DLQ and Eventarc Pub/Sub DLQ.
+3. **Content filtering** — Expression-based filtering on JSON body fields is actually **more flexible** than Eventarc (which only filters on CloudEvent attributes, not body content).
+4. **Retry with backoff** — Exponential backoff with jitter (`steps`, `duration`, `factor`, `jitter`) is on par with managed services.
+5. **Payload transformation** — src/dest field mapping in sensors covers reformatting events before triggering services.
+6. **Idempotency** — None of the three provide this natively. Always an application-level concern. Hex arch services need idempotency keys regardless of event system.
+7. **Saga patterns** — None of the three provide this natively. All pair with a separate orchestrator (Step Functions / GCP Workflows / Argo Workflows).
+
+### Alternatives Considered
+
+| Alternative | Pros | Cons | Verdict |
+|---|---|---|---|
+| **Direct Kafka consumers** (no event mesh) | Simpler architecture, full Kafka feature access (consumer groups, transactional producers, native replay), lower operational surface | Tighter coupling (services must know Kafka), no declarative CRD abstraction, more Go code for consumer loops + offset management, no webhook ingestion layer | Viable but loses the declarative K8s-native event routing that Argo Events provides |
+| **Knative Eventing** + Kafka Channel | CNCF project, native CloudEvents enforcement, Broker/Trigger model closer to EventBridge rules, built-in tracing propagation, scale-to-zero | Heavier footprint (Knative Serving + Eventing + Kafka channel), steeper learning curve, less flexible trigger types (primarily HTTP), requires full Knative ecosystem | Over-engineered for this use case; scale-to-zero not a priority |
+
+### Verdict
+
+Argo Events is a **valid choice** for event-driven transactional microservices, not just workflows. The claim that it's "only for CI/CD" is incorrect — its Sensor→HTTP trigger model with at-least-once delivery, DLQ, and retry is a legitimate event-driven backbone. The key distinction: Argo Events is a **routing and triggering layer**, not a processing framework — which is exactly what EventBridge and Eventarc are too.
+
+For this project's requirements (at-least-once + idempotency, cloud-agnostic K8s, Kafka-backed, debugging-level replay), Argo Events covers all critical transactional features. The gaps (schema registry, replay UI, tracing) are real but mitigable, and none are deal-breakers.
 
 ---
 

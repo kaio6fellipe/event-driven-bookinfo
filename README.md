@@ -115,10 +115,15 @@ All services expose their business API on the API port and observability endpoin
 ## Prerequisites
 
 - Go 1.25+
-- Docker
+- Docker (Docker Desktop recommended, ~8 GB RAM allocated)
 - [golangci-lint v2](https://golangci-lint.run/welcome/install/)
-- [kustomize](https://kustomize.io/) (optional, for Kubernetes deployment)
 - [goreleaser v2](https://goreleaser.com/install/) (for releases)
+
+**Additional for local Kubernetes (`make run-k8s`):**
+
+- [k3d](https://k3d.io/) (k3s-in-Docker)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [Helm](https://helm.sh/docs/intro/install/)
 
 ---
 
@@ -170,9 +175,21 @@ By default all services use the in-memory storage backend. To use PostgreSQL, se
 | `make mod-tidy` | Tidy go module dependencies |
 | `make docker-build SERVICE=<name>` | Build Docker image for one service |
 | `make docker-build-all` | Build Docker images for all 5 services |
+| `make run` | Start all services via Docker Compose (PostgreSQL backend) |
+| `make stop` | Stop services and remove containers |
 | `make e2e` | Run E2E tests via docker-compose |
 | `make clean` | Remove `bin/` and `dist/` directories |
 | `make help` | List all available targets |
+| `make run-k8s` | Full local k8s setup (cluster, platform, observability, deploy, seed) |
+| `make stop-k8s` | Delete k3d cluster and all resources |
+| `make k8s-rebuild` | Fast iteration: rebuild images, reimport, rollout restart |
+| `make k8s-status` | Show pod status across all namespaces + access URLs |
+| `make k8s-logs` | Tail logs from bookinfo namespace |
+| `make k8s-cluster` | Create k3d cluster with port mappings |
+| `make k8s-platform` | Install Envoy Gateway, Strimzi, Kafka, Argo Events, Gateway |
+| `make k8s-observability` | Install Prometheus, Grafana, Tempo, Loki, Alloy |
+| `make k8s-deploy` | Build images, import to k3d, deploy apps + Argo Events + HTTPRoutes |
+| `make k8s-seed` | Seed PostgreSQL databases with sample data |
 
 ---
 
@@ -231,6 +248,135 @@ done
 ```
 
 All deployments expose dual ports (API `:8080` + admin `:9090`). Liveness and readiness probes target `/healthz` and `/readyz` on the admin port. Pyroscope eBPF scraping is configured via pod annotations on the admin port; no application changes are needed.
+
+For a fully automated local development cluster with all infrastructure included (Kafka, Envoy Gateway, observability stack), see [Local Kubernetes Environment](#local-kubernetes-environment) below.
+
+---
+
+## Local Kubernetes Environment
+
+One-command local development cluster using k3d. Deploys the full stack: Envoy Gateway, Kafka (KRaft), Argo Events, PostgreSQL, observability (Prometheus + Grafana + Tempo + Loki + Alloy), and all services with CQRS read/write deployment split.
+
+### Cluster Architecture
+
+```mermaid
+graph TD
+    Browser["Browser :8080"]
+    Webhook["Webhook :8443"]
+
+    subgraph envoy-gateway-system
+        EG["Envoy Gateway"]
+    end
+
+    subgraph platform
+        GW["Gateway: default-gw"]
+        Kafka["Kafka KRaft"]
+        ArgoCtrl["Argo Events Controller"]
+    end
+
+    subgraph bookinfo
+        PP["productpage"]
+
+        DR["details"]
+        RR["reviews"]
+        RTR["ratings"]
+
+        DW["details-write"]
+        RW["reviews-write"]
+        RTW["ratings-write"]
+        N["notification"]
+
+        ES["EventSources"]
+        EB["EventBus"]
+        S["Sensors"]
+
+        PG["PostgreSQL"]
+    end
+
+    subgraph observability
+        Alloy["Alloy"]
+        Prom["Prometheus"]
+        Tempo["Tempo"]
+        Loki["Loki"]
+        Grafana["Grafana :3000"]
+    end
+
+    Browser --> EG --> GW
+    GW -->|"HTTPRoute /"| PP
+    PP -->|GET| DR
+    PP -->|GET| RR
+    RR -->|GET| RTR
+
+    Webhook --> EG
+    GW -->|"HTTPRoute /v1/*"| ES
+    ES --> EB
+    EB --> Kafka
+    Kafka --> S
+    S -->|trigger| DW
+    S -->|trigger| RW
+    S -->|trigger| RTW
+    S -->|trigger| N
+
+    DR & DW & RR & RW & RTR & RTW & N --> PG
+
+    Alloy -.->|scrape :9090/metrics| PP
+    Alloy -.->|OTLP traces| Tempo
+    Alloy -.->|remote_write| Prom
+    Alloy -.->|push logs| Loki
+    Prom & Tempo & Loki --> Grafana
+
+    style Browser fill:#6366f1,color:#fff,stroke:#818cf8
+    style Webhook fill:#6366f1,color:#fff,stroke:#818cf8
+    style EG fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
+    style GW fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
+    style Kafka fill:#f59e0b,color:#000,stroke:#d97706
+    style EB fill:#f59e0b,color:#000,stroke:#d97706
+    style ES fill:#22c55e,color:#fff,stroke:#16a34a
+    style S fill:#22c55e,color:#fff,stroke:#16a34a
+    style ArgoCtrl fill:#22c55e,color:#fff,stroke:#16a34a
+    style Grafana fill:#e879f9,color:#000,stroke:#c026d3
+    style PG fill:#3b82f6,color:#fff,stroke:#2563eb
+```
+
+The cluster (`bookinfo-local`) runs four namespaces:
+
+| Namespace | Components |
+|---|---|
+| `platform` | Strimzi operator, Kafka (KRaft single-node), Argo Events controller, EventBus, Gateway `default-gw` |
+| `envoy-gateway-system` | Envoy Gateway controller, GatewayClass `eg` |
+| `observability` | Prometheus, Grafana, Tempo, Loki, Alloy (DaemonSet for logs + Deployment for metrics/traces) |
+| `bookinfo` | 8 app deployments (CQRS split), PostgreSQL, 3 EventSources, 3 Sensors, HTTPRoutes |
+
+### CQRS Deployment Split
+
+Each backend service deploys as two separate Deployments sharing the same image and PostgreSQL database: a read instance (serves GET traffic from productpage) and a write instance (receives POST triggers from Argo Events sensors).
+
+| Deployment | Role | Called by |
+|---|---|---|
+| `productpage` | Read-only BFF | Envoy Gateway (HTTPRoute) |
+| `details` / `details-write` | Read / Write | productpage / book-added sensor |
+| `reviews` / `reviews-write` | Read / Write | productpage / review-submitted sensor |
+| `ratings` / `ratings-write` | Read / Write | reviews (read) / rating-submitted sensor |
+| `notification` | Write-only | All 3 sensors |
+
+### Usage
+
+```bash
+make run-k8s        # Full setup (~5-10 min first run)
+make k8s-status     # Check status + access URLs
+make k8s-rebuild    # Fast iteration (rebuild + redeploy, skip infra)
+make k8s-logs       # Tail application logs
+make stop-k8s       # Tear down
+```
+
+### Access URLs
+
+| Service | URL | Notes |
+|---|---|---|
+| Productpage | http://localhost:8080 | BFF web UI |
+| Grafana | http://localhost:3000 | admin / admin |
+| Prometheus | http://localhost:9090 | Metrics queries |
+| Webhooks | http://localhost:8443/v1/book-added | POST to trigger write flow |
 
 ---
 
@@ -363,10 +509,17 @@ event-driven-bookinfo/
 ├── deploy/
 │   ├── <service>/
 │   │   ├── base/               # Kustomize base (deployment, service, configmap)
-│   │   └── overlays/           # dev / staging / production patches
-│   └── argo-events/
-│       ├── eventsources/       # Webhook EventSource manifests
-│       └── sensors/            # Sensor + HTTP trigger manifests
+│   │   └── overlays/           # dev / staging / production / local patches
+│   ├── argo-events/
+│   │   ├── eventsources/       # Webhook EventSource manifests
+│   │   ├── sensors/            # Sensor + HTTP trigger manifests
+│   │   └── overlays/local/     # EventBus, sensors targeting -write services
+│   ├── gateway/
+│   │   ├── base/               # Gateway, GatewayClass, ReferenceGrant
+│   │   └── overlays/local/     # HTTPRoutes for bookinfo
+│   ├── observability/local/    # Helm values: Prometheus, Grafana, Tempo, Loki, Alloy
+│   ├── platform/local/         # Helm values: Strimzi, Argo Events; Kafka CRDs
+│   └── postgres/local/         # StatefulSet, Service, init ConfigMap
 ├── test/
 │   └── e2e/                    # docker-compose files + shell test scripts
 ├── build/

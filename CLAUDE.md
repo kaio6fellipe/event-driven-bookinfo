@@ -23,6 +23,8 @@ Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review 
 - **Sync reads**: productpage fans out GET calls to details and reviews; reviews fans out to ratings
 - **Storage**: swappable via `STORAGE_BACKEND` env var — `memory` (default, single replica) or `postgres` (horizontally scalable)
 - **Admin port** (:9090): `/metrics`, `/debug/pprof/*`, `/healthz`, `/readyz` — isolated from business API
+- **CQRS deployments** (local k8s): each backend service has separate read and write Deployments; read serves GET from productpage, write receives POST from Argo Events sensors
+- **Local k8s** (`make run-k8s`): k3d cluster with Envoy Gateway API, Strimzi Kafka (KRaft), full observability stack (Prometheus, Grafana, Tempo, Loki, Alloy)
 
 ## Build Commands
 
@@ -32,6 +34,37 @@ make test               # go test -race -count=1 ./...
 make lint               # golangci-lint run
 make e2e                # Docker Compose + shell smoke tests (memory backend)
 make docker-build-all   # Build all 5 Docker images
+```
+
+## Local Kubernetes
+
+```bash
+make run-k8s            # Full local k8s: k3d + platform + observability + apps
+make stop-k8s           # Delete k3d cluster
+make k8s-rebuild        # Fast iteration: rebuild images + redeploy (skip infra)
+make k8s-status         # Pod status + access URLs
+make k8s-logs           # Tail bookinfo namespace logs
+```
+
+**Namespaces:** `platform` (Kafka, Argo Events, Gateway), `envoy-gateway-system` (Envoy Gateway), `observability` (Prometheus, Grafana, Tempo, Loki, Alloy), `bookinfo` (apps, PostgreSQL, EventSources, Sensors, HTTPRoutes)
+
+**CQRS split:** details, reviews, ratings each have read + write Deployments. productpage is read-only. notification is write-only. Sensors target `-write` services.
+
+**Context safety:** All kubectl/helm calls use `--context=k3d-bookinfo-local`. Never mutates the user's active context.
+
+**Access:** Productpage http://localhost:8080, Grafana http://localhost:3000, Prometheus http://localhost:9090, Webhooks http://localhost:8443/v1/*
+
+## Deploy Structure
+
+```
+deploy/
+├── <service>/overlays/local/    # CQRS read/write split per service
+├── argo-events/overlays/local/  # EventBus + sensors targeting -write services
+├── gateway/base/                # Gateway, GatewayClass, ReferenceGrant
+├── gateway/overlays/local/      # HTTPRoutes for bookinfo
+├── observability/local/         # Helm values: Prometheus, Grafana, Tempo, Loki, Alloy
+├── platform/local/              # Helm values: Strimzi, Argo Events; Kafka CRDs
+└── postgres/local/              # StatefulSet, Service, init ConfigMap
 ```
 
 ## Run Locally

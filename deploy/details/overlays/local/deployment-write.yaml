@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: details-write
+  namespace: bookinfo
+  labels:
+    app: details
+    role: write
+    part-of: event-driven-bookinfo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: details
+      role: write
+  template:
+    metadata:
+      labels:
+        app: details
+        role: write
+        part-of: event-driven-bookinfo
+      annotations:
+        profiles.grafana.com/cpu.scrape: "true"
+        profiles.grafana.com/cpu.port: "9090"
+        profiles.grafana.com/memory.scrape: "true"
+        profiles.grafana.com/memory.port: "9090"
+        profiles.grafana.com/goroutine.scrape: "true"
+        profiles.grafana.com/goroutine.port: "9090"
+        profiles.grafana.com/block.scrape: "true"
+        profiles.grafana.com/block.port: "9090"
+        profiles.grafana.com/mutex.scrape: "true"
+        profiles.grafana.com/mutex.port: "9090"
+    spec:
+      containers:
+        - name: details
+          image: event-driven-bookinfo/details:local
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: admin
+              containerPort: 9090
+          envFrom:
+            - configMapRef:
+                name: details
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: admin
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: admin
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi

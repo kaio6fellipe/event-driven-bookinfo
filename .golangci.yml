@@ -12,7 +12,9 @@ linters:
     - gocyclo
     - misspell
     - unconvert
-    - gosimple
+
+formatters:
+  enable:
     - gofmt
     - goimports
 

@@ -6,53 +6,66 @@ Go hexagonal architecture monorepo adapting Istio's Bookinfo as an event-driven 
 
 ### Service Topology
 
-```
-                    +-------------------------------------+
-                    |         productpage (BFF)           |
-                    |  Go + html/template + HTMX          |
-                    |  :8080 (web) / :9090 (admin)        |
-                    +------+------------------+-----------+
-                           | sync GET         | sync GET
-                           v                  v
-                 +--------------+    +----------------+
-                 |   details    |    |    reviews     |
-                 |  :8080/:9091 |    |  :8082/:9092   |
-                 +--------------+    +-------+--------+
-                                             | sync GET
-                                             v
-                                    +----------------+
-                                    |    ratings     |
-                                    |  :8083/:9093   |
-                                    +----------------+
+```mermaid
+graph TD
+    PP["productpage (BFF)<br/>Go + html/template + HTMX<br/>:8080 / :9090"]
+    D["details<br/>:8081 / :9091"]
+    R["reviews<br/>:8082 / :9092"]
+    RT["ratings<br/>:8083 / :9093"]
+    N["notification<br/>:8084 / :9094<br/><i>event consumer only</i>"]
 
-                  +------------+
-                  | notification|   (event consumer only)
-                  | :8084/:9094 |
-                  +------------+
+    PP -->|sync GET| D
+    PP -->|sync GET| R
+    R -->|sync GET| RT
+
+    style PP fill:#6366f1,color:#fff,stroke:#818cf8
+    style D fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
+    style R fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
+    style RT fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
+    style N fill:#1a1d27,color:#e4e4e7,stroke:#f59e0b
 ```
 
 ### Event-Driven Write Flow
 
-```
-External webhook POST
-        |
-        v
-[Argo Events: EventSource (webhook)]
-        |
-        v  Kafka EventBus (CloudEvent with optional traceparent)
-        |
-        v
-[Sensor: review-submitted]
-  +---> HTTP Trigger --> reviews POST /v1/reviews
-  +---> HTTP Trigger --> notification POST /v1/notifications
+```mermaid
+graph TD
+    WH["External webhook POST"]
+    ES["Argo Events<br/>EventSource (webhook)"]
+    K["Kafka EventBus<br/>CloudEvent + traceparent"]
 
-[Sensor: rating-submitted]
-  +---> HTTP Trigger --> ratings POST /v1/ratings
-  +---> HTTP Trigger --> notification POST /v1/notifications
+    S1["Sensor: book-added"]
+    S2["Sensor: review-submitted"]
+    S3["Sensor: rating-submitted"]
 
-[Sensor: book-added]
-  +---> HTTP Trigger --> details POST /v1/details
-  +---> HTTP Trigger --> notification POST /v1/notifications
+    D["details<br/>POST /v1/details"]
+    R["reviews<br/>POST /v1/reviews"]
+    RT["ratings<br/>POST /v1/ratings"]
+    N1["notification<br/>POST /v1/notifications"]
+    N2["notification<br/>POST /v1/notifications"]
+    N3["notification<br/>POST /v1/notifications"]
+
+    WH --> ES
+    ES --> K
+
+    K --> S1
+    K --> S2
+    K --> S3
+
+    S1 -->|HTTP Trigger| D
+    S1 -->|HTTP Trigger| N1
+
+    S2 -->|HTTP Trigger| R
+    S2 -->|HTTP Trigger| N2
+
+    S3 -->|HTTP Trigger| RT
+    S3 -->|HTTP Trigger| N3
+
+    style WH fill:#6366f1,color:#fff,stroke:#818cf8
+    style ES fill:#22c55e,color:#fff,stroke:#16a34a
+    style K fill:#f59e0b,color:#000,stroke:#d97706
+    style S1 fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
+    style S2 fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
+    style S3 fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
 ```
 
 Reads are synchronous HTTP calls between services. Writes are fully async via Argo Events webhooks -> Kafka EventBus -> Sensors -> HTTP triggers. This separates the read and write paths cleanly while keeping the services themselves as plain HTTP servers with no Kafka dependency.

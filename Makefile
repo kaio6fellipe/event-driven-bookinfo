@@ -53,6 +53,19 @@ vet: ## Run go vet
 mod-tidy: ## Tidy go module dependencies
 	go mod tidy
 
+# ─── Security ──────────────────────────────────────────────────────────────
+
+.PHONY: vuln
+vuln: ## Scan Go dependencies for known CVEs (requires govulncheck)
+	govulncheck ./...
+
+.PHONY: trivy
+trivy: ## Scan Docker images for vulnerabilities (requires trivy)
+	@for svc in $(SERVICES); do \
+		echo "Scanning event-driven-bookinfo/$$svc:latest..."; \
+		trivy image --severity HIGH,CRITICAL event-driven-bookinfo/$$svc:latest || exit 1; \
+	done
+
 # ─── Docker ─────────────────────────────────────────────────────────────────
 
 .PHONY: docker-build

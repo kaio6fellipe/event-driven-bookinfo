@@ -8,16 +8,16 @@ ADMIN=http://localhost:9094
 STATUS=$(curl -sf "$ADMIN/healthz" -o /dev/null -w "%{http_code}")
 [ "$STATUS" = "200" ] || { echo "FAIL: healthz returned $STATUS"; exit 1; }
 
-# Create a notification
+# Create a notification (field is "body", not "message")
 HTTP_CODE=$(curl -s -o /tmp/notif-resp.json -w "%{http_code}" -X POST "$BASE/v1/notifications" \
     -H "Content-Type: application/json" \
-    -d '{"recipient":"alice@example.com","subject":"New review posted","message":"A new review was submitted for your book.","channel":"email"}')
+    -d '{"recipient":"alice@example.com","subject":"New review posted","body":"A new review was submitted for your book.","channel":"email"}')
 [ "$HTTP_CODE" = "201" ] || { echo "FAIL: expected 201 for notification creation, got $HTTP_CODE"; exit 1; }
 
-ID=$(python3 -c "import sys,json; print(json.load(open('/tmp/notif-resp.json'))['id'])")
+ID=$(python3 -c "import json; print(json.load(open('/tmp/notif-resp.json'))['id'])")
 [ -n "$ID" ] || { echo "FAIL: no id in notification response"; exit 1; }
 
-NOTIFICATION_STATUS=$(python3 -c "import sys,json; print(json.load(open('/tmp/notif-resp.json'))['status'])")
+NOTIFICATION_STATUS=$(python3 -c "import json; print(json.load(open('/tmp/notif-resp.json'))['status'])")
 [ "$NOTIFICATION_STATUS" = "sent" ] || { echo "FAIL: expected status=sent, got $NOTIFICATION_STATUS"; exit 1; }
 
 # Get notification by ID

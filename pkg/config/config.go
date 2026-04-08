@@ -14,6 +14,7 @@ type Config struct {
 	LogLevel               string
 	StorageBackend         string
 	DatabaseURL            string
+	RunMigrations          bool
 	OTLPEndpoint           string
 	PyroscopeServerAddress string
 }
@@ -28,6 +29,7 @@ func Load() (*Config, error) {
 		LogLevel:               envOrDefault("LOG_LEVEL", "info"),
 		StorageBackend:         envOrDefault("STORAGE_BACKEND", "memory"),
 		DatabaseURL:            os.Getenv("DATABASE_URL"),
+		RunMigrations:          envOrDefault("RUN_MIGRATIONS", "true") == "true",
 		OTLPEndpoint:           os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
 		PyroscopeServerAddress: os.Getenv("PYROSCOPE_SERVER_ADDRESS"),
 	}

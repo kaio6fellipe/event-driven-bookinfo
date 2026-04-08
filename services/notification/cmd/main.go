@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"os"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
+
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/config"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/metrics"
@@ -17,8 +20,6 @@ import (
 	logdispatcher "github.com/kaio6fellipe/event-driven-bookinfo/services/notification/internal/adapter/outbound/log"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/notification/internal/adapter/outbound/memory"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/notification/internal/core/service"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/metric"
 )
 
 func main() {

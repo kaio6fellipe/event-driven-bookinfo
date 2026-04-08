@@ -1,5 +1,5 @@
 // Package metrics provides OTel-based Prometheus metrics setup and HTTP middleware.
-package metrics
+package metrics //nolint:revive // package name is intentional
 
 import (
 	"log/slog"

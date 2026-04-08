@@ -6,6 +6,7 @@ import (
 	"runtime"
 
 	"github.com/grafana/pyroscope-go"
+
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/config"
 )
 

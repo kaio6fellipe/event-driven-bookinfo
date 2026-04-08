@@ -1,0 +1,95 @@
+.DEFAULT_GOAL := help
+
+MODULE := github.com/kaio6fellipe/event-driven-bookinfo
+SERVICES := productpage details reviews ratings notification
+
+# ─── Build ──────────────────────────────────────────────────────────────────
+
+.PHONY: build
+build: ## Build a single service: make build SERVICE=<name>
+ifndef SERVICE
+	$(error SERVICE is not set. Usage: make build SERVICE=<name>)
+endif
+	CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/$(SERVICE) ./services/$(SERVICE)/cmd/
+
+.PHONY: build-all
+build-all: ## Build all 5 services
+	@for svc in $(SERVICES); do \
+		echo "Building $$svc..."; \
+		CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/$$svc ./services/$$svc/cmd/ || exit 1; \
+	done
+	@echo "All services built successfully."
+
+# ─── Test ───────────────────────────────────────────────────────────────────
+
+.PHONY: test
+test: ## Run all tests
+	go test ./...
+
+.PHONY: test-cover
+test-cover: ## Run tests with coverage report
+	go test -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+
+.PHONY: test-race
+test-race: ## Run tests with race detector
+	go test -race -count=1 ./...
+
+# ─── Quality ────────────────────────────────────────────────────────────────
+
+.PHONY: lint
+lint: ## Run golangci-lint
+	golangci-lint run ./...
+
+.PHONY: fmt
+fmt: ## Format all Go source files
+	gofmt -w .
+
+.PHONY: vet
+vet: ## Run go vet
+	go vet ./...
+
+.PHONY: mod-tidy
+mod-tidy: ## Tidy go module dependencies
+	go mod tidy
+
+# ─── Docker ─────────────────────────────────────────────────────────────────
+
+.PHONY: docker-build
+docker-build: ## Build Docker image for one service: make docker-build SERVICE=<name>
+ifndef SERVICE
+	$(error SERVICE is not set. Usage: make docker-build SERVICE=<name>)
+endif
+	docker build -f Dockerfile.$(SERVICE) -t event-driven-bookinfo/$(SERVICE):latest .
+
+.PHONY: docker-build-all
+docker-build-all: ## Build Docker images for all 5 services
+	@for svc in $(SERVICES); do \
+		echo "Building Docker image for $$svc..."; \
+		docker build -f Dockerfile.$$svc -t event-driven-bookinfo/$$svc:latest . || exit 1; \
+	done
+	@echo "All Docker images built successfully."
+
+# ─── E2E ────────────────────────────────────────────────────────────────────
+
+.PHONY: e2e
+e2e: ## Run E2E tests via docker-compose (placeholder)
+	@echo "E2E tests not yet implemented. Run: docker-compose -f test/e2e/docker-compose.yml up"
+
+# ─── Cleanup ────────────────────────────────────────────────────────────────
+
+.PHONY: clean
+clean: ## Remove build output directories
+	rm -rf bin/ dist/
+
+# ─── Help ───────────────────────────────────────────────────────────────────
+
+.PHONY: help
+help: ## List all available targets
+	@echo "Usage: make <target> [SERVICE=<name>]"
+	@echo ""
+	@echo "Services: $(SERVICES)"
+	@echo ""
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+		| sort \
+		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'

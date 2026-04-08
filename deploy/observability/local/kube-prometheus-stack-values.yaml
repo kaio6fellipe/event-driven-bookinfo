@@ -1,0 +1,75 @@
+prometheus:
+  prometheusSpec:
+    replicas: 1
+    retention: 24h
+    enableRemoteWriteReceiver: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+  service:
+    type: NodePort
+    nodePort: 30900
+
+grafana:
+  enabled: true
+  adminPassword: admin
+  service:
+    type: NodePort
+    nodePort: 30300
+  additionalDataSources:
+    - name: Tempo
+      type: tempo
+      url: http://tempo.observability.svc.cluster.local:3100
+      access: proxy
+      isDefault: false
+      jsonData:
+        tracesToLogsV2:
+          datasourceUid: loki
+          filterByTraceID: true
+        tracesToMetrics:
+          datasourceUid: prometheus
+        serviceMap:
+          datasourceUid: prometheus
+        nodeGraph:
+          enabled: true
+    - name: Loki
+      type: loki
+      uid: loki
+      url: http://loki.observability.svc.cluster.local:3100
+      access: proxy
+      isDefault: false
+      jsonData:
+        derivedFields:
+          - datasourceUid: tempo
+            matcherRegex: '"trace_id":"(\w+)"'
+            name: TraceID
+            url: "$${__value.raw}"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+alertmanager:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeEtcd:
+  enabled: false

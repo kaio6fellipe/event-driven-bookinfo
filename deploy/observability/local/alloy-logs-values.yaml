@@ -1,0 +1,15 @@
+alloy:
+  configMap:
+    create: false
+  mounts:
+    varlog: true
+  clustering:
+    enabled: false
+
+controller:
+  type: daemonset
+
+configMap:
+  create: true
+  name: alloy-logs-config
+  key: config.alloy

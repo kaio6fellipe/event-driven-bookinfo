@@ -7,4 +7,4 @@ spec:
   kafka:
     url: bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092
     topic: argo-events
-    version: "3.9.0"
+    version: "4.2.0"

@@ -30,8 +30,14 @@ spec:
   rules:
     - matches:
         - path:
-            type: Exact
+            type: PathPrefix
             value: /v1/book-added
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /book-added
       backendRefs:
         - name: book-added-eventsource-svc
           port: 12000
@@ -49,8 +55,14 @@ spec:
   rules:
     - matches:
         - path:
-            type: Exact
+            type: PathPrefix
             value: /v1/review-submitted
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /review-submitted
       backendRefs:
         - name: review-submitted-eventsource-svc
           port: 12001
@@ -68,8 +80,14 @@ spec:
   rules:
     - matches:
         - path:
-            type: Exact
+            type: PathPrefix
             value: /v1/rating-submitted
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /rating-submitted
       backendRefs:
         - name: rating-submitted-eventsource-svc
           port: 12002

@@ -62,3 +62,10 @@ minio:
 
 gateway:
   enabled: false
+
+# Disable caching pods — not needed for local dev and consumes too much memory
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+

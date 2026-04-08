@@ -311,23 +311,15 @@ k8s-observability: ## Install observability: Prometheus, Grafana, Tempo, Loki, A
 	@$(HELM) upgrade --install loki grafana/loki \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/loki-values.yaml \
-		--wait --timeout 120s
+		--wait --timeout 300s
 	@printf "  $(GREEN)Loki ready.$(NC)\n"
 	@printf "$(BOLD)[4/5] Installing Alloy (logs)...$(NC)\n"
-	@$(KUBECTL) create configmap alloy-logs-config \
-		-n $(K8S_NS_OBSERVABILITY) \
-		--from-file=config.alloy=deploy/observability/local/alloy-logs-config.alloy \
-		--dry-run=client -o yaml | $(KUBECTL) apply -f -
 	@$(HELM) upgrade --install alloy-logs grafana/alloy \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/alloy-logs-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Alloy (logs) ready.$(NC)\n"
 	@printf "$(BOLD)[5/5] Installing Alloy (metrics+traces)...$(NC)\n"
-	@$(KUBECTL) create configmap alloy-metrics-traces-config \
-		-n $(K8S_NS_OBSERVABILITY) \
-		--from-file=config.alloy=deploy/observability/local/alloy-metrics-traces-config.alloy \
-		--dry-run=client -o yaml | $(KUBECTL) apply -f -
 	@$(HELM) upgrade --install alloy-metrics-traces grafana/alloy \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/alloy-metrics-traces-values.yaml \

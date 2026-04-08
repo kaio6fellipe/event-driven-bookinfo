@@ -1,6 +1,4 @@
 alloy:
-  configMap:
-    create: false
   clustering:
     enabled: false
   extraPorts:
@@ -12,15 +10,111 @@ alloy:
       port: 4318
       targetPort: 4318
       protocol: TCP
+  configMap:
+    content: |-
+      // Receives OTLP traces from apps, scrapes Prometheus metrics, forwards to backends.
+
+      otelcol.receiver.otlp "default" {
+        grpc {
+          endpoint = "0.0.0.0:4317"
+        }
+        http {
+          endpoint = "0.0.0.0:4318"
+        }
+        output {
+          traces = [otelcol.processor.k8sattributes.default.input]
+        }
+      }
+
+      otelcol.processor.k8sattributes "default" {
+        extract {
+          metadata = [
+            "k8s.namespace.name",
+            "k8s.deployment.name",
+            "k8s.pod.name",
+            "k8s.pod.uid",
+            "k8s.node.name",
+          ]
+        }
+        output {
+          traces = [otelcol.processor.batch.default.input]
+        }
+      }
+
+      otelcol.processor.batch "default" {
+        timeout = "2s"
+        send_batch_size = 512
+        output {
+          traces = [otelcol.exporter.otlp.tempo.input]
+        }
+      }
+
+      otelcol.exporter.otlp "tempo" {
+        client {
+          endpoint = "tempo.observability.svc.cluster.local:4317"
+          tls {
+            insecure = true
+          }
+        }
+      }
+
+      discovery.kubernetes "bookinfo_pods" {
+        role = "pod"
+        namespaces {
+          names = ["bookinfo"]
+        }
+      }
+
+      discovery.relabel "bookinfo_metrics" {
+        targets = discovery.kubernetes.bookinfo_pods.targets
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_port_number"]
+          regex         = "9090"
+          action        = "keep"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_ip"]
+          target_label  = "__address__"
+          replacement   = "$1:9090"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app"]
+          target_label  = "app"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_role"]
+          target_label  = "role"
+        }
+        rule {
+          replacement  = "/metrics"
+          target_label = "__metrics_path__"
+        }
+      }
+
+      prometheus.scrape "bookinfo" {
+        targets    = discovery.relabel.bookinfo_metrics.output
+        forward_to = [prometheus.remote_write.default.receiver]
+        scrape_interval = "15s"
+      }
+
+      prometheus.remote_write "default" {
+        endpoint {
+          url = "http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/api/v1/write"
+        }
+      }
 
 controller:
   type: deployment
   replicas: 1
-
-configMap:
-  create: true
-  name: alloy-metrics-traces-config
-  key: config.alloy
 
 serviceAccount:
   create: true

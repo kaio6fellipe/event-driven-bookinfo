@@ -4,7 +4,7 @@ metadata:
   name: productpage
 data:
   LOG_LEVEL: "debug"
-  OTEL_EXPORTER_OTLP_ENDPOINT: "alloy-metrics-traces.observability.svc.cluster.local:4317"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
   DETAILS_SERVICE_URL: "http://details"
   REVIEWS_SERVICE_URL: "http://reviews"
   RATINGS_SERVICE_URL: "http://ratings"

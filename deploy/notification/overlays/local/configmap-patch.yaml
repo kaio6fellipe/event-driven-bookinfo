@@ -7,4 +7,4 @@ data:
   STORAGE_BACKEND: "postgres"
   DATABASE_URL: "postgres://bookinfo:bookinfo@postgres.bookinfo.svc.cluster.local:5432/bookinfo_notification?sslmode=disable"
   RUN_MIGRATIONS: "true"
-  OTEL_EXPORTER_OTLP_ENDPOINT: "alloy-metrics-traces.observability.svc.cluster.local:4317"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"

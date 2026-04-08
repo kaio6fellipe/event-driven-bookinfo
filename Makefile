@@ -62,6 +62,10 @@ vuln: ## Scan Go dependencies for known CVEs (requires govulncheck)
 	@command -v $(GOVULNCHECK) >/dev/null 2>&1 || { echo "Installing govulncheck..."; go install golang.org/x/vuln/cmd/govulncheck@latest; }
 	$(GOVULNCHECK) ./...
 
+.PHONY: gitleaks
+gitleaks: ## Scan git history for leaked secrets (requires gitleaks)
+	gitleaks detect --source . -v
+
 .PHONY: trivy
 trivy: ## Scan Docker images for vulnerabilities (requires trivy)
 	@for svc in $(SERVICES); do \

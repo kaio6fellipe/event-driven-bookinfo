@@ -42,8 +42,6 @@ linters:
         text: "exported"
         linters:
           - revive
-    max-issues-per-linter: 0
-    max-same-issues: 0
 
 formatters:
   enable:

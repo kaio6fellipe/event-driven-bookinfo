@@ -1,0 +1,13 @@
+FROM golang:1.25-alpine AS builder
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY pkg/ ./pkg/
+COPY services/productpage/ ./services/productpage/
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/productpage ./services/productpage/cmd/
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=builder /bin/productpage /bin/productpage
+COPY services/productpage/templates/ /templates/
+ENV TEMPLATE_DIR=/templates
+ENTRYPOINT ["/bin/productpage"]

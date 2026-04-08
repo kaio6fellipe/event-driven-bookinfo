@@ -196,6 +196,58 @@ e2e-postgres: ## Run E2E tests with PostgreSQL backend
 clean: ## Remove build output directories
 	rm -rf bin/ dist/
 
+# ─── Kubernetes (local) ──────────────────────────────────────────────────────
+
+K8S_CLUSTER    := bookinfo-local
+K8S_CONTEXT    := k3d-$(K8S_CLUSTER)
+K8S_NS_PLATFORM     := platform
+K8S_NS_OBSERVABILITY := observability
+K8S_NS_BOOKINFO     := bookinfo
+KUBECTL        := kubectl --context=$(K8S_CONTEXT)
+HELM           := helm --kube-context=$(K8S_CONTEXT)
+
+# Context safety guard — call at the top of every k8s target.
+define k8s-guard
+	@if ! kubectl config get-contexts $(K8S_CONTEXT) >/dev/null 2>&1; then \
+		printf "$(RED)ERROR: context '$(K8S_CONTEXT)' not found.$(NC)\n"; \
+		printf "  Run $(CYAN)make k8s-cluster$(NC) first.\n"; \
+		exit 1; \
+	fi
+	@if ! echo "$(K8S_CONTEXT)" | grep -q '^k3d-'; then \
+		printf "$(RED)ERROR: context '$(K8S_CONTEXT)' is not a k3d cluster. Refusing to proceed.$(NC)\n"; \
+		exit 1; \
+	fi
+endef
+
+.PHONY: k8s-cluster
+k8s-cluster: ## Create k3d cluster with port mappings for Gateway + observability
+	@if k3d cluster list $(K8S_CLUSTER) >/dev/null 2>&1; then \
+		printf "$(GREEN)Cluster '$(K8S_CLUSTER)' already exists.$(NC)\n"; \
+	else \
+		printf "$(BOLD)Creating k3d cluster '$(K8S_CLUSTER)'...$(NC)\n"; \
+		k3d cluster create $(K8S_CLUSTER) \
+			--api-port 6550 \
+			-p "8080:80@loadbalancer" \
+			-p "8443:443@loadbalancer" \
+			-p "3000:30300@server:0" \
+			-p "9090:30900@server:0" \
+			--k3s-arg "--disable=traefik@server:0" \
+			--wait; \
+	fi
+	@printf "$(BOLD)Verifying cluster...$(NC)\n"
+	$(KUBECTL) cluster-info
+	@printf "\n$(GREEN)$(BOLD)Cluster '$(K8S_CLUSTER)' ready.$(NC)\n\n"
+
+.PHONY: stop-k8s
+stop-k8s: ## Delete k3d cluster and all resources
+	@if k3d cluster list $(K8S_CLUSTER) >/dev/null 2>&1; then \
+		printf "$(BOLD)Deleting cluster '$(K8S_CLUSTER)'...$(NC)\n"; \
+		k3d cluster delete $(K8S_CLUSTER); \
+		printf "$(GREEN)Cluster deleted.$(NC)\n"; \
+	else \
+		printf "Cluster '$(K8S_CLUSTER)' does not exist.\n"; \
+	fi
+
 # ─── Help ───────────────────────────────────────────────────────────────────
 
 .PHONY: help

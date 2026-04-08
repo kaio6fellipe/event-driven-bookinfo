@@ -1,7 +1,23 @@
 # Local development compose file.
-# Usage: make run | make run-logs | make stop
+# Usage: make run | make run-logs | make stop | make seed
 #   or:  docker compose up --build
 services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: bookinfo
+      POSTGRES_PASSWORD: bookinfo
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./dev/init-databases.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "bookinfo"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+
   ratings:
     build:
       context: .
@@ -11,7 +27,12 @@ services:
       - "9091:9090"
     environment:
       SERVICE_NAME: ratings
-      STORAGE_BACKEND: memory
+      STORAGE_BACKEND: postgres
+      DATABASE_URL: postgres://bookinfo:bookinfo@postgres:5432/bookinfo_ratings?sslmode=disable
+      RUN_MIGRATIONS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   details:
     build:
@@ -22,7 +43,12 @@ services:
       - "9092:9090"
     environment:
       SERVICE_NAME: details
-      STORAGE_BACKEND: memory
+      STORAGE_BACKEND: postgres
+      DATABASE_URL: postgres://bookinfo:bookinfo@postgres:5432/bookinfo_details?sslmode=disable
+      RUN_MIGRATIONS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   reviews:
     build:
@@ -33,10 +59,15 @@ services:
       - "9093:9090"
     environment:
       SERVICE_NAME: reviews
-      STORAGE_BACKEND: memory
+      STORAGE_BACKEND: postgres
+      DATABASE_URL: postgres://bookinfo:bookinfo@postgres:5432/bookinfo_reviews?sslmode=disable
+      RUN_MIGRATIONS: "true"
       RATINGS_SERVICE_URL: http://ratings:8080
     depends_on:
-      - ratings
+      postgres:
+        condition: service_healthy
+      ratings:
+        condition: service_started
 
   notification:
     build:
@@ -47,7 +78,12 @@ services:
       - "9094:9090"
     environment:
       SERVICE_NAME: notification
-      STORAGE_BACKEND: memory
+      STORAGE_BACKEND: postgres
+      DATABASE_URL: postgres://bookinfo:bookinfo@postgres:5432/bookinfo_notification?sslmode=disable
+      RUN_MIGRATIONS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   productpage:
     build:
@@ -65,3 +101,6 @@ services:
       - details
       - reviews
       - ratings
+
+volumes:
+  pgdata:

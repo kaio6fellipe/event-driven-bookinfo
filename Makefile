@@ -148,10 +148,33 @@ run: ## Start all services via docker compose (detached, builds images)
 	fi; \
 	printf "  Logs: $(CYAN)make run-logs$(NC)\n"; \
 	printf "  App:  $(CYAN)http://localhost:$(PRODUCTPAGE_HTTP_PORT)$(NC)\n\n"
+	@$(MAKE) --no-print-directory seed
 
 .PHONY: stop
-stop: ## Stop all services and remove containers
+stop: ## Stop all services and remove containers (keeps data)
 	docker compose down
+
+.PHONY: clean-data
+clean-data: ## Stop all services and remove postgres data volume
+	docker compose down -v
+
+.PHONY: seed
+seed: ## Seed postgres with sample data (idempotent)
+	@printf "\n$(BOLD)Seeding databases...$(NC)\n\n"
+	@for svc in details ratings reviews notification; do \
+		seed_file="services/$$svc/seeds/seed.sql"; \
+		if [ -f "$$seed_file" ]; then \
+			docker compose exec -T postgres psql -U bookinfo -d bookinfo_$$svc -f /dev/stdin < "$$seed_file" > /dev/null 2>&1; \
+			printf "  $(GREEN)%-14s$(NC) seeded\n" "$$svc"; \
+		fi; \
+	done
+	@printf "\n"
+
+.PHONY: migrate
+migrate: ## Re-run database migrations (restarts backend services)
+	@printf "\n$(BOLD)Running migrations...$(NC)\n\n"
+	docker compose restart ratings details reviews notification
+	@printf "\n  Migrations applied (services restarted).\n\n"
 
 .PHONY: run-logs
 run-logs: ## Tail logs from all services (Ctrl+C to stop)

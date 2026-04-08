@@ -104,35 +104,71 @@ NOTIFICATION_ADMIN_PORT:= 9094
 PRODUCTPAGE_HTTP_PORT  := 8080
 PRODUCTPAGE_ADMIN_PORT := 9090
 
+# Colors
+GREEN  := \033[0;32m
+RED    := \033[0;31m
+YELLOW := \033[1;33m
+CYAN   := \033[0;36m
+BOLD   := \033[1m
+NC     := \033[0m
+
 # start-service: launch a service in the background if its HTTP port is not already in use
 # Usage: $(call start-service,name,http_port,admin_port,extra_env)
 define start-service
-	@if curl -sf http://localhost:$(2)/healthz > /dev/null 2>&1 || curl -sf http://localhost:$(3)/healthz > /dev/null 2>&1; then \
-		echo "$(1) already running on :$(2)"; \
+	@if curl -sf http://localhost:$(3)/healthz > /dev/null 2>&1; then \
+		printf "  $(CYAN)$(1)$(NC) already running on :$(2)\n"; \
 	else \
-		echo "Starting $(1) on :$(2) (admin :$(3))..."; \
+		printf "  Starting $(CYAN)$(1)$(NC) on :$(2) (admin :$(3))...\n"; \
 		SERVICE_NAME=$(1) HTTP_PORT=$(2) ADMIN_PORT=$(3) $(4) \
 			go run ./services/$(1)/cmd/ > /tmp/bookinfo-$(1).log 2>&1 & \
-		echo "  PID: $$!  Log: /tmp/bookinfo-$(1).log"; \
 	fi
+endef
+
+# wait-healthy: poll a service's admin healthz endpoint with timeout
+# Usage: $(call wait-healthy,name,admin_port)
+define wait-healthy
+	@timeout=15; elapsed=0; \
+	while [ $$elapsed -lt $$timeout ]; do \
+		if curl -sf http://localhost:$(2)/healthz > /dev/null 2>&1; then \
+			break; \
+		fi; \
+		sleep 1; \
+		elapsed=$$((elapsed + 1)); \
+	done
 endef
 
 .PHONY: run
 run: ## Start all services locally (background, memory backend)
+	@printf "\n$(BOLD)Starting bookinfo services...$(NC)\n\n"
 	$(call start-service,ratings,$(RATINGS_HTTP_PORT),$(RATINGS_ADMIN_PORT),)
 	$(call start-service,details,$(DETAILS_HTTP_PORT),$(DETAILS_ADMIN_PORT),)
-	@sleep 1
+	$(call wait-healthy,ratings,$(RATINGS_ADMIN_PORT))
+	$(call wait-healthy,details,$(DETAILS_ADMIN_PORT))
 	$(call start-service,reviews,$(REVIEWS_HTTP_PORT),$(REVIEWS_ADMIN_PORT),RATINGS_SERVICE_URL=http://localhost:$(RATINGS_HTTP_PORT))
 	$(call start-service,notification,$(NOTIFICATION_HTTP_PORT),$(NOTIFICATION_ADMIN_PORT),)
-	@sleep 1
+	$(call wait-healthy,reviews,$(REVIEWS_ADMIN_PORT))
+	$(call wait-healthy,notification,$(NOTIFICATION_ADMIN_PORT))
 	$(call start-service,productpage,$(PRODUCTPAGE_HTTP_PORT),$(PRODUCTPAGE_ADMIN_PORT),DETAILS_SERVICE_URL=http://localhost:$(DETAILS_HTTP_PORT) REVIEWS_SERVICE_URL=http://localhost:$(REVIEWS_HTTP_PORT))
-	@echo ""
-	@echo "All services starting. Check health:"
-	@echo "  curl http://localhost:$(RATINGS_ADMIN_PORT)/healthz"
-	@echo "  curl http://localhost:$(DETAILS_ADMIN_PORT)/healthz"
-	@echo "  curl http://localhost:$(REVIEWS_ADMIN_PORT)/healthz"
-	@echo "  curl http://localhost:$(NOTIFICATION_ADMIN_PORT)/healthz"
-	@echo "  curl http://localhost:$(PRODUCTPAGE_ADMIN_PORT)/healthz"
+	$(call wait-healthy,productpage,$(PRODUCTPAGE_ADMIN_PORT))
+	@printf "\n$(BOLD)Service Status$(NC)\n"
+	@printf "  %-14s %-10s %-10s %s\n" "SERVICE" "API" "ADMIN" "STATUS"
+	@printf "  %-14s %-10s %-10s %s\n" "──────────────" "──────────" "──────────" "──────"
+	@for entry in \
+		"ratings:$(RATINGS_HTTP_PORT):$(RATINGS_ADMIN_PORT)" \
+		"details:$(DETAILS_HTTP_PORT):$(DETAILS_ADMIN_PORT)" \
+		"reviews:$(REVIEWS_HTTP_PORT):$(REVIEWS_ADMIN_PORT)" \
+		"notification:$(NOTIFICATION_HTTP_PORT):$(NOTIFICATION_ADMIN_PORT)" \
+		"productpage:$(PRODUCTPAGE_HTTP_PORT):$(PRODUCTPAGE_ADMIN_PORT)"; \
+	do \
+		name=$${entry%%:*}; rest=$${entry#*:}; \
+		http=$${rest%%:*}; admin=$${rest#*:}; \
+		if curl -sf http://localhost:$$admin/healthz > /dev/null 2>&1; then \
+			printf "  $(GREEN)%-14s$(NC) :%-9s :%-9s $(GREEN)healthy$(NC)\n" "$$name" "$$http" "$$admin"; \
+		else \
+			printf "  $(RED)%-14s$(NC) :%-9s :%-9s $(RED)failed$(NC)  (check /tmp/bookinfo-$$name.log)\n" "$$name" "$$http" "$$admin"; \
+		fi; \
+	done
+	@printf "\n  Logs: /tmp/bookinfo-{service}.log\n\n"
 
 .PHONY: stop
 stop: ## Stop all locally running services

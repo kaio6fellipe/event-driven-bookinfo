@@ -1,4 +1,4 @@
-// file: services/productpage/internal/model/product.go
+// Package model provides view models for the productpage service.
 package model
 
 // ProductDetail is the aggregated view model for a product detail page.

@@ -1,4 +1,3 @@
-// file: pkg/server/server_test.go
 package server_test
 
 import (
@@ -22,7 +21,7 @@ func getFreePort(t *testing.T) string {
 		t.Fatalf("failed to get free port: %v", err)
 	}
 	port := l.Addr().(*net.TCPAddr).Port
-	l.Close()
+	_ = l.Close()
 	return fmt.Sprintf("%d", port)
 }
 
@@ -38,9 +37,9 @@ func TestServer_BothPortsStart(t *testing.T) {
 	}
 
 	registerRoutes := func(mux *http.ServeMux) {
-		mux.HandleFunc("GET /v1/ping", func(w http.ResponseWriter, r *http.Request) {
+		mux.HandleFunc("GET /v1/ping", func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{"pong": "true"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"pong": "true"})
 		})
 	}
 
@@ -61,14 +60,14 @@ func TestServer_BothPortsStart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to reach API port: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("API status = %d, want %d", resp.StatusCode, http.StatusOK)
 	}
 
 	var body map[string]string
-	json.NewDecoder(resp.Body).Decode(&body)
+	_ = json.NewDecoder(resp.Body).Decode(&body)
 	if body["pong"] != "true" {
 		t.Errorf("pong = %q, want %q", body["pong"], "true")
 	}
@@ -78,14 +77,14 @@ func TestServer_BothPortsStart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to reach admin port: %v", err)
 	}
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 
 	if resp2.StatusCode != http.StatusOK {
 		t.Errorf("admin /healthz status = %d, want %d", resp2.StatusCode, http.StatusOK)
 	}
 
 	var healthBody map[string]string
-	json.NewDecoder(resp2.Body).Decode(&healthBody)
+	_ = json.NewDecoder(resp2.Body).Decode(&healthBody)
 	if healthBody["status"] != "ok" {
 		t.Errorf("healthz status = %q, want %q", healthBody["status"], "ok")
 	}
@@ -95,7 +94,7 @@ func TestServer_BothPortsStart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to reach admin readyz: %v", err)
 	}
-	defer resp3.Body.Close()
+	defer func() { _ = resp3.Body.Close() }()
 
 	if resp3.StatusCode != http.StatusOK {
 		t.Errorf("admin /readyz status = %d, want %d", resp3.StatusCode, http.StatusOK)
@@ -126,7 +125,7 @@ func TestServer_GracefulShutdown(t *testing.T) {
 	}
 
 	registerRoutes := func(mux *http.ServeMux) {
-		mux.HandleFunc("GET /v1/slow", func(w http.ResponseWriter, r *http.Request) {
+		mux.HandleFunc("GET /v1/slow", func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(100 * time.Millisecond)
 			w.WriteHeader(http.StatusOK)
 		})
@@ -165,11 +164,11 @@ func TestServer_AdminMetricsEndpoint(t *testing.T) {
 		LogLevel:    "error",
 	}
 
-	registerRoutes := func(mux *http.ServeMux) {}
+	registerRoutes := func(_ *http.ServeMux) {}
 
-	metricsHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	metricsHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
-		w.Write([]byte("# HELP test_metric A test metric\n# TYPE test_metric counter\ntest_metric 42\n"))
+		_, _ = w.Write([]byte("# HELP test_metric A test metric\n# TYPE test_metric counter\ntest_metric 42\n"))
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -186,7 +185,7 @@ func TestServer_AdminMetricsEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to reach /metrics: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("/metrics status = %d, want %d", resp.StatusCode, http.StatusOK)
@@ -208,7 +207,7 @@ func waitForServer(t *testing.T, port string) {
 	for time.Now().Before(deadline) {
 		conn, err := net.DialTimeout("tcp", "127.0.0.1:"+port, 100*time.Millisecond)
 		if err == nil {
-			conn.Close()
+			_ = conn.Close()
 			return
 		}
 		time.Sleep(10 * time.Millisecond)

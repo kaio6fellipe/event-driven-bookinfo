@@ -1,4 +1,4 @@
-// file: services/notification/internal/core/service/notification_service.go
+// Package service implements the business logic for the notification service.
 package service
 
 import (

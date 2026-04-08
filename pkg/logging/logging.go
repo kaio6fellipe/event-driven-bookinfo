@@ -1,4 +1,4 @@
-// file: pkg/logging/logging.go
+// Package logging provides structured JSON logging utilities and HTTP middleware.
 package logging
 
 import (

@@ -1,4 +1,4 @@
-// file: services/ratings/internal/core/domain/rating.go
+// Package domain contains the core domain model for the ratings service.
 package domain
 
 import (

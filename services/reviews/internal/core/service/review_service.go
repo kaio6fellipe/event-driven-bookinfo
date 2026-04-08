@@ -1,4 +1,4 @@
-// file: services/reviews/internal/core/service/review_service.go
+// Package service implements the business logic for the reviews service.
 package service
 
 import (

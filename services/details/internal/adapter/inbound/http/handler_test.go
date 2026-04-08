@@ -1,4 +1,3 @@
-// file: services/details/internal/adapter/inbound/http/handler_test.go
 package http_test
 
 import (
@@ -122,7 +121,7 @@ func TestGetDetail_Found(t *testing.T) {
 	mux.ServeHTTP(createRec, createReq)
 
 	var created handler.DetailResponse
-	json.NewDecoder(createRec.Body).Decode(&created)
+	_ = json.NewDecoder(createRec.Body).Decode(&created)
 
 	// Get the detail
 	getReq := httptest.NewRequest(http.MethodGet, "/v1/details/"+created.ID, nil)

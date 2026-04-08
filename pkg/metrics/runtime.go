@@ -1,4 +1,4 @@
-// file: pkg/metrics/runtime.go
+// Package metrics provides OTel-based Prometheus metrics setup and HTTP middleware.
 package metrics
 
 import (

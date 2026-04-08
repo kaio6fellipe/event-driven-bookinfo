@@ -1,3 +1,4 @@
+// Package telemetry configures OpenTelemetry tracing with an OTLP exporter.
 package telemetry
 
 import (
@@ -13,6 +14,8 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
+// Setup initializes OpenTelemetry tracing with an OTLP gRPC exporter when
+// OTEL_EXPORTER_OTLP_ENDPOINT is set. Returns a shutdown function.
 func Setup(ctx context.Context, serviceName string) (func(context.Context) error, error) {
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	if endpoint == "" {

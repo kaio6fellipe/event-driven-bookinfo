@@ -1,4 +1,4 @@
-// file: services/productpage/internal/handler/handler.go
+// Package handler provides the HTTP handlers for the productpage BFF service.
 package handler
 
 import (
@@ -74,7 +74,7 @@ func (h *Handler) homePage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	h.templates.ExecuteTemplate(w, "layout.html", struct {
+	_ = h.templates.ExecuteTemplate(w, "layout.html", struct {
 		Products []model.ProductDetail
 		Detail   *model.ProductDetail
 	}{Products: products})
@@ -108,7 +108,7 @@ func (h *Handler) productPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	h.templates.ExecuteTemplate(w, "layout.html", data)
+	_ = h.templates.ExecuteTemplate(w, "layout.html", data)
 }
 
 func (h *Handler) apiGetProduct(w http.ResponseWriter, r *http.Request) {
@@ -142,7 +142,7 @@ func (h *Handler) partialDetails(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Warn("failed to fetch detail for partial", "product_id", productID, "error", err)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`<p class="error">Failed to load details.</p>`))
+		_, _ = w.Write([]byte(`<p class="error">Failed to load details.</p>`))
 		return
 	}
 
@@ -160,7 +160,7 @@ func (h *Handler) partialDetails(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	h.templates.ExecuteTemplate(w, "details.html", data)
+	_ = h.templates.ExecuteTemplate(w, "details.html", data)
 }
 
 func (h *Handler) partialReviews(w http.ResponseWriter, r *http.Request) {
@@ -171,7 +171,7 @@ func (h *Handler) partialReviews(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Warn("failed to fetch reviews for partial", "product_id", productID, "error", err)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`<p class="error">Failed to load reviews.</p>`))
+		_, _ = w.Write([]byte(`<p class="error">Failed to load reviews.</p>`))
 		return
 	}
 
@@ -190,7 +190,7 @@ func (h *Handler) partialReviews(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	h.templates.ExecuteTemplate(w, "reviews.html", viewModels)
+	_ = h.templates.ExecuteTemplate(w, "reviews.html", viewModels)
 }
 
 func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
@@ -198,7 +198,7 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 
 	if err := r.ParseForm(); err != nil {
 		w.WriteHeader(http.StatusOK)
-		h.templates.ExecuteTemplate(w, "rating-form.html", map[string]any{
+		_ = h.templates.ExecuteTemplate(w, "rating-form.html", map[string]any{
 			"Success": false,
 			"Error":   "Invalid form data",
 		})
@@ -213,7 +213,7 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 	stars, err := strconv.Atoi(starsStr)
 	if err != nil {
 		w.WriteHeader(http.StatusOK)
-		h.templates.ExecuteTemplate(w, "rating-form.html", map[string]any{
+		_ = h.templates.ExecuteTemplate(w, "rating-form.html", map[string]any{
 			"Success": false,
 			"Error":   "Invalid stars value",
 		})
@@ -224,7 +224,7 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Warn("failed to submit rating", "error", err)
 		w.WriteHeader(http.StatusOK)
-		h.templates.ExecuteTemplate(w, "rating-form.html", map[string]any{
+		_ = h.templates.ExecuteTemplate(w, "rating-form.html", map[string]any{
 			"Success": false,
 			"Error":   err.Error(),
 		})
@@ -238,7 +238,7 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	h.templates.ExecuteTemplate(w, "rating-form.html", map[string]any{
+	_ = h.templates.ExecuteTemplate(w, "rating-form.html", map[string]any{
 		"Success":   true,
 		"Stars":     stars,
 		"ProductID": productID,
@@ -248,5 +248,5 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }

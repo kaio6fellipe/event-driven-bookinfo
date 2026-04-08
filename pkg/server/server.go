@@ -1,4 +1,4 @@
-// file: pkg/server/server.go
+// Package server provides a dual HTTP server (API + admin) with graceful shutdown.
 package server
 
 import (

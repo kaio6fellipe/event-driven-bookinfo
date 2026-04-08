@@ -1,4 +1,4 @@
-// file: services/reviews/cmd/main.go
+// Package main is the entry point for the reviews service.
 package main
 
 import (
@@ -37,7 +37,7 @@ func main() {
 		logger.Error("failed to setup telemetry", "error", err)
 		os.Exit(1)
 	}
-	defer shutdown(ctx)
+	defer func() { _ = shutdown(ctx) }()
 
 	metricsHandler, err := metrics.Setup(cfg.ServiceName)
 	if err != nil {

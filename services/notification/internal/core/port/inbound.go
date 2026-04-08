@@ -1,4 +1,4 @@
-// file: services/notification/internal/core/port/inbound.go
+// Package port defines the inbound and outbound interfaces for the notification service.
 package port
 
 import (

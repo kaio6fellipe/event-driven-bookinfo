@@ -1,4 +1,4 @@
-// file: services/details/internal/core/service/detail_service.go
+// Package service implements the business logic for the details service.
 package service
 
 import (

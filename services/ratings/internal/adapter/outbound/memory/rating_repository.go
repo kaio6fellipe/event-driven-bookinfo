@@ -1,4 +1,4 @@
-// file: services/ratings/internal/adapter/outbound/memory/rating_repository.go
+// Package memory provides an in-memory implementation of the ratings repository.
 package memory
 
 import (

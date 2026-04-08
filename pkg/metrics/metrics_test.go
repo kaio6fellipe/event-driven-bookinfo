@@ -43,7 +43,7 @@ func TestMiddleware_RecordsMetrics(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 

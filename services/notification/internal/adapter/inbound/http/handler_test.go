@@ -1,4 +1,3 @@
-// file: services/notification/internal/adapter/inbound/http/handler_test.go
 package http_test
 
 import (
@@ -112,7 +111,7 @@ func TestGetNotificationByID_Found(t *testing.T) {
 	mux.ServeHTTP(createRec, createReq)
 
 	var created handler.NotificationResponse
-	json.NewDecoder(createRec.Body).Decode(&created)
+	_ = json.NewDecoder(createRec.Body).Decode(&created)
 
 	// Get by ID
 	getReq := httptest.NewRequest(http.MethodGet, "/v1/notifications/"+created.ID, nil)
@@ -124,7 +123,7 @@ func TestGetNotificationByID_Found(t *testing.T) {
 	}
 
 	var body handler.NotificationResponse
-	json.NewDecoder(getRec.Body).Decode(&body)
+	_ = json.NewDecoder(getRec.Body).Decode(&body)
 
 	if body.ID != created.ID {
 		t.Errorf("ID = %q, want %q", body.ID, created.ID)
@@ -171,7 +170,7 @@ func TestGetNotificationsByRecipient(t *testing.T) {
 	}
 
 	var body handler.NotificationsListResponse
-	json.NewDecoder(rec.Body).Decode(&body)
+	_ = json.NewDecoder(rec.Body).Decode(&body)
 
 	if len(body.Notifications) != 2 {
 		t.Errorf("expected 2 notifications, got %d", len(body.Notifications))

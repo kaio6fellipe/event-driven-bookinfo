@@ -1,5 +1,5 @@
-// file: services/notification/internal/adapter/outbound/log/dispatcher.go
-package log
+// Package log provides a log-based notification dispatcher for development use.
+package log //nolint:revive // package name matches directory convention
 
 import (
 	"context"

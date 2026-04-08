@@ -1,5 +1,5 @@
-// file: services/details/internal/adapter/inbound/http/dto.go
-package http
+// Package http provides HTTP handlers and DTOs for the details service.
+package http //nolint:revive // package name matches directory convention
 
 // AddDetailRequest is the JSON body for POST /v1/details.
 type AddDetailRequest struct {

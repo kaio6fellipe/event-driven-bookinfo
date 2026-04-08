@@ -45,7 +45,7 @@ func setupMockServers(t *testing.T) (detailsURL, reviewsURL, ratingsURL string) 
 	detailsMux := http.NewServeMux()
 	detailsMux.HandleFunc("GET /v1/details/{id}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"id":        r.PathValue("id"),
 			"title":     "Test Book",
 			"author":    "Test Author",
@@ -64,7 +64,7 @@ func setupMockServers(t *testing.T) (detailsURL, reviewsURL, ratingsURL string) 
 	reviewsMux := http.NewServeMux()
 	reviewsMux.HandleFunc("GET /v1/reviews/{id}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"product_id": r.PathValue("id"),
 			"reviews": []map[string]any{
 				{
@@ -81,10 +81,10 @@ func setupMockServers(t *testing.T) (detailsURL, reviewsURL, ratingsURL string) 
 	t.Cleanup(reviewsServer.Close)
 
 	ratingsMux := http.NewServeMux()
-	ratingsMux.HandleFunc("POST /v1/ratings", func(w http.ResponseWriter, r *http.Request) {
+	ratingsMux.HandleFunc("POST /v1/ratings", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"id":         "rating-1",
 			"product_id": "product-1",
 			"reviewer":   "bob",

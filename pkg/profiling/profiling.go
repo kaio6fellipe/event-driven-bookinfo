@@ -1,4 +1,4 @@
-// file: pkg/profiling/profiling.go
+// Package profiling provides Pyroscope continuous profiling integration.
 package profiling
 
 import (
@@ -41,6 +41,6 @@ func Start(cfg *config.Config) (func(), error) {
 	}
 
 	return func() {
-		profiler.Stop()
+		_ = profiler.Stop()
 	}, nil
 }

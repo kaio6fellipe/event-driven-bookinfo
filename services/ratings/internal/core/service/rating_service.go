@@ -1,4 +1,4 @@
-// file: services/ratings/internal/core/service/rating_service.go
+// Package service implements the business logic for the ratings service.
 package service
 
 import (

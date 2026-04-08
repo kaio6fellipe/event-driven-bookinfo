@@ -1,4 +1,4 @@
-// file: services/productpage/internal/client/ratings.go
+// Package client provides HTTP clients for communicating with backend services.
 package client
 
 import (
@@ -61,11 +61,11 @@ func (c *RatingsClient) SubmitRating(ctx context.Context, productID, reviewer st
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) //nolint:gosec // URL comes from operator-controlled config, not user input
 	if err != nil {
 		return nil, fmt.Errorf("submitting rating: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("ratings service returned status %d", resp.StatusCode)

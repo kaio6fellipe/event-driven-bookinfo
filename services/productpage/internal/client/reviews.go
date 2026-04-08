@@ -1,4 +1,4 @@
-// file: services/productpage/internal/client/reviews.go
+// Package client provides HTTP clients for communicating with backend services.
 package client
 
 import (
@@ -56,11 +56,11 @@ func (c *ReviewsClient) GetProductReviews(ctx context.Context, productID string)
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) //nolint:gosec // URL comes from operator-controlled config, not user input
 	if err != nil {
 		return nil, fmt.Errorf("fetching reviews: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("reviews service returned status %d", resp.StatusCode)
@@ -94,11 +94,11 @@ func (c *ReviewsClient) SubmitReview(ctx context.Context, productID, reviewer, t
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) //nolint:gosec // URL comes from operator-controlled config, not user input
 	if err != nil {
 		return fmt.Errorf("submitting review: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("reviews service returned status %d", resp.StatusCode)

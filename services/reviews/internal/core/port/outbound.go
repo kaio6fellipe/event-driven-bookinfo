@@ -1,4 +1,4 @@
-// file: services/reviews/internal/core/port/outbound.go
+// Package port defines the inbound and outbound interfaces for the reviews service.
 package port
 
 import (

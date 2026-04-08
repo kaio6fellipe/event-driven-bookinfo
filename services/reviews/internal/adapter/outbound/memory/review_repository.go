@@ -1,4 +1,4 @@
-// file: services/reviews/internal/adapter/outbound/memory/review_repository.go
+// Package memory provides an in-memory implementation of the reviews repository.
 package memory
 
 import (

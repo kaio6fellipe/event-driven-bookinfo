@@ -1,4 +1,4 @@
-// file: services/notification/internal/core/domain/notification.go
+// Package domain contains the core domain model for the notification service.
 package domain
 
 import (
@@ -11,6 +11,7 @@ import (
 // Channel represents the notification delivery channel.
 type Channel string
 
+// Supported notification delivery channels.
 const (
 	ChannelEmail Channel = "email"
 	ChannelSMS   Channel = "sms"
@@ -20,6 +21,7 @@ const (
 // NotificationStatus represents the delivery status.
 type NotificationStatus string
 
+// Possible notification delivery statuses.
 const (
 	StatusQueued NotificationStatus = "queued"
 	StatusSent   NotificationStatus = "sent"

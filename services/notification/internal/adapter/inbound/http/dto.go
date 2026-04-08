@@ -1,5 +1,5 @@
-// file: services/notification/internal/adapter/inbound/http/dto.go
-package http
+// Package http provides HTTP handlers and DTOs for the notification service.
+package http //nolint:revive // package name matches directory convention
 
 import "time"
 

@@ -1,4 +1,4 @@
-// file: services/reviews/internal/core/domain/review.go
+// Package domain contains the core domain model for the reviews service.
 package domain
 
 import (

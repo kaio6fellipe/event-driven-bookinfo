@@ -1,5 +1,5 @@
-// file: services/reviews/internal/adapter/outbound/http/ratings_client.go
-package http
+// Package http provides an HTTP client for the ratings service used by reviews.
+package http //nolint:revive // package name matches directory convention
 
 import (
 	"context"
@@ -43,11 +43,11 @@ func (c *RatingsClient) GetProductRatings(ctx context.Context, productID string)
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) //nolint:gosec // URL comes from operator-controlled config, not user input
 	if err != nil {
 		return nil, fmt.Errorf("fetching ratings: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("ratings service returned status %d", resp.StatusCode)

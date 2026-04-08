@@ -1,4 +1,4 @@
-// file: services/notification/internal/adapter/outbound/memory/notification_repository.go
+// Package memory provides an in-memory implementation of the notification repository.
 package memory
 
 import (

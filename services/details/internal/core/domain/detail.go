@@ -1,4 +1,4 @@
-// file: services/details/internal/core/domain/detail.go
+// Package domain contains the core domain model for the details service.
 package domain
 
 import (

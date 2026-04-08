@@ -168,7 +168,7 @@ func TestMiddleware_LogsRequestCompletion(t *testing.T) {
 	var buf bytes.Buffer
 	logger := logging.NewWithWriter("info", "test-service", &buf)
 
-	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 	})
 

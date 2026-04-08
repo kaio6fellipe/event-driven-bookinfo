@@ -1,5 +1,5 @@
-// file: pkg/metrics/middleware.go
-package metrics
+// Package metrics provides OTel-based Prometheus metrics setup and HTTP middleware.
+package metrics //nolint:revive // package name is intentional; does not shadow stdlib
 
 import (
 	"fmt"

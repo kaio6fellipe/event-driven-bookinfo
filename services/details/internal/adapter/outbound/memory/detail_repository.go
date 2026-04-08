@@ -1,4 +1,4 @@
-// file: services/details/internal/adapter/outbound/memory/detail_repository.go
+// Package memory provides an in-memory implementation of the details repository.
 package memory
 
 import (

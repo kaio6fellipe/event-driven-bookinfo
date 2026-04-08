@@ -1,4 +1,4 @@
-// file: services/productpage/internal/client/details.go
+// Package client provides HTTP clients for communicating with backend services.
 package client
 
 import (
@@ -48,11 +48,11 @@ func (c *DetailsClient) GetDetail(ctx context.Context, id string) (*DetailRespon
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) //nolint:gosec // URL comes from operator-controlled config, not user input
 	if err != nil {
 		return nil, fmt.Errorf("fetching detail: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("detail not found: %s", id)
@@ -78,11 +78,11 @@ func (c *DetailsClient) ListDetails(ctx context.Context) ([]DetailResponse, erro
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) //nolint:gosec // URL comes from operator-controlled config, not user input
 	if err != nil {
 		return nil, fmt.Errorf("fetching details list: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("details service returned status %d", resp.StatusCode)

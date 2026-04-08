@@ -1,4 +1,4 @@
-// file: services/details/internal/core/port/outbound.go
+// Package port defines the inbound and outbound interfaces for the details service.
 package port
 
 import (

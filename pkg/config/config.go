@@ -1,3 +1,4 @@
+// Package config loads service configuration from environment variables.
 package config
 
 import (
@@ -5,6 +6,7 @@ import (
 	"os"
 )
 
+// Config holds all runtime configuration for a service.
 type Config struct {
 	ServiceName            string
 	HTTPPort               string
@@ -16,6 +18,8 @@ type Config struct {
 	PyroscopeServerAddress string
 }
 
+// Load reads configuration from environment variables and returns a Config.
+// Returns an error if required variables are missing or invalid.
 func Load() (*Config, error) {
 	cfg := &Config{
 		ServiceName:            os.Getenv("SERVICE_NAME"),

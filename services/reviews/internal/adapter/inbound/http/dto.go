@@ -1,5 +1,5 @@
-// file: services/reviews/internal/adapter/inbound/http/dto.go
-package http
+// Package http provides HTTP handlers and DTOs for the reviews service.
+package http //nolint:revive // package name matches directory convention
 
 // SubmitReviewRequest is the JSON body for POST /v1/reviews.
 type SubmitReviewRequest struct {

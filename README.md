@@ -163,7 +163,7 @@ By default all services use the in-memory storage backend. To use PostgreSQL, se
 
 ## Docker
 
-Each service has its own Dockerfile (`Dockerfile.<service>`). Backend services use `FROM scratch` for the smallest possible image; productpage uses `gcr.io/distroless/static-debian12:nonroot` because it needs the HTML templates directory alongside the binary.
+Each service has its own Dockerfile in the `build/` directory (`build/Dockerfile.<service>`). Backend services use `FROM scratch` for the smallest possible image; productpage uses `gcr.io/distroless/static-debian12:nonroot` because it needs the HTML templates directory alongside the binary.
 
 ```bash
 # Build a single image
@@ -354,7 +354,8 @@ event-driven-bookinfo/
 │       └── sensors/            # Sensor + HTTP trigger manifests
 ├── test/
 │   └── e2e/                    # docker-compose files + shell test scripts
-├── Dockerfile.<service>        # One per service (5 total)
+├── build/
+│   └── Dockerfile.<service>    # One per service (5 total)
 ├── Makefile
 ├── .golangci.yml               # golangci-lint v2 configuration
 ├── .goreleaser.yaml            # GoReleaser v2 multi-binary release config

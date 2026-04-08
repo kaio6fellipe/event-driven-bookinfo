@@ -110,7 +110,7 @@ dockers:
       - productpage
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:{{ .Tag }}-amd64"
-    dockerfile: Dockerfile.productpage
+    dockerfile: build/Dockerfile.productpage
     use: buildx
     build_flag_templates:
       - "--platform=linux/amd64"
@@ -124,7 +124,7 @@ dockers:
       - productpage
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:{{ .Tag }}-arm64"
-    dockerfile: Dockerfile.productpage
+    dockerfile: build/Dockerfile.productpage
     use: buildx
     build_flag_templates:
       - "--platform=linux/arm64"
@@ -138,7 +138,7 @@ dockers:
       - details
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/details:{{ .Tag }}-amd64"
-    dockerfile: Dockerfile.details
+    dockerfile: build/Dockerfile.details
     use: buildx
     build_flag_templates:
       - "--platform=linux/amd64"
@@ -152,7 +152,7 @@ dockers:
       - details
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/details:{{ .Tag }}-arm64"
-    dockerfile: Dockerfile.details
+    dockerfile: build/Dockerfile.details
     use: buildx
     build_flag_templates:
       - "--platform=linux/arm64"
@@ -166,7 +166,7 @@ dockers:
       - reviews
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/reviews:{{ .Tag }}-amd64"
-    dockerfile: Dockerfile.reviews
+    dockerfile: build/Dockerfile.reviews
     use: buildx
     build_flag_templates:
       - "--platform=linux/amd64"
@@ -180,7 +180,7 @@ dockers:
       - reviews
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/reviews:{{ .Tag }}-arm64"
-    dockerfile: Dockerfile.reviews
+    dockerfile: build/Dockerfile.reviews
     use: buildx
     build_flag_templates:
       - "--platform=linux/arm64"
@@ -194,7 +194,7 @@ dockers:
       - ratings
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/ratings:{{ .Tag }}-amd64"
-    dockerfile: Dockerfile.ratings
+    dockerfile: build/Dockerfile.ratings
     use: buildx
     build_flag_templates:
       - "--platform=linux/amd64"
@@ -208,7 +208,7 @@ dockers:
       - ratings
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/ratings:{{ .Tag }}-arm64"
-    dockerfile: Dockerfile.ratings
+    dockerfile: build/Dockerfile.ratings
     use: buildx
     build_flag_templates:
       - "--platform=linux/arm64"
@@ -222,7 +222,7 @@ dockers:
       - notification
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/notification:{{ .Tag }}-amd64"
-    dockerfile: Dockerfile.notification
+    dockerfile: build/Dockerfile.notification
     use: buildx
     build_flag_templates:
       - "--platform=linux/amd64"
@@ -236,7 +236,7 @@ dockers:
       - notification
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/notification:{{ .Tag }}-arm64"
-    dockerfile: Dockerfile.notification
+    dockerfile: build/Dockerfile.notification
     use: buildx
     build_flag_templates:
       - "--platform=linux/arm64"

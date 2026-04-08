@@ -2,7 +2,7 @@ services:
   ratings:
     build:
       context: ../..
-      dockerfile: Dockerfile.ratings
+      dockerfile: build/Dockerfile.ratings
     ports:
       - "8083:8080"
       - "9093:9090"
@@ -13,7 +13,7 @@ services:
   details:
     build:
       context: ../..
-      dockerfile: Dockerfile.details
+      dockerfile: build/Dockerfile.details
     ports:
       - "8081:8080"
       - "9091:9090"
@@ -24,7 +24,7 @@ services:
   reviews:
     build:
       context: ../..
-      dockerfile: Dockerfile.reviews
+      dockerfile: build/Dockerfile.reviews
     ports:
       - "8082:8080"
       - "9092:9090"
@@ -38,7 +38,7 @@ services:
   notification:
     build:
       context: ../..
-      dockerfile: Dockerfile.notification
+      dockerfile: build/Dockerfile.notification
     ports:
       - "8084:8080"
       - "9094:9090"
@@ -49,7 +49,7 @@ services:
   productpage:
     build:
       context: ../..
-      dockerfile: Dockerfile.productpage
+      dockerfile: build/Dockerfile.productpage
     ports:
       - "8080:8080"
       - "9090:9090"

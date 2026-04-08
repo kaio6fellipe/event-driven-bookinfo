@@ -60,13 +60,13 @@ docker-build: ## Build Docker image for one service: make docker-build SERVICE=<
 ifndef SERVICE
 	$(error SERVICE is not set. Usage: make docker-build SERVICE=<name>)
 endif
-	docker build -f Dockerfile.$(SERVICE) -t event-driven-bookinfo/$(SERVICE):latest .
+	docker build -f build/Dockerfile.$(SERVICE) -t event-driven-bookinfo/$(SERVICE):latest .
 
 .PHONY: docker-build-all
 docker-build-all: ## Build Docker images for all 5 services
 	@for svc in $(SERVICES); do \
 		echo "Building Docker image for $$svc..."; \
-		docker build -f Dockerfile.$$svc -t event-driven-bookinfo/$$svc:latest . || exit 1; \
+		docker build -f build/Dockerfile.$$svc -t event-driven-bookinfo/$$svc:latest . || exit 1; \
 	done
 	@echo "All Docker images built successfully."
 

@@ -183,6 +183,13 @@ stop: ## Stop all locally running services
 	done
 	@echo "All services stopped."
 
+BOOKINFO_SERVICES_LIST := ratings details reviews notification productpage
+
+.PHONY: run-logs
+run-logs: ## Tail logs from all running services (Ctrl+C to stop)
+	@tail -f $(foreach svc,$(BOOKINFO_SERVICES_LIST),/tmp/bookinfo-$(svc).log) 2>/dev/null || \
+		printf "$(RED)No log files found.$(NC) Run $(CYAN)make run$(NC) first.\n"
+
 # ─── E2E ────────────────────────────────────────────────────────────────────
 
 .PHONY: e2e

@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: productpage
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: productpage
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits: {}

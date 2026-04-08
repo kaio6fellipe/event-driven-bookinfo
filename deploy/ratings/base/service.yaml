@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ratings
+  labels:
+    app: ratings
+    part-of: event-driven-bookinfo
+spec:
+  type: ClusterIP
+  selector:
+    app: ratings
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

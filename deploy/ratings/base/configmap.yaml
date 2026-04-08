@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ratings
+  labels:
+    app: ratings
+    part-of: event-driven-bookinfo
+data:
+  HTTP_PORT: "8080"
+  ADMIN_PORT: "9090"
+  LOG_LEVEL: "info"
+  STORAGE_BACKEND: "memory"
+  SERVICE_NAME: "ratings"

@@ -73,8 +73,8 @@ docker-build-all: ## Build Docker images for all 5 services
 # ─── E2E ────────────────────────────────────────────────────────────────────
 
 .PHONY: e2e
-e2e: ## Run E2E tests via docker-compose (placeholder)
-	@echo "E2E tests not yet implemented. Run: docker-compose -f test/e2e/docker-compose.yml up"
+e2e: ## Run E2E tests via docker-compose
+	bash test/e2e/run-tests.sh
 
 # ─── Cleanup ────────────────────────────────────────────────────────────────
 

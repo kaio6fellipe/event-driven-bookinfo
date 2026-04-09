@@ -39,11 +39,11 @@ func Run(
 	apiMux := http.NewServeMux()
 	registerRoutes(apiMux)
 
-	// Wrap with middleware chain: logging -> metrics -> tracing -> handler
+	// Wrap with middleware chain: tracing -> logging -> metrics -> handler
 	var apiHandler http.Handler = apiMux
-	apiHandler = otelhttp.NewHandler(apiHandler, cfg.ServiceName+"-api")
 	apiHandler = metrics.Middleware(cfg.ServiceName)(apiHandler)
 	apiHandler = logging.Middleware(logger)(apiHandler)
+	apiHandler = otelhttp.NewHandler(apiHandler, cfg.ServiceName+"-api")
 
 	apiServer := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,

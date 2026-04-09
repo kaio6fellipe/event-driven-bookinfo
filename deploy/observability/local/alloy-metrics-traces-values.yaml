@@ -37,6 +37,18 @@ alloy:
           ]
         }
         output {
+          traces = [otelcol.processor.attributes.cluster.input]
+        }
+      }
+
+      // -- Static Cluster Name Attribute --
+      otelcol.processor.attributes "cluster" {
+        action {
+          key    = "k8s.cluster.name"
+          value  = "bookinfo-local"
+          action = "insert"
+        }
+        output {
           traces = [otelcol.processor.batch.default.input]
         }
       }
@@ -102,6 +114,47 @@ alloy:
 
       prometheus.scrape "bookinfo" {
         targets    = discovery.relabel.bookinfo_metrics.output
+        forward_to = [prometheus.remote_write.default.receiver]
+        scrape_interval = "15s"
+      }
+
+      // -- Prometheus Metrics Scraping (Envoy Gateway) --
+      discovery.kubernetes "envoy_pods" {
+        role = "pod"
+        namespaces {
+          names = ["envoy-gateway-system"]
+        }
+      }
+
+      discovery.relabel "envoy_metrics" {
+        targets = discovery.kubernetes.envoy_pods.targets
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_gateway_envoyproxy_io_owning_gateway_name"]
+          regex         = "default-gw"
+          action        = "keep"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_ip"]
+          target_label  = "__address__"
+          replacement   = "$1:19001"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+        rule {
+          replacement  = "/stats/prometheus"
+          target_label = "__metrics_path__"
+        }
+      }
+
+      prometheus.scrape "envoy" {
+        targets    = discovery.relabel.envoy_metrics.output
         forward_to = [prometheus.remote_write.default.receiver]
         scrape_interval = "15s"
       }

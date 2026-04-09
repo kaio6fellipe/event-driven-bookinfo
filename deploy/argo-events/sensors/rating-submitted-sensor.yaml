@@ -34,7 +34,7 @@ spec:
           payload:
             - src:
                 dependencyName: rating-submitted-dep
-                dataKey: body.title
+                dataKey: body.product_id
               dest: subject
             - src:
                 dependencyName: rating-submitted-dep

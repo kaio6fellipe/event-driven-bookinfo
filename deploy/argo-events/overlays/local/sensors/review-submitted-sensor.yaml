@@ -42,7 +42,7 @@ spec:
           payload:
             - src:
                 dependencyName: review-submitted-dep
-                dataKey: body.title
+                dataKey: body.product_id
               dest: subject
             - src:
                 dependencyName: review-submitted-dep

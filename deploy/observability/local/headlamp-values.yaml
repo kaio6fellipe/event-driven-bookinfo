@@ -1,0 +1,15 @@
+# Headlamp Kubernetes Dashboard
+# Helm chart: headlamp/headlamp
+# Repo: https://kubernetes-sigs.github.io/headlamp/
+
+service:
+  type: NodePort
+  port: 80
+  nodePort: 30444
+
+clusterRoleBinding:
+  create: true
+  clusterRoleName: cluster-admin
+
+ingress:
+  enabled: false

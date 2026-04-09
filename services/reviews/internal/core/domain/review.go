@@ -14,6 +14,13 @@ type ReviewRating struct {
 	Count   int
 }
 
+// RatingData holds both product-level and per-reviewer rating data.
+type RatingData struct {
+	Average           float64
+	Count             int
+	IndividualRatings map[string]int // reviewer -> stars
+}
+
 // Review represents a user review for a product.
 type Review struct {
 	ID        string

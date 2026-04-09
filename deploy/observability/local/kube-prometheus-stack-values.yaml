@@ -3,6 +3,8 @@ prometheus:
     replicas: 1
     retention: 24h
     enableRemoteWriteReceiver: true
+    enableFeatures:
+      - exemplar-storage
     resources:
       requests:
         cpu: 100m
@@ -27,9 +29,14 @@ grafana:
   service:
     type: NodePort
     nodePort: 30300
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: observability
   additionalDataSources:
     - name: Tempo
       type: tempo
+      uid: tempo
       url: http://tempo.observability.svc.cluster.local:3200
       access: proxy
       isDefault: false
@@ -37,8 +44,28 @@ grafana:
         tracesToLogsV2:
           datasourceUid: loki
           filterByTraceID: true
+          filterBySpanID: false
+          spanStartTimeShift: "-5m"
+          spanEndTimeShift: "5m"
+          tags:
+            - key: "k8s.namespace.name"
+              value: "namespace"
+            - key: "k8s.pod.name"
+              value: "pod"
         tracesToMetrics:
           datasourceUid: prometheus
+          spanStartTimeShift: "-5m"
+          spanEndTimeShift: "5m"
+          tags:
+            - key: "service.name"
+              value: "service"
+          queries:
+            - name: "Request rate"
+              query: "sum(rate(traces_spanmetrics_calls_total{$$__tags}[5m]))"
+            - name: "Error rate"
+              query: "sum(rate(traces_spanmetrics_calls_total{$$__tags, status_code=\"STATUS_CODE_ERROR\"}[5m]))"
+            - name: "Latency (p95)"
+              query: "histogram_quantile(0.95, sum(rate(traces_spanmetrics_latency_bucket{$$__tags}[5m])) by (le))"
         serviceMap:
           datasourceUid: prometheus
         nodeGraph:
@@ -55,6 +82,9 @@ grafana:
             matcherRegex: '"trace_id":"(\w+)"'
             name: TraceID
             url: "$${__value.raw}"
+  persistence:
+    enabled: true
+    size: 1Gi
   resources:
     requests:
       cpu: 100m

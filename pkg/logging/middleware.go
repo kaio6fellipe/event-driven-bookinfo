@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 // responseWriter wraps http.ResponseWriter to capture the status code.
@@ -43,6 +44,14 @@ func Middleware(logger *slog.Logger) func(http.Handler) http.Handler {
 				slog.String("path", r.URL.Path),
 				slog.String("remote_addr", r.RemoteAddr),
 			)
+
+			spanCtx := oteltrace.SpanContextFromContext(r.Context())
+			if spanCtx.IsValid() {
+				reqLogger = reqLogger.With(
+					slog.String("trace_id", spanCtx.TraceID().String()),
+					slog.String("span_id", spanCtx.SpanID().String()),
+				)
+			}
 
 			ctx := WithContext(r.Context(), reqLogger)
 			r = r.WithContext(ctx)

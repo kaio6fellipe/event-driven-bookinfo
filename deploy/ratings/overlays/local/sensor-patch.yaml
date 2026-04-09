@@ -3,16 +3,18 @@ kind: Sensor
 metadata:
   name: rating-submitted-sensor
 spec:
-  eventBusName: kafka
-  dependencies:
-    - name: rating-submitted-dep
-      eventSourceName: rating-submitted
-      eventName: rating-submitted
+  template:
+    container:
+      env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+        - name: OTEL_SERVICE_NAME
+          value: "rating-submitted-sensor"
   triggers:
     - template:
         name: create-rating
         http:
-          url: http://ratings/v1/ratings
+          url: http://ratings-write.bookinfo.svc.cluster.local/v1/ratings
           method: POST
           headers:
             Content-Type: application/json
@@ -27,14 +29,14 @@ spec:
     - template:
         name: notify-rating-submitted
         http:
-          url: http://notification/v1/notifications
+          url: http://notification.bookinfo.svc.cluster.local/v1/notifications
           method: POST
           headers:
             Content-Type: application/json
           payload:
             - src:
                 dependencyName: rating-submitted-dep
-                dataKey: body.title
+                dataKey: body.product_id
               dest: subject
             - src:
                 dependencyName: rating-submitted-dep

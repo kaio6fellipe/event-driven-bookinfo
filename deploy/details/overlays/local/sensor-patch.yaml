@@ -2,9 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: book-added-sensor
-  namespace: bookinfo
 spec:
-  eventBusName: kafka
   template:
     container:
       env:
@@ -12,10 +10,6 @@ spec:
           value: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
         - name: OTEL_SERVICE_NAME
           value: "book-added-sensor"
-  dependencies:
-    - name: book-added-dep
-      eventSourceName: book-added
-      eventName: book-added
   triggers:
     - template:
         name: create-detail

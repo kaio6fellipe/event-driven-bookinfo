@@ -5,6 +5,8 @@ resources:
   - deployment.yaml
   - service.yaml
   - configmap.yaml
+  - eventsource.yaml
+  - sensor.yaml
 
 commonLabels:
   app: details

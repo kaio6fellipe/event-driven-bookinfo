@@ -58,12 +58,12 @@ make k8s-logs           # Tail bookinfo namespace logs
 
 ```
 deploy/
-├── <service>/overlays/local/    # CQRS read/write split per service
-├── argo-events/overlays/local/  # EventBus + EventSources (API-aligned webhooks) + sensors targeting -write services
+├── <service>/base/              # Deployment, Service, ConfigMap, EventSource, Sensor (details/reviews/ratings)
+├── <service>/overlays/local/    # CQRS read/write split, eventsource-service, local patches
 ├── gateway/base/                # Gateway, GatewayClass, ReferenceGrant
 ├── gateway/overlays/local/      # HTTPRoutes for bookinfo
 ├── observability/local/         # Helm values: Prometheus, Grafana, Tempo, Loki, Alloy
-├── platform/local/              # Helm values: Strimzi, Argo Events; Kafka CRDs
+├── platform/local/              # Helm values: Strimzi, Argo Events; Kafka CRDs; EventBus
 └── postgres/local/              # StatefulSet, Service, init ConfigMap
 ```
 

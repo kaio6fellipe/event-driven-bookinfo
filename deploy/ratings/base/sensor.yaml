@@ -1,31 +1,31 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: review-submitted-sensor
+  name: rating-submitted-sensor
 spec:
   eventBusName: kafka
   dependencies:
-    - name: review-submitted-dep
-      eventSourceName: review-submitted
-      eventName: review-submitted
+    - name: rating-submitted-dep
+      eventSourceName: rating-submitted
+      eventName: rating-submitted
   triggers:
     - template:
-        name: create-review
+        name: create-rating
         http:
-          url: http://reviews/v1/reviews
+          url: http://ratings/v1/ratings
           method: POST
           headers:
             Content-Type: application/json
           payload:
             - src:
-                dependencyName: review-submitted-dep
+                dependencyName: rating-submitted-dep
                 dataKey: body
               dest: ""
       retryStrategy:
         steps: 3
         duration: 2s
     - template:
-        name: notify-review-submitted
+        name: notify-rating-submitted
         http:
           url: http://notification/v1/notifications
           method: POST
@@ -33,19 +33,19 @@ spec:
             Content-Type: application/json
           payload:
             - src:
-                dependencyName: review-submitted-dep
-                dataKey: body.title
+                dependencyName: rating-submitted-dep
+                dataKey: body.product_id
               dest: subject
             - src:
-                dependencyName: review-submitted-dep
-                value: "New review submitted"
+                dependencyName: rating-submitted-dep
+                value: "New rating submitted"
               dest: body
             - src:
-                dependencyName: review-submitted-dep
+                dependencyName: rating-submitted-dep
                 value: "system@bookinfo"
               dest: recipient
             - src:
-                dependencyName: review-submitted-dep
+                dependencyName: rating-submitted-dep
                 value: "email"
               dest: channel
       retryStrategy:

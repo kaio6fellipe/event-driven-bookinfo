@@ -248,31 +248,31 @@ stop-k8s: ##@Kubernetes Delete k3d cluster and all resources
 	fi
 
 .PHONY: k8s-platform
-k8s-platform: ##@Kubernetes Install platform: Envoy Gateway, Strimzi, Kafka, Argo Events
+k8s-platform: ##@Kubernetes Install platform: Envoy Gateway, Strimzi, Kafka, Argo Events, EventBus
 	$(k8s-guard)
 	@printf "\n$(BOLD)═══ Platform Layer ═══$(NC)\n\n"
 	@$(KUBECTL) create namespace $(K8S_NS_PLATFORM) --dry-run=client -o yaml | $(KUBECTL) apply -f -
-	@printf "$(BOLD)[1/5] Installing Envoy Gateway...$(NC)\n"
+	@printf "$(BOLD)[1/6] Installing Envoy Gateway...$(NC)\n"
 	@$(HELM) upgrade --install eg oci://docker.io/envoyproxy/gateway-helm \
 		--version v1.7.0 \
 		-n envoy-gateway-system --create-namespace \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Envoy Gateway controller ready.$(NC)\n"
-	@printf "$(BOLD)[2/5] Installing Strimzi operator...$(NC)\n"
+	@printf "$(BOLD)[2/6] Installing Strimzi operator...$(NC)\n"
 	@$(HELM) repo add strimzi https://strimzi.io/charts/ --force-update 2>/dev/null || true
 	@$(HELM) upgrade --install strimzi strimzi/strimzi-kafka-operator \
 		-n $(K8S_NS_PLATFORM) \
 		-f deploy/platform/local/strimzi-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Strimzi operator ready.$(NC)\n"
-	@printf "$(BOLD)[3/5] Deploying Kafka cluster (KRaft)...$(NC)\n"
+	@printf "$(BOLD)[3/6] Deploying Kafka cluster (KRaft)...$(NC)\n"
 	@$(KUBECTL) apply -f deploy/platform/local/kafka-nodepool.yaml
 	@$(KUBECTL) apply -f deploy/platform/local/kafka-cluster.yaml
 	@printf "  Waiting for Kafka cluster to be ready (this takes ~60-90s)...\n"
 	@$(KUBECTL) wait kafka/bookinfo-kafka -n $(K8S_NS_PLATFORM) \
 		--for=condition=Ready --timeout=300s
 	@printf "  $(GREEN)Kafka cluster ready.$(NC)\n"
-	@printf "$(BOLD)[4/5] Installing Argo Events controller...$(NC)\n"
+	@printf "$(BOLD)[4/6] Installing Argo Events controller...$(NC)\n"
 	@$(HELM) repo add argo https://argoproj.github.io/argo-helm --force-update 2>/dev/null || true
 	@$(HELM) upgrade --install argo-events argo/argo-events \
 		-n $(K8S_NS_PLATFORM) \
@@ -283,12 +283,16 @@ k8s-platform: ##@Kubernetes Install platform: Envoy Gateway, Strimzi, Kafka, Arg
 	@curl -sL https://github.com/kaio6fellipe/event-driven-bookinfo/releases/download/argo-events-prs-3961-3983/argoproj.io_eventsources.yaml | $(KUBECTL) apply --server-side --force-conflicts -f -
 	@curl -sL https://github.com/kaio6fellipe/event-driven-bookinfo/releases/download/argo-events-prs-3961-3983/argoproj.io_sensors.yaml | $(KUBECTL) apply --server-side --force-conflicts -f -
 	@printf "  $(GREEN)Argo Events controller ready (custom CRDs applied).$(NC)\n"
-	@printf "$(BOLD)[5/5] Applying Gateway default-gw...$(NC)\n"
+	@printf "$(BOLD)[5/6] Deploying EventBus...$(NC)\n"
+	@$(KUBECTL) create namespace $(K8S_NS_BOOKINFO) --dry-run=client -o yaml | $(KUBECTL) apply -f -
+	@$(KUBECTL) apply -f deploy/platform/local/eventbus.yaml
+	@printf "  $(GREEN)EventBus applied.$(NC)\n"
+	@printf "$(BOLD)[6/6] Applying Gateway default-gw...$(NC)\n"
 	@$(KUBECTL) apply -k deploy/gateway/base/
 	@printf "  Waiting for Gateway to be programmed...\n"
 	@$(KUBECTL) wait gateway/default-gw -n $(K8S_NS_PLATFORM) \
-		--for=condition=Programmed --timeout=120s
-	@printf "  $(GREEN)Gateway default-gw programmed.$(NC)\n"
+		--for=condition=Programmed --timeout=120s || \
+		printf "  $(YELLOW)Gateway not yet programmed (will reconcile after observability stack is deployed).$(NC)\n"
 	@printf "\n$(GREEN)$(BOLD)Platform layer complete.$(NC)\n\n"
 
 .PHONY: k8s-observability
@@ -296,68 +300,69 @@ k8s-observability: ##@Kubernetes Install observability: Prometheus, Grafana, Tem
 	$(k8s-guard)
 	@printf "\n$(BOLD)═══ Observability Layer ═══$(NC)\n\n"
 	@$(KUBECTL) create namespace $(K8S_NS_OBSERVABILITY) --dry-run=client -o yaml | $(KUBECTL) apply -f -
-	@printf "$(BOLD)[1/5] Installing kube-prometheus-stack...$(NC)\n"
+	@printf "$(BOLD)[1/6] Installing kube-prometheus-stack...$(NC)\n"
 	@$(HELM) repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update 2>/dev/null || true
 	@$(HELM) upgrade --install prometheus prometheus-community/kube-prometheus-stack \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/kube-prometheus-stack-values.yaml \
 		--wait --timeout 300s
 	@printf "  $(GREEN)kube-prometheus-stack ready.$(NC)\n"
-	@printf "$(BOLD)[2/5] Installing Tempo...$(NC)\n"
+	@printf "$(BOLD)[2/6] Installing Tempo...$(NC)\n"
 	@$(HELM) repo add grafana https://grafana.github.io/helm-charts --force-update 2>/dev/null || true
 	@$(HELM) upgrade --install tempo grafana/tempo \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/tempo-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Tempo ready.$(NC)\n"
-	@printf "$(BOLD)[3/5] Installing Loki...$(NC)\n"
+	@printf "$(BOLD)[3/6] Installing Loki...$(NC)\n"
 	@$(HELM) upgrade --install loki grafana/loki \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/loki-values.yaml \
 		--wait --timeout 300s
 	@printf "  $(GREEN)Loki ready.$(NC)\n"
-	@printf "$(BOLD)[4/5] Installing Alloy (logs)...$(NC)\n"
+	@printf "$(BOLD)[4/6] Installing Alloy (logs)...$(NC)\n"
 	@$(HELM) upgrade --install alloy-logs grafana/alloy \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/alloy-logs-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Alloy (logs) ready.$(NC)\n"
-	@printf "$(BOLD)[5/5] Installing Alloy (metrics+traces)...$(NC)\n"
+	@printf "$(BOLD)[5/6] Installing Alloy (metrics+traces)...$(NC)\n"
 	@$(HELM) upgrade --install alloy-metrics-traces grafana/alloy \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/alloy-metrics-traces-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Alloy (metrics+traces) ready.$(NC)\n"
+	@printf "$(BOLD)[6/6] Applying Grafana dashboards...$(NC)\n"
+	@$(KUBECTL) apply -k deploy/observability/local/dashboards/
+	@printf "  $(GREEN)Grafana dashboards applied.$(NC)\n"
 	@printf "\n$(GREEN)$(BOLD)Observability layer complete.$(NC)\n\n"
 
 .PHONY: k8s-deploy
-k8s-deploy: ##@Kubernetes Build images, import to k3d, deploy apps + Argo Events + HTTPRoutes
+k8s-deploy: ##@Kubernetes Build images, import to k3d, deploy apps + HTTPRoutes
 	$(k8s-guard)
 	@printf "\n$(BOLD)═══ Application Layer ═══$(NC)\n\n"
 	@$(KUBECTL) create namespace $(K8S_NS_BOOKINFO) --dry-run=client -o yaml | $(KUBECTL) apply -f -
-	@printf "$(BOLD)[1/6] Building Docker images...$(NC)\n"
+	@printf "$(BOLD)[1/5] Building Docker images...$(NC)\n"
 	@for svc in $(SERVICES); do \
 		printf "  Building $$svc...\n"; \
 		docker build -f build/Dockerfile.$$svc -t event-driven-bookinfo/$$svc:local . || exit 1; \
 	done
-	@printf "$(BOLD)[2/6] Importing images to k3d...$(NC)\n"
+	@printf "$(BOLD)[2/5] Importing images to k3d...$(NC)\n"
 	@for svc in $(SERVICES); do \
 		k3d image import event-driven-bookinfo/$$svc:local -c $(K8S_CLUSTER) || exit 1; \
 	done
 	@printf "  $(GREEN)Images imported.$(NC)\n"
-	@printf "$(BOLD)[3/6] Deploying PostgreSQL...$(NC)\n"
+	@printf "$(BOLD)[3/5] Deploying PostgreSQL...$(NC)\n"
 	@$(KUBECTL) apply -k deploy/postgres/local/
 	@$(KUBECTL) wait statefulset/postgres -n $(K8S_NS_BOOKINFO) \
 		--for=jsonpath='{.status.readyReplicas}'=1 --timeout=120s
 	@printf "  $(GREEN)PostgreSQL ready.$(NC)\n"
-	@printf "$(BOLD)[4/6] Deploying services...$(NC)\n"
+	@printf "$(BOLD)[4/5] Deploying services...$(NC)\n"
 	@for svc in $(SERVICES); do \
 		printf "  Applying $$svc local overlay...\n"; \
 		$(KUBECTL) apply -k deploy/$$svc/overlays/local/ || exit 1; \
 	done
-	@printf "$(BOLD)[5/6] Deploying Argo Events resources...$(NC)\n"
-	@$(KUBECTL) kustomize deploy/argo-events/overlays/local/ --load-restrictor LoadRestrictionsNone | $(KUBECTL) apply -f -
-	@printf "$(BOLD)[6/6] Applying HTTPRoutes...$(NC)\n"
+	@printf "$(BOLD)[5/5] Applying HTTPRoutes...$(NC)\n"
 	@$(KUBECTL) apply -k deploy/gateway/overlays/local/
 	@printf "\n$(BOLD)Waiting for deployments...$(NC)\n"
 	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification; do \

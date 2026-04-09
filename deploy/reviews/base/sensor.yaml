@@ -2,16 +2,8 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: review-submitted-sensor
-  namespace: bookinfo
 spec:
   eventBusName: kafka
-  template:
-    container:
-      env:
-        - name: OTEL_EXPORTER_OTLP_ENDPOINT
-          value: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
-        - name: OTEL_SERVICE_NAME
-          value: "review-submitted-sensor"
   dependencies:
     - name: review-submitted-dep
       eventSourceName: review-submitted
@@ -20,7 +12,7 @@ spec:
     - template:
         name: create-review
         http:
-          url: http://reviews-write.bookinfo.svc.cluster.local/v1/reviews
+          url: http://reviews/v1/reviews
           method: POST
           headers:
             Content-Type: application/json
@@ -35,14 +27,14 @@ spec:
     - template:
         name: notify-review-submitted
         http:
-          url: http://notification.bookinfo.svc.cluster.local/v1/notifications
+          url: http://notification/v1/notifications
           method: POST
           headers:
             Content-Type: application/json
           payload:
             - src:
                 dependencyName: review-submitted-dep
-                dataKey: body.title
+                dataKey: body.product_id
               dest: subject
             - src:
                 dependencyName: review-submitted-dep

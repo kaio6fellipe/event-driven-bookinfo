@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: observability
+
+configMapGenerator:
+  - name: grafana-dashboard-app-observability
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"
+    files:
+      - app-observability.json
+  - name: grafana-dashboard-envoy-gateway
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"
+    files:
+      - envoy-gateway.json

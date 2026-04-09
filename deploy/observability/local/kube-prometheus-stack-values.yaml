@@ -36,6 +36,7 @@ grafana:
   additionalDataSources:
     - name: Tempo
       type: tempo
+      uid: tempo
       url: http://tempo.observability.svc.cluster.local:3200
       access: proxy
       isDefault: false

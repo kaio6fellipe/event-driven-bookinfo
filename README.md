@@ -31,7 +31,10 @@ graph TD
 
 ```mermaid
 graph TD
-    WH["External webhook POST"]
+    Browser["Browser POST /partials/rating"]
+    PP["productpage (BFF)"]
+    GW["Gateway (CQRS routing)"]
+    WH["External POST /v1/*"]
     ES["Argo Events<br/>EventSource (webhook)"]
     K["Kafka EventBus<br/>CloudEvent + traceparent"]
 
@@ -39,14 +42,17 @@ graph TD
     S2["Sensor: review-submitted"]
     S3["Sensor: rating-submitted"]
 
-    D["details<br/>POST /v1/details"]
-    R["reviews<br/>POST /v1/reviews"]
-    RT["ratings<br/>POST /v1/ratings"]
+    D["details-write<br/>POST /v1/details"]
+    R["reviews-write<br/>POST /v1/reviews"]
+    RT["ratings-write<br/>POST /v1/ratings"]
     N1["notification<br/>POST /v1/notifications"]
     N2["notification<br/>POST /v1/notifications"]
     N3["notification<br/>POST /v1/notifications"]
 
-    WH --> ES
+    Browser --> PP
+    PP -->|"POST /v1/* via gateway"| GW
+    WH --> GW
+    GW -->|"method: POST"| ES
     ES --> K
 
     K --> S1
@@ -62,6 +68,9 @@ graph TD
     S3 -->|HTTP Trigger| RT
     S3 -->|HTTP Trigger| N3
 
+    style Browser fill:#6366f1,color:#fff,stroke:#818cf8
+    style PP fill:#6366f1,color:#fff,stroke:#818cf8
+    style GW fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
     style WH fill:#6366f1,color:#fff,stroke:#818cf8
     style ES fill:#22c55e,color:#fff,stroke:#16a34a
     style K fill:#f59e0b,color:#000,stroke:#d97706
@@ -70,7 +79,7 @@ graph TD
     style S3 fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
 ```
 
-Reads are synchronous HTTP calls between services. Writes are fully async via Argo Events webhooks -> Kafka EventBus -> Sensors -> HTTP triggers. This separates the read and write paths cleanly while keeping the services themselves as plain HTTP servers with no Kafka dependency.
+Reads are synchronous HTTP calls between services. Writes are fully async via the Envoy Gateway's method-based CQRS routing — POST requests are routed to Argo Events webhook EventSources, which publish to the Kafka EventBus. Sensors consume events and fire HTTP triggers against the write services. The gateway acts as the CQRS boundary, while services remain plain HTTP servers with no Kafka dependency.
 
 ### Hexagonal Architecture
 
@@ -272,10 +281,10 @@ One-command local development cluster using k3d. Deploys the full stack: Envoy G
 ```mermaid
 graph TD
     Browser["Browser :8080"]
-    Webhook["Webhook :8443"]
 
     subgraph envoy-gateway-system
         EG["Envoy Gateway"]
+        GWSvc["gateway (stable svc)"]
     end
 
     subgraph platform
@@ -312,13 +321,13 @@ graph TD
     end
 
     Browser --> EG --> GW
-    GW -->|"HTTPRoute /"| PP
-    PP -->|GET| DR
-    PP -->|GET| RR
-    RR -->|GET| RTR
+    GW -->|"GET /"| PP
+    GW -->|"POST /v1/*"| ES
+    PP -->|"GET /v1/* via gateway"| DR
+    PP -->|"GET /v1/* via gateway"| RR
+    PP -->|"POST /v1/* via gateway"| ES
+    RR -->|"GET via gateway"| RTR
 
-    Webhook --> EG
-    GW -->|"HTTPRoute /v1/*"| ES
     ES --> EB
     EB --> Kafka
     Kafka --> S
@@ -336,8 +345,8 @@ graph TD
     Prom & Tempo & Loki --> Grafana
 
     style Browser fill:#6366f1,color:#fff,stroke:#818cf8
-    style Webhook fill:#6366f1,color:#fff,stroke:#818cf8
     style EG fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
+    style GWSvc fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
     style GW fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
     style Kafka fill:#f59e0b,color:#000,stroke:#d97706
     style EB fill:#f59e0b,color:#000,stroke:#d97706
@@ -353,9 +362,9 @@ The cluster (`bookinfo-local`) runs four namespaces:
 | Namespace | Components |
 |---|---|
 | `platform` | Strimzi operator, Kafka (KRaft single-node), Argo Events controller, EventBus, Gateway `default-gw` |
-| `envoy-gateway-system` | Envoy Gateway controller, GatewayClass `eg` |
+| `envoy-gateway-system` | Envoy Gateway controller, GatewayClass `eg`, stable `gateway` Service for CQRS routing |
 | `observability` | Prometheus, Grafana, Tempo, Loki, Alloy (DaemonSet for logs + Deployment for metrics/traces) |
-| `bookinfo` | 8 app deployments (CQRS split), PostgreSQL, 3 EventSources, 3 Sensors, HTTPRoutes |
+| `bookinfo` | 8 app deployments (CQRS split), PostgreSQL, 3 EventSources, 3 Sensors, method-based HTTPRoutes |
 
 ### CQRS Deployment Split
 
@@ -386,7 +395,7 @@ make stop-k8s       # Tear down
 | Productpage | http://localhost:8080 | BFF web UI |
 | Grafana | http://localhost:3000 | admin / admin |
 | Prometheus | http://localhost:9090 | Metrics queries |
-| Webhooks | http://localhost:8443/v1/book-added | POST to trigger write flow |
+| Webhooks | http://localhost:8080/v1/details | POST to trigger write flow (same port, method-based routing) |
 
 ---
 
@@ -406,7 +415,7 @@ deploy/argo-events/
     └── rating-submitted-sensor.yaml # Triggers: ratings + notification
 ```
 
-Each EventSource exposes an HTTP webhook. External systems POST events to these endpoints; Argo Events converts them to CloudEvents and publishes to Kafka. Sensors subscribe to specific event types and fire HTTP triggers against the target services.
+Each EventSource exposes an HTTP webhook whose endpoint mirrors the target service's API path (e.g., the book-added EventSource listens on /v1/details). The Envoy Gateway routes POST requests to these endpoints via method-based CQRS routing on port 8080. Argo Events converts received payloads to CloudEvents and publishes to Kafka. Sensors subscribe to specific event types and fire HTTP triggers against the write services.
 
 OTel trace context propagates via `traceparent`/`tracestate` CloudEvent extensions. Services extract context when present and start a new trace when it is absent (graceful degradation).
 

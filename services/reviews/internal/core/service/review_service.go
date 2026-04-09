@@ -33,7 +33,7 @@ func (s *ReviewService) GetProductReviews(ctx context.Context, productID string)
 	}
 
 	// Fetch ratings from the ratings service
-	rating, err := s.ratingsClient.GetProductRatings(ctx, productID)
+	ratingData, err := s.ratingsClient.GetProductRatings(ctx, productID)
 	if err != nil {
 		logger := logging.FromContext(ctx)
 		logger.Warn("failed to fetch ratings, returning reviews without ratings",
@@ -43,9 +43,13 @@ func (s *ReviewService) GetProductReviews(ctx context.Context, productID string)
 		return reviews, nil
 	}
 
-	// Enrich each review with the product-level rating
+	// Enrich each review with product-level stats and individual reviewer score
 	for i := range reviews {
-		reviews[i].Rating = rating
+		reviews[i].Rating = &domain.ReviewRating{
+			Stars:   ratingData.IndividualRatings[reviews[i].Reviewer],
+			Average: ratingData.Average,
+			Count:   ratingData.Count,
+		}
 	}
 
 	return reviews, nil

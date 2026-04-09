@@ -10,6 +10,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 )
 
@@ -209,6 +211,84 @@ func TestMiddleware_LogsRequestCompletion(t *testing.T) {
 
 	if !foundCompletion {
 		t.Errorf("expected 'request completed' log, got:\n%s", output)
+	}
+}
+
+func TestMiddleware_InjectsTraceContext(t *testing.T) {
+	var buf bytes.Buffer
+	logger := logging.NewWithWriter("info", "test-service", &buf)
+
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctxLogger := logging.FromContext(r.Context())
+		ctxLogger.Info("inside handler")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := logging.Middleware(logger)(inner)
+
+	traceID, _ := oteltrace.TraceIDFromHex("4bf92f3577b34da6a3ce929d0e0e4736")
+	spanID, _ := oteltrace.SpanIDFromHex("00f067aa0ba902b7")
+	spanCtx := oteltrace.NewSpanContext(oteltrace.SpanContextConfig{
+		TraceID:    traceID,
+		SpanID:     spanID,
+		TraceFlags: oteltrace.FlagsSampled,
+		Remote:     true,
+	})
+	ctx := oteltrace.ContextWithSpanContext(context.Background(), spanCtx)
+	req := httptest.NewRequest(http.MethodGet, "/test", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	output := buf.String()
+	lines := splitJSONLines(output)
+
+	foundTrace := false
+	for _, line := range lines {
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			continue
+		}
+		if entry["trace_id"] == "4bf92f3577b34da6a3ce929d0e0e4736" &&
+			entry["span_id"] == "00f067aa0ba902b7" {
+			foundTrace = true
+			break
+		}
+	}
+
+	if !foundTrace {
+		t.Errorf("expected trace_id and span_id in log output, got:\n%s", output)
+	}
+}
+
+func TestMiddleware_NoTraceContext_OmitsFields(t *testing.T) {
+	var buf bytes.Buffer
+	logger := logging.NewWithWriter("info", "test-service", &buf)
+
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctxLogger := logging.FromContext(r.Context())
+		ctxLogger.Info("inside handler")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := logging.Middleware(logger)(inner)
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	output := buf.String()
+	lines := splitJSONLines(output)
+
+	for _, line := range lines {
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			continue
+		}
+		if _, ok := entry["trace_id"]; ok {
+			t.Errorf("did not expect trace_id when no span context, got:\n%s", output)
+		}
 	}
 }
 

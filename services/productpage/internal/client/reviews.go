@@ -103,7 +103,7 @@ func (c *ReviewsClient) SubmitReview(ctx context.Context, productID, reviewer, t
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("reviews service returned status %d", resp.StatusCode)
 	}
 

@@ -279,7 +279,11 @@ k8s-platform: ##@Kubernetes Install platform: Envoy Gateway, Strimzi, Kafka, Arg
 		-n $(K8S_NS_PLATFORM) \
 		-f deploy/platform/local/argo-events-values.yaml \
 		--wait --timeout 120s
-	@printf "  $(GREEN)Argo Events controller ready.$(NC)\n"
+	@printf "  Applying custom CRDs (PRs #3961 + #3983)...\n"
+	@curl -sL https://github.com/kaio6fellipe/event-driven-bookinfo/releases/download/argo-events-prs-3961-3983/argoproj.io_eventbus.yaml | $(KUBECTL) apply --server-side --force-conflicts -f -
+	@curl -sL https://github.com/kaio6fellipe/event-driven-bookinfo/releases/download/argo-events-prs-3961-3983/argoproj.io_eventsources.yaml | $(KUBECTL) apply --server-side --force-conflicts -f -
+	@curl -sL https://github.com/kaio6fellipe/event-driven-bookinfo/releases/download/argo-events-prs-3961-3983/argoproj.io_sensors.yaml | $(KUBECTL) apply --server-side --force-conflicts -f -
+	@printf "  $(GREEN)Argo Events controller ready (custom CRDs applied).$(NC)\n"
 	@printf "$(BOLD)[5/5] Applying Gateway default-gw...$(NC)\n"
 	@$(KUBECTL) apply -k deploy/gateway/base/
 	@printf "  Waiting for Gateway to be programmed...\n"

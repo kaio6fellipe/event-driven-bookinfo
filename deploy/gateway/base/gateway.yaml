@@ -12,9 +12,3 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
-    - name: webhooks
-      protocol: HTTP
-      port: 443
-      allowedRoutes:
-        namespaces:
-          from: All

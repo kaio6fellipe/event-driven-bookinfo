@@ -1,3 +1,151 @@
+# POST /v1/details → book-added EventSource (write path)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: details-write
+  namespace: bookinfo
+spec:
+  parentRefs:
+    - name: default-gw
+      namespace: platform
+      sectionName: web
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /v1/details
+          method: POST
+      backendRefs:
+        - name: book-added-eventsource-svc
+          port: 12000
+---
+# POST /v1/reviews → review-submitted EventSource (write path)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: reviews-write
+  namespace: bookinfo
+spec:
+  parentRefs:
+    - name: default-gw
+      namespace: platform
+      sectionName: web
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /v1/reviews
+          method: POST
+      backendRefs:
+        - name: review-submitted-eventsource-svc
+          port: 12001
+---
+# POST /v1/ratings → rating-submitted EventSource (write path)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ratings-write
+  namespace: bookinfo
+spec:
+  parentRefs:
+    - name: default-gw
+      namespace: platform
+      sectionName: web
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /v1/ratings
+          method: POST
+      backendRefs:
+        - name: rating-submitted-eventsource-svc
+          port: 12002
+---
+# GET /v1/details/* → details service (read path)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: details-read
+  namespace: bookinfo
+spec:
+  parentRefs:
+    - name: default-gw
+      namespace: platform
+      sectionName: web
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/details
+          method: GET
+      backendRefs:
+        - name: details
+          port: 80
+---
+# GET /v1/reviews/* → reviews service (read path)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: reviews-read
+  namespace: bookinfo
+spec:
+  parentRefs:
+    - name: default-gw
+      namespace: platform
+      sectionName: web
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/reviews
+          method: GET
+      backendRefs:
+        - name: reviews
+          port: 80
+---
+# GET /v1/ratings/* → ratings service (read path)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ratings-read
+  namespace: bookinfo
+spec:
+  parentRefs:
+    - name: default-gw
+      namespace: platform
+      sectionName: web
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/ratings
+          method: GET
+      backendRefs:
+        - name: ratings
+          port: 80
+---
+# POST /partials/* → productpage (HTMX form submissions)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: productpage-partials
+  namespace: bookinfo
+spec:
+  parentRefs:
+    - name: default-gw
+      namespace: platform
+      sectionName: web
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /partials
+          method: POST
+      backendRefs:
+        - name: productpage
+          port: 80
+---
+# GET /* → productpage (catch-all for HTML pages, API, static)
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -13,81 +161,7 @@ spec:
         - path:
             type: PathPrefix
             value: /
+          method: GET
       backendRefs:
         - name: productpage
           port: 80
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: book-added-webhook
-  namespace: bookinfo
-spec:
-  parentRefs:
-    - name: default-gw
-      namespace: platform
-      sectionName: webhooks
-  rules:
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /v1/book-added
-      filters:
-        - type: URLRewrite
-          urlRewrite:
-            path:
-              type: ReplacePrefixMatch
-              replacePrefixMatch: /book-added
-      backendRefs:
-        - name: book-added-eventsource-svc
-          port: 12000
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: review-submitted-webhook
-  namespace: bookinfo
-spec:
-  parentRefs:
-    - name: default-gw
-      namespace: platform
-      sectionName: webhooks
-  rules:
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /v1/review-submitted
-      filters:
-        - type: URLRewrite
-          urlRewrite:
-            path:
-              type: ReplacePrefixMatch
-              replacePrefixMatch: /review-submitted
-      backendRefs:
-        - name: review-submitted-eventsource-svc
-          port: 12001
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: rating-submitted-webhook
-  namespace: bookinfo
-spec:
-  parentRefs:
-    - name: default-gw
-      namespace: platform
-      sectionName: webhooks
-  rules:
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /v1/rating-submitted
-      filters:
-        - type: URLRewrite
-          urlRewrite:
-            path:
-              type: ReplacePrefixMatch
-              replacePrefixMatch: /rating-submitted
-      backendRefs:
-        - name: rating-submitted-eventsource-svc
-          port: 12002

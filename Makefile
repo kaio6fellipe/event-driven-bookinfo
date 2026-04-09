@@ -220,7 +220,7 @@ define k8s-guard
 endef
 
 .PHONY: k8s-cluster
-k8s-cluster: ##@Kubernetes Create k3d cluster with port mappings for Gateway + observability
+k8s-cluster: ##@Kubernetes Create k3d cluster with port mappings for Gateway, observability + Headlamp
 	@if k3d cluster list $(K8S_CLUSTER) >/dev/null 2>&1; then \
 		printf "$(GREEN)Cluster '$(K8S_CLUSTER)' already exists.$(NC)\n"; \
 	else \
@@ -230,6 +230,7 @@ k8s-cluster: ##@Kubernetes Create k3d cluster with port mappings for Gateway + o
 			-p "8080:80@loadbalancer" \
 			-p "3000:30300@server:0" \
 			-p "9090:30900@server:0" \
+			-p "4466:30444@server:0" \
 			--k3s-arg "--disable=traefik@server:0" \
 			--wait; \
 	fi
@@ -296,45 +297,52 @@ k8s-platform: ##@Kubernetes Install platform: Envoy Gateway, Strimzi, Kafka, Arg
 	@printf "\n$(GREEN)$(BOLD)Platform layer complete.$(NC)\n\n"
 
 .PHONY: k8s-observability
-k8s-observability: ##@Kubernetes Install observability: Prometheus, Grafana, Tempo, Loki, Alloy
+k8s-observability: ##@Kubernetes Install observability: Prometheus, Grafana, Tempo, Loki, Alloy, Headlamp
 	$(k8s-guard)
 	@printf "\n$(BOLD)═══ Observability Layer ═══$(NC)\n\n"
 	@$(KUBECTL) create namespace $(K8S_NS_OBSERVABILITY) --dry-run=client -o yaml | $(KUBECTL) apply -f -
-	@printf "$(BOLD)[1/6] Installing kube-prometheus-stack...$(NC)\n"
+	@printf "$(BOLD)[1/7] Installing kube-prometheus-stack...$(NC)\n"
 	@$(HELM) repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update 2>/dev/null || true
 	@$(HELM) upgrade --install prometheus prometheus-community/kube-prometheus-stack \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/kube-prometheus-stack-values.yaml \
 		--wait --timeout 300s
 	@printf "  $(GREEN)kube-prometheus-stack ready.$(NC)\n"
-	@printf "$(BOLD)[2/6] Installing Tempo...$(NC)\n"
+	@printf "$(BOLD)[2/7] Installing Tempo...$(NC)\n"
 	@$(HELM) repo add grafana https://grafana.github.io/helm-charts --force-update 2>/dev/null || true
 	@$(HELM) upgrade --install tempo grafana/tempo \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/tempo-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Tempo ready.$(NC)\n"
-	@printf "$(BOLD)[3/6] Installing Loki...$(NC)\n"
+	@printf "$(BOLD)[3/7] Installing Loki...$(NC)\n"
 	@$(HELM) upgrade --install loki grafana/loki \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/loki-values.yaml \
 		--wait --timeout 300s
 	@printf "  $(GREEN)Loki ready.$(NC)\n"
-	@printf "$(BOLD)[4/6] Installing Alloy (logs)...$(NC)\n"
+	@printf "$(BOLD)[4/7] Installing Alloy (logs)...$(NC)\n"
 	@$(HELM) upgrade --install alloy-logs grafana/alloy \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/alloy-logs-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Alloy (logs) ready.$(NC)\n"
-	@printf "$(BOLD)[5/6] Installing Alloy (metrics+traces)...$(NC)\n"
+	@printf "$(BOLD)[5/7] Installing Alloy (metrics+traces)...$(NC)\n"
 	@$(HELM) upgrade --install alloy-metrics-traces grafana/alloy \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/alloy-metrics-traces-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Alloy (metrics+traces) ready.$(NC)\n"
-	@printf "$(BOLD)[6/6] Applying Grafana dashboards...$(NC)\n"
+	@printf "$(BOLD)[6/7] Applying Grafana dashboards...$(NC)\n"
 	@$(KUBECTL) apply -k deploy/observability/local/dashboards/
 	@printf "  $(GREEN)Grafana dashboards applied.$(NC)\n"
+	@printf "$(BOLD)[7/7] Installing Headlamp dashboard...$(NC)\n"
+	@$(HELM) repo add headlamp https://charts.kubernetes-sigs.io/headlamp --force-update 2>/dev/null || true
+	@$(HELM) upgrade --install headlamp headlamp/headlamp \
+		-n $(K8S_NS_OBSERVABILITY) \
+		-f deploy/observability/local/headlamp-values.yaml \
+		--wait --timeout 120s
+	@printf "  $(GREEN)Headlamp dashboard ready.$(NC)\n"
 	@printf "\n$(GREEN)$(BOLD)Observability layer complete.$(NC)\n\n"
 
 .PHONY: k8s-deploy
@@ -433,6 +441,7 @@ k8s-status: ##@Kubernetes Show pod status and access URLs
 	@printf "  $(CYAN)Productpage:$(NC)  http://localhost:8080\n"
 	@printf "  $(CYAN)Grafana:$(NC)      http://localhost:3000  (admin/admin)\n"
 	@printf "  $(CYAN)Prometheus:$(NC)   http://localhost:9090\n"
+	@printf "  $(CYAN)Headlamp:$(NC)     http://localhost:4466\n"
 	@printf "\n$(BOLD)Webhooks (via Gateway CQRS routing):$(NC)\n\n"
 	@printf "  $(CYAN)book-added:$(NC)         curl -X POST http://localhost:8080/v1/details -H 'Content-Type: application/json' -d '{...}'\n"
 	@printf "  $(CYAN)review-submitted:$(NC)   curl -X POST http://localhost:8080/v1/reviews -H 'Content-Type: application/json' -d '{...}'\n"

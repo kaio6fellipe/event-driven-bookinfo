@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // SubmitRatingRequest represents the request body for submitting a rating.
@@ -36,7 +38,8 @@ func NewRatingsClient(baseURL string) *RatingsClient {
 	return &RatingsClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
-			Timeout: 5 * time.Second,
+			Timeout:   5 * time.Second,
+			Transport: otelhttp.NewTransport(http.DefaultTransport),
 		},
 	}
 }
@@ -67,14 +70,17 @@ func (c *RatingsClient) SubmitRating(ctx context.Context, productID, reviewer st
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusCreated {
+	switch resp.StatusCode {
+	case http.StatusCreated:
+		var body RatingResponse
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			return nil, fmt.Errorf("decoding rating response: %w", err)
+		}
+		return &body, nil
+	case http.StatusOK:
+		// Async write via EventSource — event accepted, no resource returned
+		return nil, nil
+	default:
 		return nil, fmt.Errorf("ratings service returned status %d", resp.StatusCode)
 	}
-
-	var body RatingResponse
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return nil, fmt.Errorf("decoding rating response: %w", err)
-	}
-
-	return &body, nil
 }

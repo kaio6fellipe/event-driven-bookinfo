@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // DetailResponse represents the details service API response.
@@ -34,7 +36,8 @@ func NewDetailsClient(baseURL string) *DetailsClient {
 	return &DetailsClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
-			Timeout: 5 * time.Second,
+			Timeout:   5 * time.Second,
+			Transport: otelhttp.NewTransport(http.DefaultTransport),
 		},
 	}
 }

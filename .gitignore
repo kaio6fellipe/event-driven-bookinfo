@@ -39,3 +39,6 @@ coverage.out
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Superpowers brainstorm sessions
+.superpowers/

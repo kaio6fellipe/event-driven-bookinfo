@@ -216,3 +216,94 @@ func TestPartialRatingSubmit(t *testing.T) {
 		t.Errorf("expected success message, got:\n%s", body)
 	}
 }
+
+func TestPartialRatingSubmitAsync(t *testing.T) {
+	detailsURL, reviewsURL, _ := setupMockServers(t)
+
+	// Simulate EventSource webhook: returns 200 OK with event ack (not 201 Created)
+	asyncRatingsMux := http.NewServeMux()
+	asyncRatingsMux.HandleFunc("POST /v1/ratings", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"eventID":     "evt-12345",
+			"eventSource": "rating-submitted",
+		})
+	})
+	asyncRatingsServer := httptest.NewServer(asyncRatingsMux)
+	t.Cleanup(asyncRatingsServer.Close)
+
+	detailsClient := client.NewDetailsClient(detailsURL)
+	reviewsClient := client.NewReviewsClient(reviewsURL)
+	ratingsClient := client.NewRatingsClient(asyncRatingsServer.URL)
+
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, templateDir(t))
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	formData := "product_id=product-1&reviewer=bob&stars=5"
+	req := httptest.NewRequest(http.MethodPost, "/partials/rating", strings.NewReader(formData))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "successfully") {
+		t.Errorf("expected success message for async write, got:\n%s", body)
+	}
+}
+
+func TestPartialRatingSubmitAsyncWithReview(t *testing.T) {
+	detailsURL, _, _ := setupMockServers(t)
+
+	// Simulate EventSource webhooks: return 200 OK
+	asyncRatingsMux := http.NewServeMux()
+	asyncRatingsMux.HandleFunc("POST /v1/ratings", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	asyncRatingsServer := httptest.NewServer(asyncRatingsMux)
+	t.Cleanup(asyncRatingsServer.Close)
+
+	asyncReviewsMux := http.NewServeMux()
+	asyncReviewsMux.HandleFunc("GET /v1/reviews/{id}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"product_id": r.PathValue("id"),
+			"reviews":    []any{},
+		})
+	})
+	asyncReviewsMux.HandleFunc("POST /v1/reviews", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	asyncReviewsServer := httptest.NewServer(asyncReviewsMux)
+	t.Cleanup(asyncReviewsServer.Close)
+
+	detailsClient := client.NewDetailsClient(detailsURL)
+	reviewsClient := client.NewReviewsClient(asyncReviewsServer.URL)
+	ratingsClient := client.NewRatingsClient(asyncRatingsServer.URL)
+
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, templateDir(t))
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	formData := "product_id=product-1&reviewer=bob&stars=5&text=Great+book"
+	req := httptest.NewRequest(http.MethodPost, "/partials/rating", strings.NewReader(formData))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "successfully") {
+		t.Errorf("expected success message for async write with review, got:\n%s", body)
+	}
+}

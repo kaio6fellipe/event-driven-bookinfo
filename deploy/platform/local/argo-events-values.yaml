@@ -1,0 +1,24 @@
+# Argo Events Controller - local dev values
+# Chart: argo/argo-events
+global:
+  image:
+    repository: ghcr.io/kaio6fellipe/argo-events
+    tag: "prs-3961-3983"
+
+controller:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+configs:
+  jetstream:
+    versions:
+      - version: latest
+        natsImage: nats:latest
+        metricsExporterImage: natsio/prometheus-nats-exporter:latest
+        configReloaderImage: natsio/nats-server-config-reloader:latest
+        startCommand: /nats-server

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reviews
+data:
+  LOG_LEVEL: "debug"
+  STORAGE_BACKEND: "postgres"
+  DATABASE_URL: "postgres://bookinfo:bookinfo@postgres.bookinfo.svc.cluster.local:5432/bookinfo_reviews?sslmode=disable"
+  RUN_MIGRATIONS: "true"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+  RATINGS_SERVICE_URL: "http://gateway.envoy-gateway-system.svc.cluster.local"

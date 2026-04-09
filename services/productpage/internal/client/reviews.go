@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // ReviewRatingResponse represents rating data from the reviews service.
@@ -42,7 +44,8 @@ func NewReviewsClient(baseURL string) *ReviewsClient {
 	return &ReviewsClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
-			Timeout: 5 * time.Second,
+			Timeout:   5 * time.Second,
+			Transport: otelhttp.NewTransport(http.DefaultTransport),
 		},
 	}
 }
@@ -100,7 +103,7 @@ func (c *ReviewsClient) SubmitReview(ctx context.Context, productID, reviewer, t
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("reviews service returned status %d", resp.StatusCode)
 	}
 

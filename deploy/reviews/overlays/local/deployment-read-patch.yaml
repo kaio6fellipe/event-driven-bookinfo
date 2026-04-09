@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reviews
+  labels:
+    role: read
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        role: read
+    spec:
+      containers:
+        - name: reviews
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits: {}

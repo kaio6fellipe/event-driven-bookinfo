@@ -28,13 +28,13 @@ func Setup(ctx context.Context, serviceName string) (func(context.Context) error
 	}
 
 	r, err := resource.New(ctx,
+		resource.WithAttributes(
+			resource.Default().Attributes()...,
+		),
 		resource.WithFromEnv(),
 		resource.WithHost(),
 		resource.WithAttributes(
 			semconv.ServiceName(serviceName),
-		),
-		resource.WithAttributes(
-			resource.Default().Attributes()...,
 		),
 	)
 	if err != nil {

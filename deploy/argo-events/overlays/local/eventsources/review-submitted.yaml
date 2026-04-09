@@ -15,5 +15,5 @@ spec:
   webhook:
     review-submitted:
       port: "12001"
-      endpoint: /review-submitted
+      endpoint: /v1/reviews
       method: POST

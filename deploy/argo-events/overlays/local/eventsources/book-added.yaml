@@ -15,5 +15,5 @@ spec:
   webhook:
     book-added:
       port: "12000"
-      endpoint: /book-added
+      endpoint: /v1/details
       method: POST

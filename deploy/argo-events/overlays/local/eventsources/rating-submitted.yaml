@@ -15,5 +15,5 @@ spec:
   webhook:
     rating-submitted:
       port: "12002"
-      endpoint: /rating-submitted
+      endpoint: /v1/ratings
       method: POST

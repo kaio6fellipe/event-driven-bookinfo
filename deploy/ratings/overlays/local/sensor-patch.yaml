@@ -1,39 +1,33 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: book-added-sensor
-  namespace: bookinfo
+  name: rating-submitted-sensor
 spec:
-  eventBusName: kafka
   template:
     container:
       env:
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
           value: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
         - name: OTEL_SERVICE_NAME
-          value: "book-added-sensor"
-  dependencies:
-    - name: book-added-dep
-      eventSourceName: book-added
-      eventName: book-added
+          value: "rating-submitted-sensor"
   triggers:
     - template:
-        name: create-detail
+        name: create-rating
         http:
-          url: http://details-write.bookinfo.svc.cluster.local/v1/details
+          url: http://ratings-write.bookinfo.svc.cluster.local/v1/ratings
           method: POST
           headers:
             Content-Type: application/json
           payload:
             - src:
-                dependencyName: book-added-dep
+                dependencyName: rating-submitted-dep
                 dataKey: body
               dest: ""
       retryStrategy:
         steps: 3
         duration: 2s
     - template:
-        name: notify-book-added
+        name: notify-rating-submitted
         http:
           url: http://notification.bookinfo.svc.cluster.local/v1/notifications
           method: POST
@@ -41,19 +35,19 @@ spec:
             Content-Type: application/json
           payload:
             - src:
-                dependencyName: book-added-dep
-                dataKey: body.title
+                dependencyName: rating-submitted-dep
+                dataKey: body.product_id
               dest: subject
             - src:
-                dependencyName: book-added-dep
-                value: "New book added"
+                dependencyName: rating-submitted-dep
+                value: "New rating submitted"
               dest: body
             - src:
-                dependencyName: book-added-dep
+                dependencyName: rating-submitted-dep
                 value: "system@bookinfo"
               dest: recipient
             - src:
-                dependencyName: book-added-dep
+                dependencyName: rating-submitted-dep
                 value: "email"
               dest: channel
       retryStrategy:

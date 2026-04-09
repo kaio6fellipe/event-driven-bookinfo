@@ -1,39 +1,33 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: review-submitted-sensor
-  namespace: bookinfo
+  name: book-added-sensor
 spec:
-  eventBusName: kafka
   template:
     container:
       env:
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
           value: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
         - name: OTEL_SERVICE_NAME
-          value: "review-submitted-sensor"
-  dependencies:
-    - name: review-submitted-dep
-      eventSourceName: review-submitted
-      eventName: review-submitted
+          value: "book-added-sensor"
   triggers:
     - template:
-        name: create-review
+        name: create-detail
         http:
-          url: http://reviews-write.bookinfo.svc.cluster.local/v1/reviews
+          url: http://details-write.bookinfo.svc.cluster.local/v1/details
           method: POST
           headers:
             Content-Type: application/json
           payload:
             - src:
-                dependencyName: review-submitted-dep
+                dependencyName: book-added-dep
                 dataKey: body
               dest: ""
       retryStrategy:
         steps: 3
         duration: 2s
     - template:
-        name: notify-review-submitted
+        name: notify-book-added
         http:
           url: http://notification.bookinfo.svc.cluster.local/v1/notifications
           method: POST
@@ -41,19 +35,19 @@ spec:
             Content-Type: application/json
           payload:
             - src:
-                dependencyName: review-submitted-dep
-                dataKey: body.product_id
+                dependencyName: book-added-dep
+                dataKey: body.title
               dest: subject
             - src:
-                dependencyName: review-submitted-dep
-                value: "New review submitted"
+                dependencyName: book-added-dep
+                value: "New book added"
               dest: body
             - src:
-                dependencyName: review-submitted-dep
+                dependencyName: book-added-dep
                 value: "system@bookinfo"
               dest: recipient
             - src:
-                dependencyName: review-submitted-dep
+                dependencyName: book-added-dep
                 value: "email"
               dest: channel
       retryStrategy:

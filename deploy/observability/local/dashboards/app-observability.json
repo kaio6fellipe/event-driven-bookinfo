@@ -118,20 +118,8 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(ratings_submitted_total[5m]))",
-          "legendFormat": "ratings submitted"
-        },
-        {
-          "expr": "sum(rate(reviews_submitted_total[5m]))",
-          "legendFormat": "reviews submitted"
-        },
-        {
-          "expr": "sum(rate(books_added_total[5m]))",
-          "legendFormat": "books added"
-        },
-        {
-          "expr": "sum(rate(notifications_dispatched_total[5m]))",
-          "legendFormat": "notifications dispatched"
+          "expr": "sum by (app, route) (rate(http_server_requests_total{namespace=\"bookinfo\"}[5m]))",
+          "legendFormat": "{{ app }} {{ route }}"
         }
       ],
       "fieldConfig": {
@@ -149,7 +137,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum by (app) (process_runtime_go_goroutines)",
+          "expr": "sum by (app) (go_goroutine_count)",
           "legendFormat": "{{ app }}"
         }
       ],

@@ -7,6 +7,7 @@ resources:
   - ../../base
   - deployment-write.yaml
   - service-write.yaml
+  - eventsource-service.yaml
 
 patches:
   - path: deployment-read-patch.yaml
@@ -17,6 +18,14 @@ patches:
     target:
       kind: ConfigMap
       name: reviews
+  - path: eventsource-patch.yaml
+    target:
+      kind: EventSource
+      name: review-submitted
+  - path: sensor-patch.yaml
+    target:
+      kind: Sensor
+      name: review-submitted-sensor
 
 images:
   - name: event-driven-bookinfo/reviews

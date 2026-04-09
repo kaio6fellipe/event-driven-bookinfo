@@ -82,6 +82,9 @@ grafana:
             matcherRegex: '"trace_id":"(\w+)"'
             name: TraceID
             url: "$${__value.raw}"
+  persistence:
+    enabled: true
+    size: 1Gi
   resources:
     requests:
       cpu: 100m

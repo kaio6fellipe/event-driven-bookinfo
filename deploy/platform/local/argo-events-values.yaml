@@ -1,5 +1,10 @@
 # Argo Events Controller - local dev values
 # Chart: argo/argo-events
+global:
+  image:
+    repository: ghcr.io/kaio6fellipe/argo-events
+    tag: "prs-3961-3983"
+
 controller:
   resources:
     requests:

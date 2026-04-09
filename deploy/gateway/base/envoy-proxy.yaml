@@ -24,3 +24,6 @@ spec:
           environment:
             name: ENVOY_POD_NAMESPACE
             defaultValue: "envoy-gateway-system"
+    metrics:
+      prometheus: {}
+      enableVirtualHostStats: true

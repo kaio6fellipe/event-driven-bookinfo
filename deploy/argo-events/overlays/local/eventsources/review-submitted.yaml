@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: review-submitted
+  namespace: bookinfo
+spec:
+  eventBusName: kafka
+  template:
+    container:
+      env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+        - name: OTEL_SERVICE_NAME
+          value: "review-submitted-eventsource"
+  webhook:
+    review-submitted:
+      port: "12001"
+      endpoint: /review-submitted
+      method: POST

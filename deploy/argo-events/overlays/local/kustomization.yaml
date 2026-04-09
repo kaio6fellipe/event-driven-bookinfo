@@ -6,9 +6,9 @@ namespace: bookinfo
 resources:
   - eventbus.yaml
   - eventsource-services.yaml
-  - ../../eventsources/book-added.yaml
-  - ../../eventsources/review-submitted.yaml
-  - ../../eventsources/rating-submitted.yaml
+  - eventsources/book-added.yaml
+  - eventsources/review-submitted.yaml
+  - eventsources/rating-submitted.yaml
   - sensors/book-added-sensor.yaml
   - sensors/review-submitted-sensor.yaml
   - sensors/rating-submitted-sensor.yaml

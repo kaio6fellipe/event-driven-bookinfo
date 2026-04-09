@@ -1,6 +1,6 @@
 # Headlamp Kubernetes Dashboard
 # Helm chart: headlamp/headlamp
-# Repo: https://charts.kubernetes-sigs.io/headlamp
+# Repo: https://kubernetes-sigs.github.io/headlamp/
 
 service:
   type: NodePort

@@ -337,7 +337,7 @@ k8s-observability: ##@Kubernetes Install observability: Prometheus, Grafana, Tem
 	@$(KUBECTL) apply -k deploy/observability/local/dashboards/
 	@printf "  $(GREEN)Grafana dashboards applied.$(NC)\n"
 	@printf "$(BOLD)[7/7] Installing Headlamp dashboard...$(NC)\n"
-	@$(HELM) repo add headlamp https://charts.kubernetes-sigs.io/headlamp --force-update 2>/dev/null || true
+	@$(HELM) repo add headlamp https://kubernetes-sigs.github.io/headlamp/ --force-update 2>/dev/null || true
 	@$(HELM) upgrade --install headlamp headlamp/headlamp \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/headlamp-values.yaml \

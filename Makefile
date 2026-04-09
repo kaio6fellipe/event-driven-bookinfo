@@ -442,6 +442,7 @@ k8s-status: ##@Kubernetes Show pod status and access URLs
 	@printf "  $(CYAN)Grafana:$(NC)      http://localhost:3000  (admin/admin)\n"
 	@printf "  $(CYAN)Prometheus:$(NC)   http://localhost:9090\n"
 	@printf "  $(CYAN)Headlamp:$(NC)     http://localhost:4466\n"
+	@printf "\n  $(BOLD)Headlamp token:$(NC) $(KUBECTL) create token headlamp -n $(K8S_NS_OBSERVABILITY)\n"
 	@printf "\n$(BOLD)Webhooks (via Gateway CQRS routing):$(NC)\n\n"
 	@printf "  $(CYAN)book-added:$(NC)         curl -X POST http://localhost:8080/v1/details -H 'Content-Type: application/json' -d '{...}'\n"
 	@printf "  $(CYAN)review-submitted:$(NC)   curl -X POST http://localhost:8080/v1/reviews -H 'Content-Type: application/json' -d '{...}'\n"

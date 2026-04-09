@@ -228,7 +228,6 @@ k8s-cluster: ##@Kubernetes Create k3d cluster with port mappings for Gateway + o
 		k3d cluster create $(K8S_CLUSTER) \
 			--api-port 6550 \
 			-p "8080:80@loadbalancer" \
-			-p "8443:443@loadbalancer" \
 			-p "3000:30300@server:0" \
 			-p "9090:30900@server:0" \
 			--k3s-arg "--disable=traefik@server:0" \
@@ -429,10 +428,10 @@ k8s-status: ##@Kubernetes Show pod status and access URLs
 	@printf "  $(CYAN)Productpage:$(NC)  http://localhost:8080\n"
 	@printf "  $(CYAN)Grafana:$(NC)      http://localhost:3000  (admin/admin)\n"
 	@printf "  $(CYAN)Prometheus:$(NC)   http://localhost:9090\n"
-	@printf "\n$(BOLD)Webhooks (via Gateway):$(NC)\n\n"
-	@printf "  $(CYAN)book-added:$(NC)         curl -X POST http://localhost:8443/v1/book-added -H 'Content-Type: application/json' -d '{...}'\n"
-	@printf "  $(CYAN)review-submitted:$(NC)   curl -X POST http://localhost:8443/v1/review-submitted -H 'Content-Type: application/json' -d '{...}'\n"
-	@printf "  $(CYAN)rating-submitted:$(NC)   curl -X POST http://localhost:8443/v1/rating-submitted -H 'Content-Type: application/json' -d '{...}'\n"
+	@printf "\n$(BOLD)Webhooks (via Gateway CQRS routing):$(NC)\n\n"
+	@printf "  $(CYAN)book-added:$(NC)         curl -X POST http://localhost:8080/v1/details -H 'Content-Type: application/json' -d '{...}'\n"
+	@printf "  $(CYAN)review-submitted:$(NC)   curl -X POST http://localhost:8080/v1/reviews -H 'Content-Type: application/json' -d '{...}'\n"
+	@printf "  $(CYAN)rating-submitted:$(NC)   curl -X POST http://localhost:8080/v1/ratings -H 'Content-Type: application/json' -d '{...}'\n"
 	@printf "\n"
 
 .PHONY: k8s-logs

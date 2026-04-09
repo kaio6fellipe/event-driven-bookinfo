@@ -10,6 +10,7 @@ type SubmitReviewRequest struct {
 
 // ReviewRatingResponse represents rating data embedded in a review response.
 type ReviewRatingResponse struct {
+	Stars   int     `json:"stars"`
 	Average float64 `json:"average"`
 	Count   int     `json:"count"`
 }

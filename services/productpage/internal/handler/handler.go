@@ -183,6 +183,7 @@ func (h *Handler) partialReviews(w http.ResponseWriter, r *http.Request) {
 			Text:     review.Text,
 		}
 		if review.Rating != nil {
+			vm.Stars = review.Rating.Stars
 			vm.Average = review.Rating.Average
 			vm.Count = review.Rating.Count
 		}

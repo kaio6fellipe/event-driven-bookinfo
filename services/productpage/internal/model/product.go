@@ -20,6 +20,7 @@ type ProductReview struct {
 	ID       string
 	Reviewer string
 	Text     string
+	Stars    int
 	Average  float64
 	Count    int
 }

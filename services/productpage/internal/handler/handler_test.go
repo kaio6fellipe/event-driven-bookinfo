@@ -72,7 +72,7 @@ func setupMockServers(t *testing.T) (detailsURL, reviewsURL, ratingsURL string) 
 					"product_id": r.PathValue("id"),
 					"reviewer":   "alice",
 					"text":       "Great book!",
-					"rating":     map[string]any{"average": 4.5, "count": 10},
+					"rating":     map[string]any{"stars": 5, "average": 4.5, "count": 10},
 				},
 			},
 		})
@@ -186,6 +186,15 @@ func TestPartialReviews(t *testing.T) {
 	}
 	if !strings.Contains(body, "Great book!") {
 		t.Errorf("expected 'Great book!' in response, got:\n%s", body)
+	}
+	// Should render 5 filled stars for alice's individual score
+	filledStars := strings.Count(body, "star-filled")
+	if filledStars != 5 {
+		t.Errorf("expected 5 filled stars, got %d", filledStars)
+	}
+	// Should show "5/5" individual score
+	if !strings.Contains(body, "5/5") {
+		t.Errorf("expected '5/5' score display in response, got:\n%s", body)
 	}
 }
 

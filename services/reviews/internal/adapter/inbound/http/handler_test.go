@@ -16,19 +16,25 @@ import (
 )
 
 type stubRatingsClient struct {
-	rating *domain.ReviewRating
-	err    error
+	data *domain.RatingData
+	err  error
 }
 
-func (s *stubRatingsClient) GetProductRatings(_ context.Context, _ string) (*domain.ReviewRating, error) {
-	return s.rating, s.err
+func (s *stubRatingsClient) GetProductRatings(_ context.Context, _ string) (*domain.RatingData, error) {
+	return s.data, s.err
 }
 
 func setupHandler(t *testing.T) *http.ServeMux {
 	t.Helper()
 	repo := memory.NewReviewRepository()
 	client := &stubRatingsClient{
-		rating: &domain.ReviewRating{Average: 4.0, Count: 5},
+		data: &domain.RatingData{
+			Average: 4.0,
+			Count:   5,
+			IndividualRatings: map[string]int{
+				"alice": 4,
+			},
+		},
 	}
 	svc := service.NewReviewService(repo, client)
 	mux := http.NewServeMux()
@@ -145,6 +151,9 @@ func TestGetProductReviews_WithRatings(t *testing.T) {
 	review := body.Reviews[0]
 	if review.Rating == nil {
 		t.Fatal("expected non-nil rating")
+	}
+	if review.Rating.Stars != 4 {
+		t.Errorf("Rating.Stars = %d, want 4", review.Rating.Stars)
 	}
 	if review.Rating.Average != 4.0 {
 		t.Errorf("Rating.Average = %f, want 4.0", review.Rating.Average)

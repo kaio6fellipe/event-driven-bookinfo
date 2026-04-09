@@ -12,12 +12,12 @@ import (
 
 // stubRatingsClient returns fixed rating data for testing.
 type stubRatingsClient struct {
-	rating *domain.ReviewRating
-	err    error
+	data *domain.RatingData
+	err  error
 }
 
-func (s *stubRatingsClient) GetProductRatings(_ context.Context, _ string) (*domain.ReviewRating, error) {
-	return s.rating, s.err
+func (s *stubRatingsClient) GetProductRatings(_ context.Context, _ string) (*domain.RatingData, error) {
+	return s.data, s.err
 }
 
 func TestSubmitReview_Success(t *testing.T) {
@@ -70,7 +70,7 @@ func TestSubmitReview_ValidationError(t *testing.T) {
 func TestGetProductReviews_Empty(t *testing.T) {
 	repo := memory.NewReviewRepository()
 	client := &stubRatingsClient{
-		rating: &domain.ReviewRating{Stars: 0, Average: 0, Count: 0},
+		data: &domain.RatingData{Average: 0, Count: 0, IndividualRatings: map[string]int{}},
 	}
 	svc := service.NewReviewService(repo, client)
 
@@ -87,7 +87,14 @@ func TestGetProductReviews_Empty(t *testing.T) {
 func TestGetProductReviews_WithRatings(t *testing.T) {
 	repo := memory.NewReviewRepository()
 	client := &stubRatingsClient{
-		rating: &domain.ReviewRating{Stars: 0, Average: 4.5, Count: 10},
+		data: &domain.RatingData{
+			Average: 3.5,
+			Count:   2,
+			IndividualRatings: map[string]int{
+				"alice": 5,
+				"bob":   2,
+			},
+		},
 	}
 	svc := service.NewReviewService(repo, client)
 
@@ -110,17 +117,28 @@ func TestGetProductReviews_WithRatings(t *testing.T) {
 		t.Fatalf("expected 2 reviews, got %d", len(reviews))
 	}
 
-	// Each review should have rating data
 	for _, review := range reviews {
 		if review.Rating == nil {
-			t.Error("expected non-nil Rating on review")
+			t.Errorf("expected non-nil Rating on review by %s", review.Reviewer)
 			continue
 		}
-		if review.Rating.Average != 4.5 {
-			t.Errorf("Rating.Average = %f, want 4.5", review.Rating.Average)
+		if review.Rating.Average != 3.5 {
+			t.Errorf("Rating.Average = %f, want 3.5", review.Rating.Average)
 		}
-		if review.Rating.Count != 10 {
-			t.Errorf("Rating.Count = %d, want 10", review.Rating.Count)
+		if review.Rating.Count != 2 {
+			t.Errorf("Rating.Count = %d, want 2", review.Rating.Count)
+		}
+		switch review.Reviewer {
+		case "alice":
+			if review.Rating.Stars != 5 {
+				t.Errorf("alice Rating.Stars = %d, want 5", review.Rating.Stars)
+			}
+		case "bob":
+			if review.Rating.Stars != 2 {
+				t.Errorf("bob Rating.Stars = %d, want 2", review.Rating.Stars)
+			}
+		default:
+			t.Errorf("unexpected reviewer: %s", review.Reviewer)
 		}
 	}
 }

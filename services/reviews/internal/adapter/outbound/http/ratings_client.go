@@ -13,11 +13,20 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
 )
 
+// individualRating mirrors a single rating entry from the ratings service.
+type individualRating struct {
+	ID        string `json:"id"`
+	ProductID string `json:"product_id"`
+	Reviewer  string `json:"reviewer"`
+	Stars     int    `json:"stars"`
+}
+
 // ratingsResponse mirrors the ratings service ProductRatingsResponse.
 type ratingsResponse struct {
-	ProductID string  `json:"product_id"`
-	Average   float64 `json:"average"`
-	Count     int     `json:"count"`
+	ProductID string             `json:"product_id"`
+	Average   float64            `json:"average"`
+	Count     int                `json:"count"`
+	Ratings   []individualRating `json:"ratings"`
 }
 
 // RatingsClient is an HTTP client that fetches ratings from the ratings service.
@@ -37,8 +46,8 @@ func NewRatingsClient(baseURL string) *RatingsClient {
 	}
 }
 
-// GetProductRatings fetches the aggregated ratings for a product from the ratings service.
-func (c *RatingsClient) GetProductRatings(ctx context.Context, productID string) (*domain.ReviewRating, error) {
+// GetProductRatings fetches both product-level and per-reviewer ratings from the ratings service.
+func (c *RatingsClient) GetProductRatings(ctx context.Context, productID string) (*domain.RatingData, error) {
 	url := fmt.Sprintf("%s/v1/ratings/%s", c.baseURL, productID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -61,8 +70,14 @@ func (c *RatingsClient) GetProductRatings(ctx context.Context, productID string)
 		return nil, fmt.Errorf("decoding ratings response: %w", err)
 	}
 
-	return &domain.ReviewRating{
-		Average: body.Average,
-		Count:   body.Count,
+	individual := make(map[string]int, len(body.Ratings))
+	for _, r := range body.Ratings {
+		individual[r.Reviewer] = r.Stars
+	}
+
+	return &domain.RatingData{
+		Average:           body.Average,
+		Count:             body.Count,
+		IndividualRatings: individual,
 	}, nil
 }

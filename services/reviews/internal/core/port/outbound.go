@@ -18,6 +18,6 @@ type ReviewRepository interface {
 
 // RatingsClient defines the outbound operations for fetching ratings.
 type RatingsClient interface {
-	// GetProductRatings returns the aggregated rating info for a product.
-	GetProductRatings(ctx context.Context, productID string) (*domain.ReviewRating, error)
+	// GetProductRatings returns both product-level and per-reviewer rating data.
+	GetProductRatings(ctx context.Context, productID string) (*domain.RatingData, error)
 }

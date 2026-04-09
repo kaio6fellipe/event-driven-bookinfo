@@ -46,6 +46,7 @@ func (h *Handler) getProductReviews(w http.ResponseWriter, r *http.Request) {
 		}
 		if review.Rating != nil {
 			resp.Rating = &ReviewRatingResponse{
+				Stars:   review.Rating.Stars,
 				Average: review.Rating.Average,
 				Count:   review.Rating.Count,
 			}

@@ -14,6 +14,7 @@ import (
 
 // ReviewRatingResponse represents rating data from the reviews service.
 type ReviewRatingResponse struct {
+	Stars   int     `json:"stars"`
 	Average float64 `json:"average"`
 	Count   int     `json:"count"`
 }

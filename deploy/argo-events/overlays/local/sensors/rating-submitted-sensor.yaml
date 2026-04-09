@@ -5,6 +5,13 @@ metadata:
   namespace: bookinfo
 spec:
   eventBusName: kafka
+  template:
+    container:
+      env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+        - name: OTEL_SERVICE_NAME
+          value: "rating-submitted-sensor"
   dependencies:
     - name: rating-submitted-dep
       eventSourceName: rating-submitted

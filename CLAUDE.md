@@ -19,11 +19,11 @@ Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review 
 ## Architecture
 
 - **Hexagonal architecture** (ports & adapters): domain -> ports -> service -> adapters -> cmd
-- **Event-driven writes**: Argo Events webhook EventSources -> Kafka EventBus -> Sensors -> HTTP triggers to services
+- **Event-driven writes**: Envoy Gateway CQRS routing (POST -> EventSources) -> Kafka EventBus -> Sensors -> HTTP triggers to write services
 - **Sync reads**: productpage fans out GET calls to details and reviews; reviews fans out to ratings
 - **Storage**: swappable via `STORAGE_BACKEND` env var — `memory` (default, single replica) or `postgres` (horizontally scalable)
 - **Admin port** (:9090): `/metrics`, `/debug/pprof/*`, `/healthz`, `/readyz` — isolated from business API
-- **CQRS deployments** (local k8s): each backend service has separate read and write Deployments; read serves GET from productpage, write receives POST from Argo Events sensors
+- **CQRS deployments** (local k8s): each backend service has separate read and write Deployments; read serves GET via gateway, write receives POST from Argo Events sensors. The Envoy Gateway acts as the CQRS routing boundary (GET -> read services, POST -> EventSource webhooks)
 - **Local k8s** (`make run-k8s`): k3d cluster with Envoy Gateway API, Strimzi Kafka (KRaft), full observability stack (Prometheus, Grafana, Tempo, Loki, Alloy)
 
 ## Build Commands
@@ -52,14 +52,14 @@ make k8s-logs           # Tail bookinfo namespace logs
 
 **Context safety:** All kubectl/helm calls use `--context=k3d-bookinfo-local`. Never mutates the user's active context.
 
-**Access:** Productpage http://localhost:8080, Grafana http://localhost:3000, Prometheus http://localhost:9090, Webhooks http://localhost:8443/v1/*
+**Access:** Productpage http://localhost:8080, Webhooks POST http://localhost:8080/v1/* (method-based CQRS routing), Grafana http://localhost:3000, Prometheus http://localhost:9090
 
 ## Deploy Structure
 
 ```
 deploy/
 ├── <service>/overlays/local/    # CQRS read/write split per service
-├── argo-events/overlays/local/  # EventBus + sensors targeting -write services
+├── argo-events/overlays/local/  # EventBus + EventSources (API-aligned webhooks) + sensors targeting -write services
 ├── gateway/base/                # Gateway, GatewayClass, ReferenceGrant
 ├── gateway/overlays/local/      # HTTPRoutes for bookinfo
 ├── observability/local/         # Helm values: Prometheus, Grafana, Tempo, Loki, Alloy

@@ -8,3 +8,4 @@ spec:
     url: bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092
     topic: argo-events
     version: "4.2.0"
+    consumerBatchMaxWait: "0"

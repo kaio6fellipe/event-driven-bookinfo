@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: envoy-gateway-system
+  labels:
+    app.kubernetes.io/name: gateway
+    app.kubernetes.io/component: proxy-alias
+    part-of: event-driven-bookinfo
+spec:
+  type: ClusterIP
+  selector:
+    gateway.envoyproxy.io/owning-gateway-name: default-gw
+    gateway.envoyproxy.io/owning-gateway-namespace: platform
+  ports:
+    - name: http
+      port: 80
+      targetPort: 10080

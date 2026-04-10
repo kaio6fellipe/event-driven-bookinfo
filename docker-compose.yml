@@ -18,6 +18,18 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+
   ratings:
     build:
       context: .
@@ -97,10 +109,17 @@ services:
       DETAILS_SERVICE_URL: http://details:8080
       REVIEWS_SERVICE_URL: http://reviews:8080
       RATINGS_SERVICE_URL: http://ratings:8080
+      REDIS_URL: redis://redis:6379
     depends_on:
-      - details
-      - reviews
-      - ratings
+      redis:
+        condition: service_healthy
+      details:
+        condition: service_started
+      reviews:
+        condition: service_started
+      ratings:
+        condition: service_started
 
 volumes:
   pgdata:
+  redisdata:

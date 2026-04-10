@@ -34,6 +34,7 @@ func (s *RedisStore) Close() error {
 	return s.client.Close()
 }
 
+// StorePending appends a pending review to the Redis list for the given product.
 func (s *RedisStore) StorePending(ctx context.Context, productID string, review Review) error {
 	data, err := json.Marshal(review)
 	if err != nil {
@@ -42,6 +43,7 @@ func (s *RedisStore) StorePending(ctx context.Context, productID string, review 
 	return s.client.RPush(ctx, keyPrefix+productID, data).Err()
 }
 
+// GetAndReconcile returns pending reviews after removing any that match confirmed reviews.
 func (s *RedisStore) GetAndReconcile(ctx context.Context, productID string, confirmed []ConfirmedReview) ([]Review, error) {
 	key := keyPrefix + productID
 

@@ -466,32 +466,27 @@ k8s-logs: ##@Kubernetes Tail logs from bookinfo namespace
 GATEWAY_URL := http://localhost:8080
 
 .PHONY: k8s-traffic
-k8s-traffic: ##@Kubernetes Generate sample GET and POST traffic through the gateway
+k8s-traffic: ##@Kubernetes Generate sample traffic through the productpage
 	@printf "$(BOLD)Generating sample traffic against $(GATEWAY_URL)...$(NC)\n\n"
-	@printf "$(CYAN)[POST]$(NC) /v1/details — add a book\n"
-	@curl -s -X POST $(GATEWAY_URL)/v1/details \
-		-H 'Content-Type: application/json' \
-		-d '{"title":"The Go Programming Language","author":"Donovan & Kernighan","year":2015,"isbn":"978-0134190440"}' \
-		-w "  HTTP %{http_code}\n"
-	@printf "$(CYAN)[POST]$(NC) /v1/ratings — submit a rating\n"
-	@curl -s -X POST $(GATEWAY_URL)/v1/ratings \
-		-H 'Content-Type: application/json' \
-		-d '{"book_id":"1","rating":5}' \
-		-w "  HTTP %{http_code}\n"
-	@printf "$(CYAN)[POST]$(NC) /v1/reviews — submit a review\n"
-	@curl -s -X POST $(GATEWAY_URL)/v1/reviews \
-		-H 'Content-Type: application/json' \
-		-d '{"book_id":"1","reviewer":"alice","text":"Excellent book on Go","rating":5}' \
-		-w "  HTTP %{http_code}\n"
-	@sleep 2
-	@printf "\n$(CYAN)[GET]$(NC)  /v1/products/1 — read product page\n"
-	@curl -s $(GATEWAY_URL)/v1/products/1 -o /dev/null -w "  HTTP %{http_code}\n"
-	@printf "$(CYAN)[GET]$(NC)  /v1/details — list details\n"
-	@curl -s $(GATEWAY_URL)/v1/details -o /dev/null -w "  HTTP %{http_code}\n"
-	@printf "$(CYAN)[GET]$(NC)  /v1/ratings/1 — get ratings\n"
-	@curl -s $(GATEWAY_URL)/v1/ratings/1 -o /dev/null -w "  HTTP %{http_code}\n"
-	@printf "$(CYAN)[GET]$(NC)  /v1/reviews/1 — get reviews\n"
-	@curl -s $(GATEWAY_URL)/v1/reviews/1 -o /dev/null -w "  HTTP %{http_code}\n"
+	@printf "$(BOLD)── Read path (GET via productpage → fan-out to backends) ──$(NC)\n"
+	@printf "$(CYAN)[GET]$(NC)  / — home page (productpage → details)\n"
+	@curl -s $(GATEWAY_URL)/ -o /dev/null -w "  HTTP %{http_code}\n"
+	@PRODUCT_ID=$$(curl -s $(GATEWAY_URL)/ | grep -o '/products/[^"]*' | head -1 | sed 's|/products/||'); \
+	if [ -z "$$PRODUCT_ID" ]; then \
+		printf "  $(RED)No products found, skipping product-specific requests$(NC)\n"; \
+	else \
+		printf "$(CYAN)[GET]$(NC)  /products/$$PRODUCT_ID — product page (productpage → details + reviews + ratings)\n"; \
+		curl -s $(GATEWAY_URL)/products/$$PRODUCT_ID -o /dev/null -w "  HTTP %{http_code}\n"; \
+		printf "$(CYAN)[GET]$(NC)  /partials/details/$$PRODUCT_ID — HTMX partial details\n"; \
+		curl -s $(GATEWAY_URL)/partials/details/$$PRODUCT_ID -o /dev/null -w "  HTTP %{http_code}\n"; \
+		printf "$(CYAN)[GET]$(NC)  /partials/reviews/$$PRODUCT_ID — HTMX partial reviews\n"; \
+		curl -s $(GATEWAY_URL)/partials/reviews/$$PRODUCT_ID -o /dev/null -w "  HTTP %{http_code}\n"; \
+		printf "\n$(BOLD)── Write path (POST via productpage → gateway → Argo Events CQRS) ──$(NC)\n"; \
+		printf "$(CYAN)[POST]$(NC) /partials/rating — submit rating+review (productpage → ratings + reviews via gateway)\n"; \
+		curl -s -o /dev/null -X POST $(GATEWAY_URL)/partials/rating \
+			-d "product_id=$$PRODUCT_ID&reviewer=alice&stars=5&text=Excellent+book+on+Go" \
+			-w "  HTTP %{http_code}\n"; \
+	fi
 	@printf "\n$(GREEN)Done. Check traces at http://localhost:3000 (Grafana > Explore > Tempo)$(NC)\n"
 
 # ─── Help ───────────────────────────────────────────────────────────────────

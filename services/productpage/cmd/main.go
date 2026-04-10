@@ -15,6 +15,7 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/productpage/internal/client"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/productpage/internal/handler"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/productpage/internal/pending"
 )
 
 func main() {
@@ -59,8 +60,28 @@ func main() {
 	reviewsClient := client.NewReviewsClient(reviewsURL)
 	ratingsClient := client.NewRatingsClient(ratingsURL)
 
+	// Pending review store (Redis or no-op)
+	var pendingStore pending.Store
+	if cfg.RedisURL != "" {
+		rs, err := pending.NewRedisStore(cfg.RedisURL)
+		if err != nil {
+			logger.Error("failed to create redis pending store", "error", err)
+			os.Exit(1)
+		}
+		if err := rs.Ping(ctx); err != nil {
+			logger.Error("failed to connect to redis", "error", err)
+			os.Exit(1)
+		}
+		defer func() { _ = rs.Close() }()
+		logger.Info("pending review store enabled", "redis_url", cfg.RedisURL)
+		pendingStore = rs
+	} else {
+		logger.Info("pending review store disabled (REDIS_URL not set)")
+		pendingStore = pending.NoopStore{}
+	}
+
 	templateDir := envOrDefault("TEMPLATE_DIR", "services/productpage/templates")
-	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, templateDir)
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, pendingStore, templateDir)
 
 	registerRoutes := func(mux *http.ServeMux) {
 		h.RegisterRoutes(mux)

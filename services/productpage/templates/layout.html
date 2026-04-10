@@ -466,6 +466,43 @@
             height: 16px;
             margin-bottom: 8px;
         }
+
+        /* Pending review */
+        .review-pending {
+            border: 1px dashed rgba(245, 158, 11, 0.4);
+            border-radius: 6px;
+            background: rgba(245, 158, 11, 0.03);
+            padding: 0.75rem;
+            margin-top: 0.5rem;
+        }
+
+        .review-pending:last-child {
+            border-bottom: 1px dashed rgba(245, 158, 11, 0.4);
+        }
+
+        .pending-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            color: var(--warning);
+            font-size: 0.65rem;
+            font-weight: 500;
+            margin-left: 0.5rem;
+        }
+
+        .pending-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--warning);
+            display: inline-block;
+            animation: pending-pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pending-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
     </style>
 </head>
 <body>

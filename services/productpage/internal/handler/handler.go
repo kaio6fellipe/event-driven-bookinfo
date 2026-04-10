@@ -11,6 +11,7 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/productpage/internal/client"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/productpage/internal/model"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/productpage/internal/pending"
 )
 
 // Handler holds the HTTP handlers for the productpage BFF.
@@ -18,6 +19,7 @@ type Handler struct {
 	detailsClient *client.DetailsClient
 	reviewsClient *client.ReviewsClient
 	ratingsClient *client.RatingsClient
+	pendingStore  pending.Store
 	templates     *template.Template
 	templateDir   string
 }
@@ -27,6 +29,7 @@ func NewHandler(
 	detailsClient *client.DetailsClient,
 	reviewsClient *client.ReviewsClient,
 	ratingsClient *client.RatingsClient,
+	pendingStore pending.Store,
 	templateDir string,
 ) *Handler {
 	tmpl := template.Must(template.ParseGlob(filepath.Join(templateDir, "*.html")))
@@ -36,6 +39,7 @@ func NewHandler(
 		detailsClient: detailsClient,
 		reviewsClient: reviewsClient,
 		ratingsClient: ratingsClient,
+		pendingStore:  pendingStore,
 		templates:     tmpl,
 		templateDir:   templateDir,
 	}
@@ -175,8 +179,14 @@ func (h *Handler) partialReviews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var confirmed []pending.ConfirmedReview
 	var viewModels []model.ProductReview
 	for _, review := range reviews.Reviews {
+		confirmed = append(confirmed, pending.ConfirmedReview{
+			Reviewer: review.Reviewer,
+			Text:     review.Text,
+		})
+
 		vm := model.ProductReview{
 			ID:       review.ID,
 			Reviewer: review.Reviewer,
@@ -190,8 +200,32 @@ func (h *Handler) partialReviews(w http.ResponseWriter, r *http.Request) {
 		viewModels = append(viewModels, vm)
 	}
 
+	// Merge pending reviews from Redis
+	pendingReviews, err := h.pendingStore.GetAndReconcile(r.Context(), productID, confirmed)
+	if err != nil {
+		logger.Warn("failed to get pending reviews", "product_id", productID, "error", err)
+	}
+	for _, pr := range pendingReviews {
+		viewModels = append(viewModels, model.ProductReview{
+			Reviewer: pr.Reviewer,
+			Text:     pr.Text,
+			Stars:    pr.Stars,
+			Pending:  true,
+		})
+	}
+
+	hasPending := len(pendingReviews) > 0
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = h.templates.ExecuteTemplate(w, "reviews.html", viewModels)
+	_ = h.templates.ExecuteTemplate(w, "reviews.html", struct {
+		Reviews    []model.ProductReview
+		HasPending bool
+		ProductID  string
+	}{
+		Reviews:    viewModels,
+		HasPending: hasPending,
+		ProductID:  productID,
+	})
 }
 
 func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
@@ -236,6 +270,10 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 	if reviewText != "" {
 		if err := h.reviewsClient.SubmitReview(r.Context(), productID, reviewer, reviewText); err != nil {
 			logger.Warn("failed to submit review", "error", err)
+		}
+
+		if err := h.pendingStore.StorePending(r.Context(), productID, pending.NewReview(reviewer, reviewText, stars)); err != nil {
+			logger.Warn("failed to store pending review", "error", err)
 		}
 	}
 

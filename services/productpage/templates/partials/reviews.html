@@ -1,11 +1,25 @@
-{{if .}}
-{{range .}}
-<div class="review">
+{{if .HasPending}}
+<div hx-get="/partials/reviews/{{.ProductID}}"
+     hx-trigger="every 2s"
+     hx-target="#reviews-section"
+     hx-swap="innerHTML">
+{{end}}
+{{if .Reviews}}
+{{range .Reviews}}
+<div class="review{{if .Pending}} review-pending{{end}}">
     <div class="review-header">
         <div class="reviewer">
             <div class="reviewer-avatar">{{slice .Reviewer 0 1}}</div>
             <div>
-                <div class="reviewer-name">{{.Reviewer}}</div>
+                <div class="reviewer-name">
+                    {{.Reviewer}}
+                    {{if .Pending}}
+                    <span class="pending-badge">
+                        <span class="pending-dot"></span>
+                        Processing
+                    </span>
+                    {{end}}
+                </div>
             </div>
         </div>
         {{if gt .Stars 0}}
@@ -27,4 +41,7 @@
 {{end}}
 {{else}}
 <p style="color: var(--text-muted); font-size: 0.9rem; padding: 0.5rem 0;">No reviews yet.</p>
+{{end}}
+{{if .HasPending}}
+</div>
 {{end}}

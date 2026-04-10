@@ -10,7 +10,7 @@ Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review 
 
 | Service | Type | Port | Description |
 |---|---|---|---|
-| **productpage** | BFF (Go + HTMX) | :8080 web / :9090 admin | Aggregator; fans out sync reads to details + reviews; renders HTML with HTMX |
+| **productpage** | BFF (Go + HTMX) | :8080 web / :9090 admin | Aggregator; fans out sync reads to details + reviews; renders HTML with HTMX; pending review cache via Redis |
 | **details** | Backend (hex arch) | :8080 / :9090 admin | Book metadata CRUD |
 | **reviews** | Backend (hex arch) | :8080 / :9090 admin | User reviews; sync call to ratings service |
 | **ratings** | Backend (hex arch) | :8080 / :9090 admin | Star ratings |
@@ -24,6 +24,7 @@ Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review 
 - **Storage**: swappable via `STORAGE_BACKEND` env var — `memory` (default, single replica) or `postgres` (horizontally scalable)
 - **Admin port** (:9090): `/metrics`, `/debug/pprof/*`, `/healthz`, `/readyz` — isolated from business API
 - **CQRS deployments** (local k8s): each backend service has separate read and write Deployments; read serves GET via gateway, write receives POST from Argo Events sensors. The Envoy Gateway acts as the CQRS routing boundary (GET -> read services, POST -> EventSource webhooks)
+- **Pending review cache**: productpage stores submitted reviews in Redis immediately after async POST; merges into read responses with "Processing" badge; HTMX auto-polls to reconcile when confirmed. Disabled when `REDIS_URL` is unset.
 - **Local k8s** (`make run-k8s`): k3d cluster with Envoy Gateway API, Strimzi Kafka (KRaft), full observability stack (Prometheus, Grafana, Tempo, Loki, Alloy)
 
 ## Build Commands
@@ -64,6 +65,7 @@ deploy/
 ├── gateway/overlays/local/      # HTTPRoutes for bookinfo
 ├── observability/local/         # Helm values: Prometheus, Grafana, Tempo, Loki, Alloy
 ├── platform/local/              # Helm values: Strimzi, Argo Events; Kafka CRDs; EventBus
+├── redis/local/                 # Helm values: Bitnami Redis
 └── postgres/local/              # StatefulSet, Service, init ConfigMap
 ```
 
@@ -97,13 +99,13 @@ SERVICE_NAME=productpage HTTP_PORT=8080 ADMIN_PORT=9090 \
   go run ./services/productpage/cmd/
 ```
 
-Optional env vars (all services): `LOG_LEVEL` (debug/info/warn/error, default info), `OTEL_EXPORTER_OTLP_ENDPOINT`, `PYROSCOPE_SERVER_ADDRESS`, `STORAGE_BACKEND` (memory/postgres), `DATABASE_URL`.
+Optional env vars (all services): `LOG_LEVEL` (debug/info/warn/error, default info), `OTEL_EXPORTER_OTLP_ENDPOINT`, `PYROSCOPE_SERVER_ADDRESS`, `STORAGE_BACKEND` (memory/postgres), `DATABASE_URL`. Productpage-specific: `REDIS_URL` (enables pending review cache; disabled when unset).
 
 ## Shared Packages (`pkg/`)
 
 | Package | Purpose |
 |---|---|
-| `pkg/config` | Env-based config struct: ServiceName, HTTPPort, AdminPort, LogLevel, StorageBackend, DatabaseURL, OTLPEndpoint, PyroscopeServerAddress |
+| `pkg/config` | Env-based config struct: ServiceName, HTTPPort, AdminPort, LogLevel, StorageBackend, DatabaseURL, RedisURL, OTLPEndpoint, PyroscopeServerAddress |
 | `pkg/health` | `/healthz` (liveness) and `/readyz` (readiness with optional check functions) |
 | `pkg/logging` | slog + otelslog bridge, JSON output, `FromContext`/`WithContext`, request-scoped HTTP middleware |
 | `pkg/metrics` | OTel meter provider + Prometheus exporter, HTTP middleware (duration, requests_total, active_requests), runtime metrics |

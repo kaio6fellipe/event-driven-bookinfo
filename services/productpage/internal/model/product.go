@@ -23,6 +23,7 @@ type ProductReview struct {
 	Stars    int
 	Average  float64
 	Count    int
+	Pending  bool
 }
 
 // ProductPage is the full page view model combining detail and reviews.

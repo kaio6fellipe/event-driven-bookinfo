@@ -15,16 +15,19 @@ graph TD
     R["reviews<br/>:8082 / :9092"]
     RT["ratings<br/>:8083 / :9093"]
     N["notification<br/>:8084 / :9094<br/><i>event consumer only</i>"]
+    Redis["Redis<br/><i>pending review cache</i>"]
 
     PP -->|sync GET| D
     PP -->|sync GET| R
     R -->|sync GET| RT
+    PP -->|"pending cache"| Redis
 
     style PP fill:#6366f1,color:#fff,stroke:#818cf8
     style D fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
     style R fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
     style RT fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
     style N fill:#1a1d27,color:#e4e4e7,stroke:#f59e0b
+    style Redis fill:#ef4444,color:#fff,stroke:#dc2626
 ```
 
 ### Event-Driven Write Flow
@@ -97,7 +100,7 @@ All service wiring happens in `services/<name>/cmd/main.go`. The shared `pkg/` p
 
 | Service | Type | API Port | Admin Port | Description |
 |---|---|---|---|---|
-| **productpage** | BFF (Go + HTMX) | 8080 | 9090 | Aggregates details + reviews + ratings into an HTML product page. Fans out sync GET calls; no storage. |
+| **productpage** | BFF (Go + HTMX) | 8080 | 9090 | Aggregates details + reviews + ratings into an HTML product page. Fans out sync GET calls; pending review cache via Redis. |
 | **details** | Backend | 8081 | 9091 | Book metadata CRUD. Event-written via `book-added` sensor. |
 | **reviews** | Backend | 8082 | 9092 | User reviews. Makes sync GET to ratings service. Event-written via `review-submitted` sensor. |
 | **ratings** | Backend | 8083 | 9093 | Star ratings per reviewer. Event-written via `rating-submitted` sensor. |
@@ -154,6 +157,7 @@ SERVICE_NAME=reviews HTTP_PORT=8082 ADMIN_PORT=9092 \
 
 SERVICE_NAME=notification HTTP_PORT=8084 ADMIN_PORT=9094 ./bin/notification
 
+# Optional: REDIS_URL=redis://localhost:6379 (enables pending review cache)
 SERVICE_NAME=productpage HTTP_PORT=8080 ADMIN_PORT=9090 \
   DETAILS_SERVICE_URL=http://localhost:8081 \
   REVIEWS_SERVICE_URL=http://localhost:8082 \
@@ -222,7 +226,7 @@ make docker-build SERVICE=ratings
 make docker-build-all
 
 # Run all services with PostgreSQL (recommended for local dev)
-make run          # builds images, starts postgres + all services, seeds databases
+make run          # builds images, starts postgres + redis + all services, seeds databases
 make run-logs     # tail service logs
 make stop         # stop and remove containers (keeps data)
 make clean-data   # stop and remove containers + postgres data volume
@@ -310,6 +314,7 @@ graph TD
         S["Sensors"]
 
         PG["PostgreSQL"]
+        Redis["Redis"]
     end
 
     subgraph observability
@@ -337,6 +342,7 @@ graph TD
     S -->|trigger| N
 
     DR & DW & RR & RW & RTR & RTW & N --> PG
+    PP --> Redis
 
     Alloy -.->|scrape :9090/metrics| PP
     Alloy -.->|OTLP traces| Tempo
@@ -355,6 +361,7 @@ graph TD
     style ArgoCtrl fill:#22c55e,color:#fff,stroke:#16a34a
     style Grafana fill:#e879f9,color:#000,stroke:#c026d3
     style PG fill:#3b82f6,color:#fff,stroke:#2563eb
+    style Redis fill:#ef4444,color:#fff,stroke:#dc2626
 ```
 
 The cluster (`bookinfo-local`) runs four namespaces:
@@ -538,6 +545,7 @@ event-driven-bookinfo/
 │   │   └── overlays/local/     # HTTPRoutes for bookinfo
 │   ├── observability/local/    # Helm values: Prometheus, Grafana, Tempo, Loki, Alloy
 │   ├── platform/local/         # Helm values: Strimzi, Argo Events; Kafka CRDs
+│   ├── redis/local/            # Helm values: Bitnami Redis
 │   └── postgres/local/         # StatefulSet, Service, init ConfigMap
 ├── test/
 │   └── e2e/                    # docker-compose files + shell test scripts

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -16,12 +17,23 @@ type RedisStore struct {
 }
 
 // NewRedisStore creates a RedisStore from a Redis URL (e.g. "redis://localhost:6379").
+// The client is instrumented with OpenTelemetry tracing — every command
+// produces a child span with operation name and key.
 func NewRedisStore(redisURL string) (*RedisStore, error) {
 	opts, err := redis.ParseURL(redisURL)
 	if err != nil {
 		return nil, fmt.Errorf("parsing redis URL: %w", err)
 	}
-	return &RedisStore{client: redis.NewClient(opts)}, nil
+
+	client := redis.NewClient(opts)
+
+	if err := redisotel.InstrumentTracing(client,
+		redisotel.WithDBStatement(false),
+	); err != nil {
+		return nil, fmt.Errorf("instrumenting redis tracing: %w", err)
+	}
+
+	return &RedisStore{client: client}, nil
 }
 
 // Ping verifies the connection to Redis.

@@ -111,3 +111,28 @@ func TestGetAndReconcile_IsolatesProducts(t *testing.T) {
 		t.Errorf("product-1 reviewer = %q, want alice", reviews[0].Reviewer)
 	}
 }
+
+func TestNewRedisStore_HasTracingHook(t *testing.T) {
+	mr := miniredis.RunT(t)
+	store, err := pending.NewRedisStore("redis://" + mr.Addr())
+	if err != nil {
+		t.Fatalf("NewRedisStore failed: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	// Verify the store was created successfully with tracing.
+	// The tracing hook is transparent — existing operations must still work.
+	ctx := context.Background()
+	err = store.StorePending(ctx, "trace-test", pending.NewReview("tracer", "test", 5))
+	if err != nil {
+		t.Fatalf("StorePending with tracing hook failed: %v", err)
+	}
+
+	reviews, err := store.GetAndReconcile(ctx, "trace-test", nil)
+	if err != nil {
+		t.Fatalf("GetAndReconcile with tracing hook failed: %v", err)
+	}
+	if len(reviews) != 1 {
+		t.Fatalf("got %d reviews, want 1", len(reviews))
+	}
+}

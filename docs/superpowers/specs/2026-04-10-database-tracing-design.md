@@ -97,14 +97,18 @@ Only affects productpage service (the only Redis consumer). Transparent to `Noop
 - **`pkg/database/`**: Verify pool is created with tracer configured (parse config, assert `ConnConfig.Tracer` is non-nil).
 - **`pending/redis.go`**: Existing `miniredis`-based tests continue to pass — the tracing hook is transparent. Add a test verifying `InstrumentTracing` succeeds on a valid client.
 
-### Integration Verification
+### Integration Verification (POST Trace End-to-End)
 
-After deployment to local k8s, validate in Grafana Tempo:
+After deployment to local k8s, validate the full async write path in Grafana Tempo:
 
-1. Submit a review via productpage
-2. Open the resulting trace
-3. Confirm Postgres spans appear as children of HTTP handler spans (e.g., `SELECT` under `GET /partials/reviews`)
-4. Confirm Redis spans appear for pending review operations (e.g., `RPUSH`, `LRANGE`)
+1. Submit a review via POST through the productpage UI
+2. Grab the trace ID from the response or logs
+3. Open the trace in Grafana Tempo (http://localhost:3000)
+4. Confirm Redis spans appear for pending review storage (e.g., `RPUSH pending:reviews:<product_id>`)
+5. Follow the async path through Kafka to the reviews-write service
+6. Confirm Postgres `INSERT` spans appear as children of the write service HTTP handler span
+7. Trigger a GET to `/partials/reviews` and confirm Postgres `SELECT` spans appear on the read path
+8. Confirm Redis `LRANGE` / `LREM` spans appear for pending review reconciliation
 
 ## Files Changed
 

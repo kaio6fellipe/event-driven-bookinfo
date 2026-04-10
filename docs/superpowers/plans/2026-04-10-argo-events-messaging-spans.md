@@ -6,13 +6,19 @@
 
 **Architecture:** Extend the existing `pkg/shared/tracing` package with span kind helpers and a messaging attributes builder. Modify `eventsource.publish` to PRODUCER, `sensor.trigger` to CLIENT, add new `sensor.consume` CONSUMER span, and add `eventsource.receive` SERVER span for webhook sources. The EventBus link (`eventsource -> sensor`) uses PRODUCER/CONSUMER edge matching in Tempo via CloudEvent traceparent propagation.
 
-**Tech Stack:** Go, OpenTelemetry Go SDK, Argo Events fork (`ghcr.io/kaio6fellipe/argo-events`, branch based on PRs #3961 + #3983)
+**Tech Stack:** Go, OpenTelemetry Go SDK, Argo Events fork (`ghcr.io/kaio6fellipe/argo-events`)
 
 **Spec:** `docs/superpowers/specs/2026-04-10-argo-events-messaging-spans-design.md`
 
 **Repos involved:**
-- **Argo Events fork** — all Go code changes (Tasks 1-7)
-- **go-http-server** — Tempo config and image version bump (Task 8)
+- **Argo Events fork** (`kaio6fellipe/argo-events`) — all Go code changes (Tasks 1-7), branch `feat/cloudevents-compliance-otel-tracing`
+- **go-http-server** — Tempo config update (Task 8), image tag stays `prs-3961-3983`
+
+**Git rules for Argo Events fork:**
+- All commits must use `git commit -s` (sign-off with `Signed-off-by:` trailer)
+- **No** `Co-Authored-By` trailer
+- Only push OTel/CloudEvents-related commits to `feat/cloudevents-compliance-otel-tracing` — no Kafka optimization or unrelated changes
+- After pushing, merge both PR branches into `feat/combined-prs-3961-3983` on the fork, run codegen, build and push image as `ghcr.io/kaio6fellipe/argo-events:prs-3961-3983`
 
 ---
 
@@ -229,7 +235,7 @@ Expected: All `TestStartServerSpan`, `TestStartProducerSpan`, `TestStartConsumer
 
 ```bash
 git add pkg/shared/tracing/tracing.go pkg/shared/tracing/tracing_test.go
-git commit -m "feat(tracing): add span kind helper functions for SERVER/PRODUCER/CONSUMER/CLIENT"
+git commit -s -m "feat(tracing): add span kind helper functions for SERVER/PRODUCER/CONSUMER/CLIENT"
 ```
 
 ---
@@ -469,7 +475,7 @@ Expected: All tests pass, including `TestStartSpanWithAttributes` from Task 1 (w
 
 ```bash
 git add pkg/shared/tracing/messaging.go pkg/shared/tracing/messaging_test.go
-git commit -m "feat(tracing): add messaging attributes builder and source type span kind classifier"
+git commit -s -m "feat(tracing): add messaging attributes builder and source type span kind classifier"
 ```
 
 ---
@@ -553,7 +559,7 @@ Expected: All existing tests pass. The span kind change doesn't affect test asse
 
 ```bash
 git add pkg/eventsources/eventing.go
-git commit -m "feat(eventsource): change eventsource.publish span to PRODUCER with messaging attributes"
+git commit -s -m "feat(eventsource): change eventsource.publish span to PRODUCER with messaging attributes"
 ```
 
 ---
@@ -612,7 +618,7 @@ Expected: All existing tests pass.
 
 ```bash
 git add pkg/sensors/listener.go
-git commit -m "feat(sensor): add sensor.consume CONSUMER span for EventBus message consumption"
+git commit -s -m "feat(sensor): add sensor.consume CONSUMER span for EventBus message consumption"
 ```
 
 ---
@@ -675,7 +681,7 @@ Expected: All existing tests pass.
 
 ```bash
 git add pkg/sensors/listener.go
-git commit -m "feat(sensor): change sensor.trigger span to CLIENT with server.address attribute"
+git commit -s -m "feat(sensor): change sensor.trigger span to CLIENT with server.address attribute"
 ```
 
 ---
@@ -722,16 +728,18 @@ Expected: All existing tests pass.
 
 ```bash
 git add eventsources/sources/webhook/start.go
-git commit -m "feat(eventsource/webhook): add eventsource.receive SERVER span for inbound webhooks"
+git commit -s -m "feat(eventsource/webhook): add eventsource.receive SERVER span for inbound webhooks"
 ```
 
 ---
 
-### Task 7: Build and Push Updated Argo Events Image
+### Task 7: Push, Merge Branches, Codegen, Build and Push Image
 
 **Repo:** Argo Events fork
 
-- [ ] **Step 1: Run the full test suite**
+This task handles the branch workflow: push tracing commits to the OTel branch, merge both PR branches into the combined branch, run codegen, and build/push the image.
+
+- [ ] **Step 1: Run the full test suite on `feat/cloudevents-compliance-otel-tracing`**
 
 ```bash
 go test -race -count=1 ./...
@@ -739,27 +747,76 @@ go test -race -count=1 ./...
 
 Expected: All tests pass.
 
-- [ ] **Step 2: Build the container image**
+- [ ] **Step 2: Push tracing commits to the OTel branch**
 
-Build the updated Argo Events image with a new tag that includes the tracing changes:
+Ensure you're on `feat/cloudevents-compliance-otel-tracing` and push only the OTel/CloudEvents-related commits:
 
 ```bash
-docker build -t ghcr.io/kaio6fellipe/argo-events:prs-3961-3983-messaging-spans .
+git log --oneline origin/feat/cloudevents-compliance-otel-tracing..HEAD
+```
+
+Review the log — it should only contain commits from Tasks 1-6 (span kind helpers, messaging attributes, PRODUCER/CONSUMER/CLIENT changes, webhook receive span). No Kafka optimization or unrelated changes.
+
+```bash
+git push origin feat/cloudevents-compliance-otel-tracing
+```
+
+- [ ] **Step 3: Switch to the combined branch and merge both PR branches**
+
+```bash
+git checkout feat/combined-prs-3961-3983
+git merge feat/cloudevents-compliance-otel-tracing
+```
+
+If the PR #3983 branch also needs to be merged (and isn't already in the combined branch):
+
+```bash
+git merge <pr-3983-branch-name>
+```
+
+Resolve any merge conflicts if they arise.
+
+- [ ] **Step 4: Run codegen**
+
+```bash
+PATH="$(go env GOPATH)/bin:$PATH" make codegen
+```
+
+If codegen produces changes, commit them:
+
+```bash
+git add -A
+git diff --cached --quiet || git commit -s -m "chore: run codegen after merging tracing span kind changes"
+```
+
+- [ ] **Step 5: Run the full test suite on the combined branch**
+
+```bash
+go test -race -count=1 ./...
+```
+
+Expected: All tests pass on the combined branch.
+
+- [ ] **Step 6: Build the container image**
+
+Build using the existing image tag (overwrites the previous image):
+
+```bash
+docker build -t ghcr.io/kaio6fellipe/argo-events:prs-3961-3983 .
 ```
 
 Adjust the Dockerfile path and build args based on the fork's build system (check the existing Makefile or Dockerfile).
 
-- [ ] **Step 3: Push the image**
+- [ ] **Step 7: Push the image**
 
 ```bash
-docker push ghcr.io/kaio6fellipe/argo-events:prs-3961-3983-messaging-spans
+docker push ghcr.io/kaio6fellipe/argo-events:prs-3961-3983
 ```
 
-- [ ] **Step 4: Commit any remaining changes**
+- [ ] **Step 8: Push the combined branch**
 
 ```bash
-git add -A
-git commit -m "feat(tracing): complete PRODUCER/CONSUMER span instrumentation for service graph"
+git push origin feat/combined-prs-3961-3983
 ```
 
 ---
@@ -771,6 +828,8 @@ git commit -m "feat(tracing): complete PRODUCER/CONSUMER span instrumentation fo
 **Repo:** go-http-server
 **Files:**
 - Modify: `deploy/observability/local/tempo-values.yaml`
+
+The image tag stays `prs-3961-3983` (Task 7 overwrites the same tag), so no deploy manifest changes needed — just Tempo config and a rollout restart to pull the updated image.
 
 - [ ] **Step 1: Enable messaging system histogram and add messaging.system dimension**
 
@@ -790,25 +849,19 @@ In `deploy/observability/local/tempo-values.yaml`, update the `service_graphs` b
 
 Note: `enable_virtual_node_label` may already be present from the Alloy transform plan. If so, only add `enable_messaging_system_latency_histogram` and the `messaging.system` dimension.
 
-- [ ] **Step 2: Update Argo Events image tag in deploy manifests**
-
-Update the Argo Events Helm values or Makefile to use the new image tag. Search for the current tag `prs-3961-3983` in the Makefile and Argo Events Helm values:
-
-```bash
-grep -r "prs-3961-3983" deploy/ Makefile
-```
-
-Update all occurrences to the new tag `prs-3961-3983-messaging-spans`.
-
-- [ ] **Step 3: Commit**
+- [ ] **Step 2: Commit**
 
 ```bash
 git add deploy/observability/local/tempo-values.yaml
-git add -A  # Include any Makefile or deploy changes for the image tag
-git commit -m "feat(observability): enable messaging system histogram and update Argo Events image tag"
+git commit -m "$(cat <<'EOF'
+feat(observability): enable messaging system latency histogram in Tempo service graph
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+EOF
+)"
 ```
 
-- [ ] **Step 4: Redeploy Tempo**
+- [ ] **Step 3: Redeploy Tempo**
 
 ```bash
 helm upgrade --install tempo grafana/tempo \
@@ -818,15 +871,22 @@ helm upgrade --install tempo grafana/tempo \
   --wait --timeout 120s
 ```
 
-- [ ] **Step 5: Redeploy Argo Events**
+- [ ] **Step 4: Restart Argo Events pods to pull updated image**
 
-Redeploy the Argo Events components to pick up the new image. Use the Makefile target or helm upgrade for the Argo Events deployment:
+The image tag is the same (`prs-3961-3983`) but the content changed. Force a rollout restart of EventSource and Sensor pods to pull the new image:
 
 ```bash
-make k8s-platform
+kubectl --context=k3d-bookinfo-local -n bookinfo rollout restart deployment -l app.kubernetes.io/part-of=argo-events
 ```
 
-Then reapply the bookinfo app manifests to restart EventSources and Sensors:
+If the above selector doesn't match, restart the specific deployments:
+
+```bash
+kubectl --context=k3d-bookinfo-local -n bookinfo delete pods -l managed-by=events-source
+kubectl --context=k3d-bookinfo-local -n bookinfo delete pods -l managed-by=sensor-controller
+```
+
+Alternatively, redeploy the full app stack which recreates them:
 
 ```bash
 make k8s-apps

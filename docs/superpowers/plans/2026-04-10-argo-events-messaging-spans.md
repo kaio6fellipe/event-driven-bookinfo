@@ -892,25 +892,7 @@ Alternatively, redeploy the full app stack which recreates them:
 make k8s-apps
 ```
 
-- [ ] **Step 6: Remove Alloy transform workaround (if deployed)**
-
-If the Alloy span kind transform from the companion plan was deployed, it can now be removed since Argo Events emits correct span kinds natively. Revert the transform processor block from:
-- `deploy/observability/local/alloy-metrics-traces-config.alloy`
-- `deploy/observability/local/alloy-metrics-traces-values.yaml`
-
-Rewire the cluster attributes output back to the batch processor and remove the `otelcol.processor.transform "argo_events"` block.
-
-Then redeploy Alloy:
-
-```bash
-helm upgrade --install alloy-metrics-traces grafana/alloy \
-  -n observability \
-  --kube-context=k3d-bookinfo-local \
-  -f deploy/observability/local/alloy-metrics-traces-values.yaml \
-  --wait --timeout 120s
-```
-
-- [ ] **Step 7: Verify end-to-end**
+- [ ] **Step 6: Verify end-to-end**
 
 Trigger a POST request:
 

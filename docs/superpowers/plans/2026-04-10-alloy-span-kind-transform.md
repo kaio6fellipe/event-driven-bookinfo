@@ -1,5 +1,7 @@
 # Alloy Span Kind Transform Implementation Plan
 
+> **SUPERSEDED:** This plan is not being executed. The Argo Events fork will be updated directly with proper span kinds (Plan: `2026-04-10-argo-events-messaging-spans.md`), making this Alloy workaround unnecessary. Kept for reference.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make Argo Events sensors and EventSources visible in the Grafana Tempo service graph by transforming their span kinds from INTERNAL to CLIENT/SERVER in the Alloy collector pipeline.

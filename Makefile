@@ -461,6 +461,39 @@ k8s-logs: ##@Kubernetes Tail logs from bookinfo namespace
 	$(k8s-guard)
 	$(KUBECTL) logs -n $(K8S_NS_BOOKINFO) -l part-of=event-driven-bookinfo -f --max-log-requests=10
 
+# ─── Traffic ─────────────────────────────────────────────────────────────────
+
+GATEWAY_URL := http://localhost:8080
+
+.PHONY: k8s-traffic
+k8s-traffic: ##@Kubernetes Generate sample GET and POST traffic through the gateway
+	@printf "$(BOLD)Generating sample traffic against $(GATEWAY_URL)...$(NC)\n\n"
+	@printf "$(CYAN)[POST]$(NC) /v1/details — add a book\n"
+	@curl -s -X POST $(GATEWAY_URL)/v1/details \
+		-H 'Content-Type: application/json' \
+		-d '{"title":"The Go Programming Language","author":"Donovan & Kernighan","year":2015,"isbn":"978-0134190440"}' \
+		-w "  HTTP %{http_code}\n"
+	@printf "$(CYAN)[POST]$(NC) /v1/ratings — submit a rating\n"
+	@curl -s -X POST $(GATEWAY_URL)/v1/ratings \
+		-H 'Content-Type: application/json' \
+		-d '{"book_id":"1","rating":5}' \
+		-w "  HTTP %{http_code}\n"
+	@printf "$(CYAN)[POST]$(NC) /v1/reviews — submit a review\n"
+	@curl -s -X POST $(GATEWAY_URL)/v1/reviews \
+		-H 'Content-Type: application/json' \
+		-d '{"book_id":"1","reviewer":"alice","text":"Excellent book on Go","rating":5}' \
+		-w "  HTTP %{http_code}\n"
+	@sleep 2
+	@printf "\n$(CYAN)[GET]$(NC)  /v1/products/1 — read product page\n"
+	@curl -s $(GATEWAY_URL)/v1/products/1 -o /dev/null -w "  HTTP %{http_code}\n"
+	@printf "$(CYAN)[GET]$(NC)  /v1/details — list details\n"
+	@curl -s $(GATEWAY_URL)/v1/details -o /dev/null -w "  HTTP %{http_code}\n"
+	@printf "$(CYAN)[GET]$(NC)  /v1/ratings/1 — get ratings\n"
+	@curl -s $(GATEWAY_URL)/v1/ratings/1 -o /dev/null -w "  HTTP %{http_code}\n"
+	@printf "$(CYAN)[GET]$(NC)  /v1/reviews/1 — get reviews\n"
+	@curl -s $(GATEWAY_URL)/v1/reviews/1 -o /dev/null -w "  HTTP %{http_code}\n"
+	@printf "\n$(GREEN)Done. Check traces at http://localhost:3000 (Grafana > Explore > Tempo)$(NC)\n"
+
 # ─── Help ───────────────────────────────────────────────────────────────────
 
 .PHONY: help

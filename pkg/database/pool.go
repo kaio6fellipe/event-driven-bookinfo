@@ -4,9 +4,11 @@ package database
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/exaring/otelpgx"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // NewPoolConfig parses a database URL and returns a pgxpool.Config with
@@ -17,9 +19,16 @@ func NewPoolConfig(databaseURL string) (*pgxpool.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parsing database URL: %w", err)
 	}
-	cfg.ConnConfig.Tracer = otelpgx.NewTracer(
+	tracerOpts := []otelpgx.Option{
 		otelpgx.WithTrimSQLInSpanName(),
-	)
+	}
+	if u, err := url.Parse(databaseURL); err == nil && u.Hostname() != "" {
+		tracerOpts = append(tracerOpts, otelpgx.WithTracerAttributes(
+			attribute.String("server.address", u.Hostname()),
+			attribute.String("server.port", u.Port()),
+		))
+	}
+	cfg.ConnConfig.Tracer = otelpgx.NewTracer(tracerOpts...)
 	return cfg, nil
 }
 

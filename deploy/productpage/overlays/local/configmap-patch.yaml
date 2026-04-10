@@ -8,3 +8,4 @@ data:
   DETAILS_SERVICE_URL: "http://gateway.envoy-gateway-system.svc.cluster.local"
   REVIEWS_SERVICE_URL: "http://gateway.envoy-gateway-system.svc.cluster.local"
   RATINGS_SERVICE_URL: "http://gateway.envoy-gateway-system.svc.cluster.local"
+  REDIS_URL: "redis://redis-master.bookinfo.svc.cluster.local:6379"

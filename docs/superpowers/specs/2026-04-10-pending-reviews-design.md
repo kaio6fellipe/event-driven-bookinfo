@@ -131,6 +131,76 @@ Productpage read deployment ConfigMap updated with `REDIS_URL` env var pointing 
 - Form submission HTML structure
 - Success banner message
 
+## Docker Compose: Local Development
+
+Add a Redis service to `docker-compose.yml` for the `make run` local development flow:
+
+```yaml
+redis:
+  image: redis:7-alpine
+  ports:
+    - "6379:6379"
+  volumes:
+    - redisdata:/data
+  healthcheck:
+    test: ["CMD", "redis-cli", "ping"]
+    interval: 2s
+    timeout: 5s
+    retries: 5
+```
+
+Productpage service updated with `REDIS_URL: redis://redis:6379` and `depends_on: redis`.
+
+Add `redisdata` to the volumes section.
+
+## Docker Compose: E2E Tests
+
+The e2e test compose (`test/e2e/docker-compose.yml`) also needs a Redis service for the productpage. Same image and config, but without persistent volume (tests are ephemeral). The postgres overlay (`test/e2e/docker-compose.postgres.yml`) does not need changes — Redis is independent of the storage backend choice.
+
+E2E test scripts do not need changes for the pending feature — the existing tests exercise the direct service APIs (POST to reviews/ratings services, GET productpage). The pending review cache is transparent to the API contract. The HTMX partial endpoints are not tested in the shell-based e2e suite.
+
+## Documentation Updates
+
+### README.md
+
+**Service Topology diagram (mermaid):** Add Redis node connected to productpage:
+```
+Redis["Redis"]
+PP -->|"pending cache"| Redis
+```
+
+**Cluster Architecture diagram (mermaid):** Add Redis to the `bookinfo` subgraph alongside PostgreSQL:
+```
+Redis["Redis"]
+PP --> Redis
+```
+
+**Services table:** Update productpage description to mention Redis pending cache: "Aggregates details + reviews + ratings into an HTML product page. Fans out sync GET calls; pending review cache via Redis."
+
+**Access URLs table:** No changes needed (Redis is not exposed to the host).
+
+**Project Structure:** Add `deploy/redis/local/` entry under `deploy/`.
+
+**Quick Start section:** Add `REDIS_URL` as optional env var for productpage in the local binary run section (optional — feature is disabled when unset).
+
+**Docker section:** Mention Redis in the `make run` description.
+
+### CLAUDE.md
+
+**Services table:** Update productpage description to mention pending review cache.
+
+**Architecture section:** Add bullet about Redis pending review cache in productpage.
+
+**Deploy Structure:** Add `deploy/redis/local/` entry.
+
+**Run Locally section:** Add `REDIS_URL` as optional env var for productpage.
+
+**Access section:** No changes (Redis is internal).
+
+### .claude/rules/*.md
+
+No changes needed — the coding rules (code-style, api-design, testing) are generic and don't reference specific services or infrastructure.
+
 ## Request Lifecycle (Updated)
 
 ```

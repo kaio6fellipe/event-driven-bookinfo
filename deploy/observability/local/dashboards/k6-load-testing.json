@@ -15,7 +15,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "10.0.0"
+      "version": "10.1.2"
     },
     {
       "type": "datasource",
@@ -64,11 +64,10 @@
       }
     ]
   },
-  "description": "Visualize k6 OSS results stored in Prometheus",
+  "description": "Visualize k6 OSS results stored in Prometheus with Native Histograms.",
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "gnetId": 19665,
-  "graphTooltip": 2,
+  "graphTooltip": 0,
   "links": [
     {
       "asDropdown": false,
@@ -96,7 +95,6 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -226,7 +224,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "http_req_duration_[a-zA-Z0-9_]+"
+              "options": "http_req_duration_q.*"
             },
             "properties": [
               {
@@ -263,7 +261,7 @@
           "showLegend": true
         },
         "tooltip": {
-          "mode": "multi",
+          "mode": "single",
           "sort": "none"
         }
       },
@@ -274,7 +272,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(k6_vus{testid=~\"$testid\"})",
+          "expr": "avg(k6_vus{testid=~\"$testid\"})",
           "instant": false,
           "legendFormat": "vus",
           "range": true,
@@ -286,10 +284,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg(k6_http_req_duration_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "histogram_quantile($quantile, sum by (le) (rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval])))",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_duration_$quantile_stat",
+          "legendFormat": "http_req_duration_q$quantile",
           "range": true,
           "refId": "C"
         },
@@ -390,10 +388,9 @@
           "fields": "",
           "values": false
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
+        "textMode": "auto"
       },
+      "pluginVersion": "10.1.2",
       "targets": [
         {
           "datasource": {
@@ -453,10 +450,9 @@
           "fields": "",
           "values": false
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
+        "textMode": "auto"
       },
+      "pluginVersion": "10.1.2",
       "targets": [
         {
           "datasource": {
@@ -515,10 +511,9 @@
           "fields": "",
           "values": false
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
+        "textMode": "auto"
       },
+      "pluginVersion": "10.1.2",
       "targets": [
         {
           "datasource": {
@@ -528,19 +523,12 @@
           "editorMode": "code",
           "expr": "sum(irate(k6_http_reqs_total{testid=~\"$testid\"}[$__rate_interval]))",
           "instant": false,
-          "interval": "",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Peak RPS",
-      "transformations": [
-        {
-          "id": "reduce",
-          "options": {}
-        }
-      ],
       "type": "stat"
     },
     {
@@ -548,7 +536,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Select a different Stat to change the query",
+      "description": "Select a different quantile to change the query",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -585,10 +573,9 @@
           "fields": "",
           "values": false
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
+        "textMode": "auto"
       },
+      "pluginVersion": "10.1.2",
       "targets": [
         {
           "datasource": {
@@ -596,7 +583,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg(k6_http_req_duration_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "histogram_quantile($quantile, sum by(le) (rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval])))",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -617,7 +604,6 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -723,7 +709,6 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -807,9 +792,9 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg(k6_iteration_duration_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "histogram_quantile($quantile, sum by(le) (rate(k6_iteration_duration_seconds{testid=~\"$testid\"}[$__rate_interval])))",
           "instant": false,
-          "legendFormat": "iteration_duration_$quantile_stat",
+          "legendFormat": "iteration_duration_q$quantile",
           "range": true,
           "refId": "A"
         },
@@ -849,14 +834,13 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Select a different Stat to change the query\n\n<a href=\"https://k6.io/docs/using-k6/metrics/reference/#http\" target=\"_blank\">HTTP-specific built-in metrics</a>",
+      "description": "Select a different quantile to change the query\n\n<a href=\"https://k6.io/docs/using-k6/metrics/reference/#http\" target=\"_blank\">HTTP-specific built-in metrics</a>",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
-            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -942,10 +926,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg(k6_http_req_blocked_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "histogram_quantile($quantile, sum by(le) (rate(k6_http_req_blocked_seconds{testid=~\"$testid\"}[$__rate_interval])))",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_blocked_$quantile_stat",
+          "legendFormat": "http_req_blocked_q$quantile",
           "range": true,
           "refId": "B"
         },
@@ -955,10 +939,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg(k6_http_req_tls_handshaking_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "histogram_quantile($quantile, sum by(le) (rate(k6_http_req_tls_handshaking_seconds{testid=~\"$testid\"}[$__rate_interval])))",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_tls_handshaking_$quantile_stat",
+          "legendFormat": "http_req_tls_handshaking_q$quantile",
           "range": true,
           "refId": "C"
         },
@@ -968,10 +952,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg(k6_http_req_sending_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "histogram_quantile($quantile, sum by(le) (rate(k6_http_req_sending_seconds{testid=~\"$testid\"}[$__rate_interval])))",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_sending_$quantile_stat",
+          "legendFormat": "http_req_sending_q$quantile",
           "range": true,
           "refId": "D"
         },
@@ -981,10 +965,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg(k6_http_req_waiting_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "histogram_quantile($quantile, sum by(le) (rate(k6_http_req_waiting_seconds{testid=~\"$testid\"}[$__rate_interval])))",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_waiting_$quantile_stat",
+          "legendFormat": "http_req_waiting_q$quantile",
           "range": true,
           "refId": "E"
         },
@@ -994,10 +978,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg(k6_http_req_receiving_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "histogram_quantile($quantile, sum by(le) (rate(k6_http_req_receiving_seconds{testid=~\"$testid\"}[$__rate_interval])))",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_receiving_$quantile_stat",
+          "legendFormat": "http_req_receiving_q$quantile",
           "range": true,
           "refId": "F"
         },
@@ -1007,10 +991,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg(k6_http_req_duration_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "histogram_quantile($quantile, sum by(le) (rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval])))",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_duration_$quantile_stat",
+          "legendFormat": "http_req_duration_q$quantile",
           "range": true,
           "refId": "A"
         }
@@ -1023,14 +1007,13 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Select a different Stat to change the query",
+      "description": "Select a different quantile to change the query",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
-            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1077,7 +1060,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "errors_http_req_duration_[a-zA-Z0-9_]+"
+              "options": "errors_http_req_duration_q.*"
             },
             "properties": [
               {
@@ -1092,7 +1075,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "success_http_req_duration_[a-zA-Z0-9_]+"
+              "options": "success_http_req_duration_q.*"
             },
             "properties": [
               {
@@ -1107,22 +1090,7 @@
           {
             "matcher": {
               "id": "byRegexp",
-              "options": "http_req_duration_[a-zA-Z0-9_]+"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "yellow",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "http_req_duration_[a-zA-Z0-9_]+"
+              "options": "http_req_duration_q.*"
             },
             "properties": [
               {
@@ -1162,10 +1130,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg(k6_http_req_duration_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "histogram_quantile($quantile, sum by (le) ((rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval]))))",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_duration_$quantile_stat",
+          "legendFormat": "http_req_duration_q$quantile",
           "range": true,
           "refId": "A"
         },
@@ -1175,9 +1143,9 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg(k6_http_req_duration_$quantile_stat{testid=~\"$testid\", expected_response=\"true\"})",
+          "expr": "histogram_quantile($quantile, sum by(le) (rate(k6_http_req_waiting_seconds{testid=~\"$testid\", expected_response=\"true\"}[$__rate_interval])))",
           "instant": false,
-          "legendFormat": "success_http_req_duration_$quantile_stat",
+          "legendFormat": "success_http_req_duration_q$quantile",
           "range": true,
           "refId": "C"
         },
@@ -1187,10 +1155,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg(k6_http_req_duration_$quantile_stat{testid=~\"$testid\", expected_response=\"false\"})",
+          "expr": "histogram_quantile($quantile, sum by(le) (rate(k6_http_req_waiting_seconds{testid=~\"$testid\", expected_response=\"false\"}[$__rate_interval])))",
           "hide": false,
           "instant": false,
-          "legendFormat": "errors_http_req_duration_$quantile_stat",
+          "legendFormat": "errors_http_req_duration_q$quantile",
           "range": true,
           "refId": "B"
         }
@@ -1210,7 +1178,6 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1529,6 +1496,7 @@
         "frameIndex": 2,
         "showHeader": true
       },
+      "pluginVersion": "10.1.2",
       "targets": [
         {
           "datasource": {
@@ -1536,7 +1504,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg by(name, method, status) (k6_http_req_duration_min{testid=~\"$testid\"})",
+          "expr": "histogram_quantile(0, sum by(le, name, method, status) (rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval])))",
           "format": "table",
           "hide": false,
           "instant": false,
@@ -1550,7 +1518,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg by(name, method, status) (k6_http_req_duration_max{testid=~\"$testid\"})",
+          "expr": "histogram_quantile(1, sum by(le, name, method, status) (rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval])))",
           "format": "table",
           "hide": false,
           "instant": false,
@@ -1564,7 +1532,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg by(name, method, status) (k6_http_req_duration_p95{testid=~\"$testid\"})",
+          "expr": "histogram_quantile(0.95, sum by(le, name, method, status) (rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval])))",
           "format": "table",
           "hide": false,
           "instant": false,
@@ -1578,7 +1546,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg by(name, method, status) (k6_http_req_duration_p99{testid=~\"$testid\"})",
+          "expr": "histogram_quantile(0.99, sum by(le, name, method, status) (rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval])))",
           "format": "table",
           "hide": false,
           "instant": false,
@@ -1777,6 +1745,7 @@
           }
         ]
       },
+      "pluginVersion": "10.1.2",
       "targets": [
         {
           "datasource": {
@@ -1791,6 +1760,19 @@
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "round(k6_checks_rate{testid=~\"$testid\"}, 0.1)",
+          "hide": true,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "Checks list",
@@ -1867,7 +1849,6 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1970,14 +1951,17 @@
         "content": "### Visualize other k6 results  \n\nAt the top of the dashboard, click `Add` and select `Visualization` from the dropdown menu. Choose the visualization type and input the PromQL queries for the `k6_` metric(s).\n\nAlternatively, click on the `Explore` icon on the menu bar and input the queries for the `k6_` metric(s). From `Explore`, you can add new Panels to this dashboard. \n\nNote that all <a href=\"https://k6.io/docs/using-k6/metrics/\" target=\"_blank\">k6 metrics</a> are prefixed with the `k6_` namespace when sent to Prometheus.",
         "mode": "markdown"
       },
+      "pluginVersion": "10.1.2",
       "type": "text"
     }
   ],
   "refresh": "",
-  "schemaVersion": 39,
+  "schemaVersion": 38,
+  "style": "dark",
   "tags": [
     "prometheus",
-    "k6"
+    "k6",
+    "native-histogram"
   ],
   "templating": {
     "list": [
@@ -2026,28 +2010,25 @@
         "type": "query"
       },
       {
-        "current": {},
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
+        "current": {
+          "selected": false,
+          "text": "0.99",
+          "value": "0.99"
         },
-        "definition": "metrics(k6_http_req_duration_)",
-        "description": "Statistic for Trend Metrics Queries. The available options depend on the values of the K6_PROMETHEUS_RW_TREND_STATS setting.",
+        "description": "Statistic for Trend Metrics Queries. Calculate the \u03c6-quantile (0 \u2264 \u03c6 \u2264 1) in native histogram metrics.  0=min, 0.5=mean, 0.9=p90, 0.95=p95, 0.99=p99, 1=max",
         "hide": 0,
-        "includeAll": false,
         "label": "Trend Metrics Query",
-        "multi": false,
-        "name": "quantile_stat",
-        "options": [],
-        "query": {
-          "query": "metrics(k6_http_req_duration_)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 2,
-        "regex": "/http_req_duration_(min|max|count|sum|avg|med|p[0-9]+)/g",
+        "name": "quantile",
+        "options": [
+          {
+            "selected": true,
+            "text": "0.95",
+            "value": "0.95"
+          }
+        ],
+        "query": "0.99",
         "skipUrlSync": false,
-        "sort": 2,
-        "type": "query"
+        "type": "textbox"
       },
       {
         "datasource": {
@@ -2065,14 +2046,14 @@
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-15m",
     "to": "now"
   },
-  "timeRangeUpdatedDuringEditOrView": false,
   "timepicker": {},
   "timezone": "",
   "title": "k6 Load Testing",
   "uid": "k6-load-testing",
-  "version": 3,
-  "weekStart": ""
+  "version": 1,
+  "weekStart": "",
+  "gnetId": 18030
 }

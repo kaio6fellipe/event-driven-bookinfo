@@ -481,7 +481,7 @@ k8s-load: ##@Kubernetes Run k6 load test via Docker (default 30s). Usage: DURATI
 k8s-load-start: ##@Kubernetes Deploy k6 CronJob for continuous background load
 	$(k8s-guard)
 	@printf "$(BOLD)Deploying k6 load generator CronJob...$(NC)\n"
-	@$(KUBECTL) apply -k deploy/k6/overlays/local/
+	@$(KUBECTL) kustomize --load-restrictor LoadRestrictionsNone deploy/k6/overlays/local/ | $(KUBECTL) apply -f -
 	@printf "$(GREEN)k6 CronJob deployed. Runs every 10 minutes in namespace $(K8S_NS_BOOKINFO).$(NC)\n"
 	@printf "Use $(CYAN)make k8s-load-stop$(NC) to remove.\n"
 
@@ -489,7 +489,7 @@ k8s-load-start: ##@Kubernetes Deploy k6 CronJob for continuous background load
 k8s-load-stop: ##@Kubernetes Remove k6 CronJob from the cluster
 	$(k8s-guard)
 	@printf "$(BOLD)Removing k6 load generator CronJob...$(NC)\n"
-	@$(KUBECTL) delete -k deploy/k6/overlays/local/ --ignore-not-found
+	@$(KUBECTL) kustomize --load-restrictor LoadRestrictionsNone deploy/k6/overlays/local/ | $(KUBECTL) delete --ignore-not-found -f -
 	@printf "$(GREEN)k6 CronJob removed.$(NC)\n"
 
 # ─── Help ───────────────────────────────────────────────────────────────────

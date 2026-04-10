@@ -18,3 +18,10 @@ configMapGenerator:
         grafana_dashboard: "1"
     files:
       - envoy-gateway.json
+  - name: grafana-dashboard-k6-load-testing
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"
+    files:
+      - k6-load-testing.json

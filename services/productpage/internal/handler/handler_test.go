@@ -12,6 +12,7 @@ import (
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/productpage/internal/client"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/productpage/internal/handler"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/productpage/internal/pending"
 )
 
 // projectRoot walks up from the current working directory to find the go.mod file
@@ -104,7 +105,7 @@ func TestAPIGetProducts(t *testing.T) {
 	reviewsClient := client.NewReviewsClient(reviewsURL)
 	ratingsClient := client.NewRatingsClient(ratingsURL)
 
-	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, templateDir(t))
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, pending.NoopStore{}, templateDir(t))
 
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
@@ -138,7 +139,7 @@ func TestPartialDetails(t *testing.T) {
 	reviewsClient := client.NewReviewsClient(reviewsURL)
 	ratingsClient := client.NewRatingsClient(ratingsURL)
 
-	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, templateDir(t))
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, pending.NoopStore{}, templateDir(t))
 
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
@@ -167,7 +168,7 @@ func TestPartialReviews(t *testing.T) {
 	reviewsClient := client.NewReviewsClient(reviewsURL)
 	ratingsClient := client.NewRatingsClient(ratingsURL)
 
-	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, templateDir(t))
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, pending.NoopStore{}, templateDir(t))
 
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
@@ -205,7 +206,7 @@ func TestPartialRatingSubmit(t *testing.T) {
 	reviewsClient := client.NewReviewsClient(reviewsURL)
 	ratingsClient := client.NewRatingsClient(ratingsURL)
 
-	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, templateDir(t))
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, pending.NoopStore{}, templateDir(t))
 
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
@@ -246,7 +247,7 @@ func TestPartialRatingSubmitAsync(t *testing.T) {
 	reviewsClient := client.NewReviewsClient(reviewsURL)
 	ratingsClient := client.NewRatingsClient(asyncRatingsServer.URL)
 
-	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, templateDir(t))
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, pending.NoopStore{}, templateDir(t))
 
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
@@ -296,7 +297,7 @@ func TestPartialRatingSubmitAsyncWithReview(t *testing.T) {
 	reviewsClient := client.NewReviewsClient(asyncReviewsServer.URL)
 	ratingsClient := client.NewRatingsClient(asyncRatingsServer.URL)
 
-	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, templateDir(t))
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, pending.NoopStore{}, templateDir(t))
 
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)

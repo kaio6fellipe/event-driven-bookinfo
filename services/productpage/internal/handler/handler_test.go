@@ -2,6 +2,7 @@
 package handler_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/alicebob/miniredis/v2"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/productpage/internal/client"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/productpage/internal/handler"
@@ -315,5 +318,92 @@ func TestPartialRatingSubmitAsyncWithReview(t *testing.T) {
 	body := rec.Body.String()
 	if !strings.Contains(body, "successfully") {
 		t.Errorf("expected success message for async write with review, got:\n%s", body)
+	}
+}
+
+func TestPartialReviewsWithPending(t *testing.T) {
+	detailsURL, reviewsURL, ratingsURL := setupMockServers(t)
+
+	detailsClient := client.NewDetailsClient(detailsURL)
+	reviewsClient := client.NewReviewsClient(reviewsURL)
+	ratingsClient := client.NewRatingsClient(ratingsURL)
+
+	mr := miniredis.RunT(t)
+	store, err := pending.NewRedisStore("redis://" + mr.Addr())
+	if err != nil {
+		t.Fatalf("failed to create redis store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	// Store a pending review
+	ctx := context.Background()
+	_ = store.StorePending(ctx, "product-1", pending.NewReview("bob", "Pending review text", 4))
+
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, store, templateDir(t))
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/partials/reviews/product-1", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	body := rec.Body.String()
+
+	// Confirmed review from mock server
+	if !strings.Contains(body, "alice") {
+		t.Errorf("expected confirmed review 'alice' in response")
+	}
+
+	// Pending review
+	if !strings.Contains(body, "bob") {
+		t.Errorf("expected pending review 'bob' in response")
+	}
+	if !strings.Contains(body, "Pending review text") {
+		t.Errorf("expected pending review text in response")
+	}
+	if !strings.Contains(body, "review-pending") {
+		t.Errorf("expected 'review-pending' CSS class in response")
+	}
+	if !strings.Contains(body, "Processing") {
+		t.Errorf("expected 'Processing' label in response")
+	}
+
+	// HTMX polling should be active
+	if !strings.Contains(body, "every 2s") {
+		t.Errorf("expected HTMX polling trigger 'every 2s' in response")
+	}
+}
+
+func TestPartialReviewsNoPending(t *testing.T) {
+	detailsURL, reviewsURL, ratingsURL := setupMockServers(t)
+
+	detailsClient := client.NewDetailsClient(detailsURL)
+	reviewsClient := client.NewReviewsClient(reviewsURL)
+	ratingsClient := client.NewRatingsClient(ratingsURL)
+
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, pending.NoopStore{}, templateDir(t))
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/partials/reviews/product-1", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+
+	// Should NOT have polling when no pending reviews
+	if strings.Contains(body, "every 2s") {
+		t.Errorf("expected NO HTMX polling when there are no pending reviews")
+	}
+
+	// Should NOT have pending CSS class
+	if strings.Contains(body, "review-pending") {
+		t.Errorf("expected NO review-pending CSS class when no pending reviews")
 	}
 }

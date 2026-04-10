@@ -475,6 +475,7 @@ k8s-load: ##@Kubernetes Run k6 load test via Docker (default 30s). Usage: DURATI
 		-e DURATION=$(DURATION) \
 		-e BASE_RATE=$(BASE_RATE) \
 		-e K6_PROMETHEUS_RW_SERVER_URL=http://host.docker.internal:9090/api/v1/write \
+		-e K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=true \
 		grafana/k6 run -o experimental-prometheus-rw /scripts/bookinfo-traffic.js
 
 .PHONY: k8s-load-start

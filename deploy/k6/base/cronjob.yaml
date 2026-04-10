@@ -38,6 +38,8 @@ spec:
                   value: "1"
                 - name: K6_PROMETHEUS_RW_SERVER_URL
                   value: "http://prometheus-kube-prometheus-prometheus.observability.svc.cluster.local:9090/api/v1/write"
+                - name: K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM
+                  value: "true"
               volumeMounts:
                 - name: k6-scripts
                   mountPath: /scripts

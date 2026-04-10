@@ -35,7 +35,6 @@ function buildStages() {
 }
 
 export const options = {
-  discardResponseBodies: true,
   scenarios: {
     bookinfo: {
       executor: 'ramping-arrival-rate',
@@ -49,6 +48,9 @@ export const options = {
   thresholds: {
     http_req_duration: ['p(95)<2000'],
     http_req_failed: ['rate<0.1'],
+  },
+  tags: {
+    testid: `bookinfo-${new Date().toISOString().slice(0, 19)}`,
   },
 };
 
@@ -73,16 +75,20 @@ export default function (data) {
 
   // --- Read path ---
   // Home page: productpage -> details fan-out
-  const homeRes = http.get(`${BASE_URL}/`);
+  const homeRes = http.get(`${BASE_URL}/`, { tags: { name: 'GET /' } });
   check(homeRes, { 'home 200': (r) => r.status === 200 });
 
   if (productId) {
     // Product page: productpage -> details + reviews + ratings
-    http.get(`${BASE_URL}/products/${productId}`);
+    const productRes = http.get(`${BASE_URL}/products/${productId}`, { tags: { name: 'GET /products/{id}' } });
+    check(productRes, { 'product 200': (r) => r.status === 200 });
 
     // HTMX partials
-    http.get(`${BASE_URL}/partials/details/${productId}`);
-    http.get(`${BASE_URL}/partials/reviews/${productId}`);
+    const detailsRes = http.get(`${BASE_URL}/partials/details/${productId}`, { tags: { name: 'GET /partials/details/{id}' } });
+    check(detailsRes, { 'details 200': (r) => r.status === 200 });
+
+    const reviewsRes = http.get(`${BASE_URL}/partials/reviews/${productId}`, { tags: { name: 'GET /partials/reviews/{id}' } });
+    check(reviewsRes, { 'reviews 200': (r) => r.status === 200 });
 
     // --- Write path ---
     // Submit rating + review: productpage -> gateway -> EventSource -> Sensor -> write services
@@ -90,12 +96,13 @@ export default function (data) {
     const reviewer = reviewers[Math.floor(Math.random() * reviewers.length)];
     const stars = Math.floor(Math.random() * 5) + 1;
 
-    http.post(`${BASE_URL}/partials/rating`, {
+    const ratingRes = http.post(`${BASE_URL}/partials/rating`, {
       product_id: productId,
       reviewer: reviewer,
       stars: String(stars),
       text: `k6 load test review by ${reviewer}`,
-    });
+    }, { tags: { name: 'POST /partials/rating' } });
+    check(ratingRes, { 'rating 200': (r) => r.status === 200 });
   }
 
   // Small random sleep to add jitter between requests within an iteration

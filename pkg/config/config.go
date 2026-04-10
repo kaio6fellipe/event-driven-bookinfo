@@ -17,6 +17,7 @@ type Config struct {
 	RunMigrations          bool
 	OTLPEndpoint           string
 	PyroscopeServerAddress string
+	RedisURL               string
 }
 
 // Load reads configuration from environment variables and returns a Config.
@@ -32,6 +33,7 @@ func Load() (*Config, error) {
 		RunMigrations:          envOrDefault("RUN_MIGRATIONS", "true") == "true",
 		OTLPEndpoint:           os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
 		PyroscopeServerAddress: os.Getenv("PYROSCOPE_SERVER_ADDRESS"),
+		RedisURL:               os.Getenv("REDIS_URL"),
 	}
 
 	if cfg.ServiceName == "" {

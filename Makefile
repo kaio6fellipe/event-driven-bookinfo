@@ -461,6 +461,34 @@ k8s-logs: ##@Kubernetes Tail logs from bookinfo namespace
 	$(k8s-guard)
 	$(KUBECTL) logs -n $(K8S_NS_BOOKINFO) -l part-of=event-driven-bookinfo -f --max-log-requests=10
 
+# ─── Traffic ─────────────────────────────────────────────────────────────────
+
+GATEWAY_URL := http://localhost:8080
+
+.PHONY: k8s-traffic
+k8s-traffic: ##@Kubernetes Generate sample traffic through the productpage
+	@printf "$(BOLD)Generating sample traffic against $(GATEWAY_URL)...$(NC)\n\n"
+	@printf "$(BOLD)── Read path (GET via productpage → fan-out to backends) ──$(NC)\n"
+	@printf "$(CYAN)[GET]$(NC)  / — home page (productpage → details)\n"
+	@curl -s $(GATEWAY_URL)/ -o /dev/null -w "  HTTP %{http_code}\n"
+	@PRODUCT_ID=$$(curl -s $(GATEWAY_URL)/ | grep -o '/products/[^"]*' | head -1 | sed 's|/products/||'); \
+	if [ -z "$$PRODUCT_ID" ]; then \
+		printf "  $(RED)No products found, skipping product-specific requests$(NC)\n"; \
+	else \
+		printf "$(CYAN)[GET]$(NC)  /products/$$PRODUCT_ID — product page (productpage → details + reviews + ratings)\n"; \
+		curl -s $(GATEWAY_URL)/products/$$PRODUCT_ID -o /dev/null -w "  HTTP %{http_code}\n"; \
+		printf "$(CYAN)[GET]$(NC)  /partials/details/$$PRODUCT_ID — HTMX partial details\n"; \
+		curl -s $(GATEWAY_URL)/partials/details/$$PRODUCT_ID -o /dev/null -w "  HTTP %{http_code}\n"; \
+		printf "$(CYAN)[GET]$(NC)  /partials/reviews/$$PRODUCT_ID — HTMX partial reviews\n"; \
+		curl -s $(GATEWAY_URL)/partials/reviews/$$PRODUCT_ID -o /dev/null -w "  HTTP %{http_code}\n"; \
+		printf "\n$(BOLD)── Write path (POST via productpage → gateway → Argo Events CQRS) ──$(NC)\n"; \
+		printf "$(CYAN)[POST]$(NC) /partials/rating — submit rating+review (productpage → ratings + reviews via gateway)\n"; \
+		curl -s -o /dev/null -X POST $(GATEWAY_URL)/partials/rating \
+			-d "product_id=$$PRODUCT_ID&reviewer=alice&stars=5&text=Excellent+book+on+Go" \
+			-w "  HTTP %{http_code}\n"; \
+	fi
+	@printf "\n$(GREEN)Done. Check traces at http://localhost:3000 (Grafana > Explore > Tempo)$(NC)\n"
+
 # ─── Help ───────────────────────────────────────────────────────────────────
 
 .PHONY: help

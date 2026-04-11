@@ -136,7 +136,22 @@ export function teardown(data) {
     sleep(2);
   }
 
-  // Phase 2: Delete all k6-generated reviews
+  // Phase 2: Wait for Redis pending cache to reconcile (no more "Processing" badges)
+  console.log('Waiting for pending reviews to reconcile...');
+  for (let attempt = 1; attempt <= 15; attempt++) {
+    const res = http.get(`${BASE_URL}/partials/reviews/${productId}`,
+      { tags: { name: 'teardown: check reconciliation' } });
+    if (res.status === 200 && !res.body.includes('Processing')) {
+      console.log(`All pending reviews reconciled after ${attempt} checks.`);
+      break;
+    }
+    if (attempt === 15) {
+      console.log('Warning: some reviews still pending after 30s, proceeding with cleanup.');
+    }
+    sleep(2);
+  }
+
+  // Phase 3: Delete all k6-generated reviews
   console.log('Cleaning up k6-generated reviews...');
   const maxRounds = 5;
   let totalDeleted = 0;

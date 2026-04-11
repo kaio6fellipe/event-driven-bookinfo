@@ -108,3 +108,41 @@ export default function (data) {
   // Small random sleep to add jitter between requests within an iteration
   sleep(Math.random() * 0.5);
 }
+
+export function teardown(data) {
+  const productId = data.productId;
+  if (!productId) return;
+
+  console.log('Cleaning up k6-generated reviews...');
+
+  let page = 1;
+  let totalPages = 1;
+  let deleted = 0;
+
+  while (page <= totalPages) {
+    const res = http.get(`${BASE_URL}/v1/reviews/${productId}?page=${page}&page_size=100`,
+      { tags: { name: 'teardown: GET reviews' } });
+
+    if (res.status !== 200) {
+      console.log(`Failed to fetch reviews page ${page}: status ${res.status}`);
+      break;
+    }
+
+    const body = JSON.parse(res.body);
+    totalPages = body.pagination.total_pages;
+
+    for (const review of body.reviews) {
+      if (review.text && review.text.startsWith('k6 load test review')) {
+        const delRes = http.del(`${BASE_URL}/v1/reviews/${review.id}`,
+          null, { tags: { name: 'teardown: DELETE review' } });
+        if (delRes.status === 204 || delRes.status === 200) {
+          deleted++;
+        }
+      }
+    }
+
+    page++;
+  }
+
+  console.log(`Cleanup complete: deleted ${deleted} k6-generated reviews.`);
+}

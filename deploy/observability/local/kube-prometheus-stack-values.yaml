@@ -41,6 +41,7 @@ grafana:
       url: http://tempo.observability.svc.cluster.local:3200
       access: proxy
       isDefault: false
+      editable: true
       jsonData:
         tracesToLogsV2:
           datasourceUid: loki

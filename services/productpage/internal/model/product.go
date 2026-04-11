@@ -24,6 +24,7 @@ type ProductReview struct {
 	Average  float64
 	Count    int
 	Pending  bool
+	Deleting bool
 }
 
 // ProductPage is the full page view model combining detail and reviews.

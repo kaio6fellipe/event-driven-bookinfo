@@ -2,10 +2,14 @@
 package domain
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 )
+
+// ErrNotFound is returned when a review is not found.
+var ErrNotFound = errors.New("review not found")
 
 // ReviewRating holds the rating data attached to a review.
 type ReviewRating struct {

@@ -25,7 +25,7 @@ Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review 
 - **Admin port** (:9090): `/metrics`, `/debug/pprof/*`, `/healthz`, `/readyz` — isolated from business API
 - **CQRS deployments** (local k8s): each backend service has separate read and write Deployments; read serves GET via gateway, write receives POST from Argo Events sensors. The Envoy Gateway acts as the CQRS routing boundary (GET -> read services, POST -> EventSource webhooks)
 - **Pending review cache**: productpage stores submitted reviews in Redis immediately after async POST; merges into read responses with "Processing" badge; HTMX auto-polls to reconcile when confirmed. Disabled when `REDIS_URL` is unset.
-- **Local k8s** (`make run-k8s`): k3d cluster with Envoy Gateway API, Strimzi Kafka (KRaft), full observability stack (Prometheus, Grafana, Tempo, Loki, Alloy)
+- **Local k8s** (`make run-k8s`): k3d cluster with Envoy Gateway API, Strimzi Kafka (KRaft), full observability stack (Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy)
 
 ## Build Commands
 
@@ -47,7 +47,7 @@ make k8s-status         # Pod status + access URLs
 make k8s-logs           # Tail bookinfo namespace logs
 ```
 
-**Namespaces:** `platform` (Kafka, Argo Events, Gateway), `envoy-gateway-system` (Envoy Gateway), `observability` (Prometheus, Grafana, Tempo, Loki, Alloy), `bookinfo` (apps, PostgreSQL, EventSources, Sensors, HTTPRoutes)
+**Namespaces:** `platform` (Kafka, Argo Events, Gateway), `envoy-gateway-system` (Envoy Gateway), `observability` (Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy), `bookinfo` (apps, PostgreSQL, EventSources, Sensors, HTTPRoutes)
 
 **CQRS split:** details, reviews, ratings each have read + write Deployments. productpage is read-only. notification is write-only. Sensors target `-write` services.
 

@@ -208,7 +208,7 @@ make stop         # Stop and remove containers
 | `make k8s-logs` | Tail logs from bookinfo namespace |
 | `make k8s-cluster` | Create k3d cluster with port mappings |
 | `make k8s-platform` | Install Envoy Gateway, Strimzi, Kafka, Argo Events, Gateway |
-| `make k8s-observability` | Install Prometheus, Grafana, Tempo, Loki, Alloy |
+| `make k8s-observability` | Install Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy |
 | `make k8s-deploy` | Build images, import to k3d, deploy apps + Argo Events + HTTPRoutes |
 | `make k8s-seed` | Seed PostgreSQL databases with sample data |
 
@@ -270,7 +270,7 @@ for svc in productpage details reviews ratings notification; do
 done
 ```
 
-All deployments expose dual ports (API `:8080` + admin `:9090`). Liveness and readiness probes target `/healthz` and `/readyz` on the admin port. Pyroscope eBPF scraping is configured via pod annotations on the admin port; no application changes are needed.
+All deployments expose dual ports (API `:8080` + admin `:9090`). Liveness and readiness probes target `/healthz` and `/readyz` on the admin port. Continuous profiling is push-based via the Pyroscope Go SDK with trace-to-profile correlation.
 
 For a fully automated local development cluster with all infrastructure included (Kafka, Envoy Gateway, observability stack), see [Local Kubernetes Environment](#local-kubernetes-environment) below.
 
@@ -278,7 +278,7 @@ For a fully automated local development cluster with all infrastructure included
 
 ## Local Kubernetes Environment
 
-One-command local development cluster using k3d. Deploys the full stack: Envoy Gateway, Kafka (KRaft), Argo Events, PostgreSQL, observability (Prometheus + Grafana + Tempo + Loki + Alloy), and all services with CQRS read/write deployment split.
+One-command local development cluster using k3d. Deploys the full stack: Envoy Gateway, Kafka (KRaft), Argo Events, PostgreSQL, observability (Prometheus + Grafana + Tempo + Loki + Pyroscope + Alloy), and all services with CQRS read/write deployment split.
 
 ### Cluster Architecture
 
@@ -322,6 +322,7 @@ graph TD
         Prom["Prometheus"]
         Tempo["Tempo"]
         Loki["Loki"]
+        Pyro["Pyroscope"]
         Grafana["Grafana :3000"]
     end
 
@@ -348,7 +349,8 @@ graph TD
     Alloy -.->|OTLP traces| Tempo
     Alloy -.->|remote_write| Prom
     Alloy -.->|push logs| Loki
-    Prom & Tempo & Loki --> Grafana
+    PP & DR & DW & RR & RW & RTR & RTW & N -.->|push profiles| Pyro
+    Prom & Tempo & Loki & Pyro --> Grafana
 
     style Browser fill:#6366f1,color:#fff,stroke:#818cf8
     style EG fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
@@ -370,7 +372,7 @@ The cluster (`bookinfo-local`) runs four namespaces:
 |---|---|
 | `platform` | Strimzi operator, Kafka (KRaft single-node), Argo Events controller, EventBus, Gateway `default-gw` |
 | `envoy-gateway-system` | Envoy Gateway controller, GatewayClass `eg`, stable `gateway` Service for CQRS routing |
-| `observability` | Prometheus, Grafana, Tempo, Loki, Alloy (DaemonSet for logs + Deployment for metrics/traces) |
+| `observability` | Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy (DaemonSet for logs + Deployment for metrics/traces) |
 | `bookinfo` | 8 app deployments (CQRS split), PostgreSQL, 3 EventSources, 3 Sensors, method-based HTTPRoutes |
 
 ### CQRS Deployment Split
@@ -481,10 +483,9 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 ./bin/ratings
 
 ### Profiling
 
-Two complementary profiling modes:
+Push-based continuous profiling with trace-to-profile correlation:
 
-- **Local/dev (push mode)**: Pyroscope Go SDK. Set `PYROSCOPE_SERVER_ADDRESS` to enable. No-op when unset. Profiles CPU, alloc, inuse objects/space, goroutines, mutex, and block.
-- **Production (pull mode)**: Grafana Alloy DaemonSet with `pyroscope.ebpf` scrapes profiles via pod annotations on the admin port. Zero application changes required.
+- **Pyroscope Go SDK** with `grafana/otel-profiling-go` wrapper. Set `PYROSCOPE_SERVER_ADDRESS` to enable. No-op when unset. Profiles CPU, alloc, inuse objects/space, goroutines, mutex, and block. Span IDs are automatically injected into profiling samples, enabling Grafana to link Tempo traces directly to Pyroscope profiles.
 
 ```bash
 PYROSCOPE_SERVER_ADDRESS=http://localhost:4040 ./bin/ratings
@@ -543,7 +544,7 @@ event-driven-bookinfo/
 │   ├── gateway/
 │   │   ├── base/               # Gateway, GatewayClass, ReferenceGrant
 │   │   └── overlays/local/     # HTTPRoutes for bookinfo
-│   ├── observability/local/    # Helm values: Prometheus, Grafana, Tempo, Loki, Alloy
+│   ├── observability/local/    # Helm values: Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy
 │   ├── platform/local/         # Helm values: Strimzi, Argo Events; Kafka CRDs
 │   ├── redis/local/            # Helm values: Bitnami Redis
 │   └── postgres/local/         # StatefulSet, Service, init ConfigMap

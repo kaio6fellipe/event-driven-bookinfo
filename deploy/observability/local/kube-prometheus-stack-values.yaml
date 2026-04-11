@@ -25,6 +25,7 @@ prometheus:
 
 grafana:
   enabled: true
+  useStatefulSet: true
   adminPassword: admin
   service:
     type: NodePort

@@ -33,7 +33,12 @@ func NewHandler(
 	pendingStore pending.Store,
 	templateDir string,
 ) *Handler {
-	tmpl := template.Must(template.ParseGlob(filepath.Join(templateDir, "*.html")))
+	funcMap := template.FuncMap{
+		"add":      func(a, b int) int { return a + b },
+		"subtract": func(a, b int) int { return a - b },
+		"not":      func(v bool) bool { return !v },
+	}
+	tmpl := template.Must(template.New("").Funcs(funcMap).ParseGlob(filepath.Join(templateDir, "*.html")))
 	template.Must(tmpl.ParseGlob(filepath.Join(templateDir, "partials", "*.html")))
 
 	return &Handler{

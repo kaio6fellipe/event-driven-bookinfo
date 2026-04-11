@@ -6,7 +6,7 @@
 {{end}}
 {{if .Reviews}}
 {{range .Reviews}}
-<div class="review{{if .Pending}} review-pending{{end}}">
+<div class="review{{if .Pending}} review-pending{{end}}{{if .Deleting}} review-deleting{{end}}">
     <div class="review-header">
         <div class="reviewer">
             <div class="reviewer-avatar">{{slice .Reviewer 0 1}}</div>
@@ -17,6 +17,12 @@
                     <span class="pending-badge">
                         <span class="pending-dot"></span>
                         Processing
+                    </span>
+                    {{end}}
+                    {{if .Deleting}}
+                    <span class="deleting-badge">
+                        <span class="deleting-dot"></span>
+                        Deleting...
                     </span>
                     {{end}}
                 </div>

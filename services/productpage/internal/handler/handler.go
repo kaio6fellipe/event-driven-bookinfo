@@ -3,6 +3,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"net/http"
 	"path/filepath"
@@ -58,6 +59,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /partials/details/{id}", h.partialDetails)
 	mux.HandleFunc("GET /partials/reviews/{id}", h.partialReviews)
 	mux.HandleFunc("POST /partials/rating", h.partialRatingSubmit)
+	mux.HandleFunc("DELETE /partials/reviews/{id}", h.partialDeleteReview)
 }
 
 func (h *Handler) homePage(w http.ResponseWriter, r *http.Request) {
@@ -126,7 +128,7 @@ func (h *Handler) apiGetProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reviews, err := h.reviewsClient.GetProductReviews(r.Context(), productID)
+	reviews, err := h.reviewsClient.GetProductReviews(r.Context(), productID, 1, 100)
 	if err != nil {
 		logger.Warn("failed to fetch reviews", "product_id", productID, "error", err)
 		reviews = &client.ProductReviewsResponse{ProductID: productID, Reviews: []client.ReviewResponse{}}
@@ -171,7 +173,14 @@ func (h *Handler) partialReviews(w http.ResponseWriter, r *http.Request) {
 	productID := r.PathValue("id")
 	logger := logging.FromContext(r.Context())
 
-	reviews, err := h.reviewsClient.GetProductReviews(r.Context(), productID)
+	page := 1
+	if v := r.URL.Query().Get("page"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil && p >= 1 {
+			page = p
+		}
+	}
+
+	reviews, err := h.reviewsClient.GetProductReviews(r.Context(), productID, page, 10)
 	if err != nil {
 		logger.Warn("failed to fetch reviews for partial", "product_id", productID, "error", err)
 		w.WriteHeader(http.StatusOK)
@@ -180,12 +189,14 @@ func (h *Handler) partialReviews(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var confirmed []pending.ConfirmedReview
+	var confirmedIDs []string
 	var viewModels []model.ProductReview
 	for _, review := range reviews.Reviews {
 		confirmed = append(confirmed, pending.ConfirmedReview{
 			Reviewer: review.Reviewer,
 			Text:     review.Text,
 		})
+		confirmedIDs = append(confirmedIDs, review.ID)
 
 		vm := model.ProductReview{
 			ID:       review.ID,
@@ -200,31 +211,50 @@ func (h *Handler) partialReviews(w http.ResponseWriter, r *http.Request) {
 		viewModels = append(viewModels, vm)
 	}
 
-	// Merge pending reviews from Redis
-	pendingReviews, err := h.pendingStore.GetAndReconcile(r.Context(), productID, confirmed)
+	// Merge pending reviews and deleting IDs from Redis
+	pendingReviews, deletingIDs, err := h.pendingStore.GetAndReconcile(r.Context(), productID, confirmed, confirmedIDs)
 	if err != nil {
 		logger.Warn("failed to get pending reviews", "product_id", productID, "error", err)
 	}
-	for _, pr := range pendingReviews {
-		viewModels = append(viewModels, model.ProductReview{
-			Reviewer: pr.Reviewer,
-			Text:     pr.Text,
-			Stars:    pr.Stars,
-			Pending:  true,
-		})
+
+	// Only show pending reviews on page 1
+	if page == 1 {
+		for _, pr := range pendingReviews {
+			viewModels = append(viewModels, model.ProductReview{
+				Reviewer: pr.Reviewer,
+				Text:     pr.Text,
+				Stars:    pr.Stars,
+				Pending:  true,
+			})
+		}
 	}
 
-	hasPending := len(pendingReviews) > 0
+	// Mark reviews being deleted
+	deletingSet := make(map[string]struct{}, len(deletingIDs))
+	for _, id := range deletingIDs {
+		deletingSet[id] = struct{}{}
+	}
+	for i := range viewModels {
+		if _, found := deletingSet[viewModels[i].ID]; found {
+			viewModels[i].Deleting = true
+		}
+	}
+
+	hasPendingState := len(pendingReviews) > 0 || len(deletingIDs) > 0
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = h.templates.ExecuteTemplate(w, "reviews.html", struct {
 		Reviews    []model.ProductReview
 		HasPending bool
 		ProductID  string
+		Page       int
+		TotalPages int
 	}{
 		Reviews:    viewModels,
-		HasPending: hasPending,
+		HasPending: hasPendingState,
 		ProductID:  productID,
+		Page:       page,
+		TotalPages: reviews.Pagination.TotalPages,
 	})
 }
 
@@ -283,6 +313,30 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 		"Stars":     stars,
 		"ProductID": productID,
 	})
+}
+
+func (h *Handler) partialDeleteReview(w http.ResponseWriter, r *http.Request) {
+	reviewID := r.PathValue("id")
+	productID := r.URL.Query().Get("product_id")
+	logger := logging.FromContext(r.Context())
+
+	if err := h.reviewsClient.DeleteReview(r.Context(), reviewID); err != nil {
+		logger.Warn("failed to delete review", "error", err, "review_id", reviewID)
+	}
+
+	if productID != "" {
+		if err := h.pendingStore.StoreDeleting(r.Context(), productID, reviewID); err != nil {
+			logger.Warn("failed to store deleting state", "error", err)
+		}
+	}
+
+	// Trigger a refresh of the reviews section
+	if productID != "" {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = fmt.Fprintf(w, `<div hx-get="/partials/reviews/%s" hx-trigger="load" hx-target="#reviews-section" hx-swap="innerHTML"></div>`, productID)
+	} else {
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

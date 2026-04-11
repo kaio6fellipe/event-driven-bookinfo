@@ -1,4 +1,3 @@
-// file: pkg/profiling/profiling_test.go
 package profiling_test
 
 import (
@@ -25,4 +24,32 @@ func TestStart_NoOpWhenUnset(t *testing.T) {
 
 	// No-op stop should not panic
 	stop()
+}
+
+func TestStart_BuildsTagsFromEnv(t *testing.T) {
+	t.Setenv("POD_NAME", "ratings-abc123")
+	t.Setenv("POD_NAMESPACE", "bookinfo")
+
+	tags := profiling.BuildTags()
+
+	if tags["pod"] != "ratings-abc123" {
+		t.Errorf("expected pod tag 'ratings-abc123', got %q", tags["pod"])
+	}
+	if tags["namespace"] != "bookinfo" {
+		t.Errorf("expected namespace tag 'bookinfo', got %q", tags["namespace"])
+	}
+}
+
+func TestStart_BuildsTagsOmitsEmptyEnv(t *testing.T) {
+	t.Setenv("POD_NAME", "")
+	t.Setenv("POD_NAMESPACE", "")
+
+	tags := profiling.BuildTags()
+
+	if _, ok := tags["pod"]; ok {
+		t.Error("expected pod tag to be absent when POD_NAME is empty")
+	}
+	if _, ok := tags["namespace"]; ok {
+		t.Error("expected namespace tag to be absent when POD_NAMESPACE is empty")
+	}
 }

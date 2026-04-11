@@ -6,6 +6,7 @@ resources:
   - service.yaml
   - configmap.yaml
   - eventsource.yaml
+  - eventsource-delete.yaml
   - sensor.yaml
 
 commonLabels:

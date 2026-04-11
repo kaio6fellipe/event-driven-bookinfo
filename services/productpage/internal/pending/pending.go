@@ -29,10 +29,14 @@ type Store interface {
 	// StorePending appends a pending review for the given product.
 	StorePending(ctx context.Context, productID string, review Review) error
 
-	// GetAndReconcile returns pending reviews for a product after removing
-	// any that match the confirmed reviews. A pending review matches a
-	// confirmed review when both reviewer and text are equal.
-	GetAndReconcile(ctx context.Context, productID string, confirmed []ConfirmedReview) ([]Review, error)
+	// StoreDeleting marks a review as being deleted for the given product.
+	StoreDeleting(ctx context.Context, productID string, reviewID string) error
+
+	// GetAndReconcile returns pending reviews and deleting review IDs for a product
+	// after reconciling against the confirmed reviews.
+	// Pending reviews that match confirmed reviews are removed.
+	// Deleting IDs that no longer appear in confirmed reviews are removed.
+	GetAndReconcile(ctx context.Context, productID string, confirmed []ConfirmedReview, confirmedIDs []string) ([]Review, []string, error)
 }
 
 // NewReview creates a Review with the current timestamp.

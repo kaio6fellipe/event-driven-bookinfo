@@ -79,6 +79,7 @@ func setupMockServers(t *testing.T) (detailsURL, reviewsURL, ratingsURL string) 
 					"rating":     map[string]any{"stars": 5, "average": 4.5, "count": 10},
 				},
 			},
+			"pagination": map[string]any{"page": 1, "page_size": 10, "total_items": 1, "total_pages": 1},
 		})
 	})
 	reviewsServer := httptest.NewServer(reviewsMux)
@@ -288,6 +289,7 @@ func TestPartialRatingSubmitAsyncWithReview(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"product_id": r.PathValue("id"),
 			"reviews":    []any{},
+			"pagination": map[string]any{"page": 1, "page_size": 10, "total_items": 0, "total_pages": 0},
 		})
 	})
 	asyncReviewsMux.HandleFunc("POST /v1/reviews", func(w http.ResponseWriter, _ *http.Request) {
@@ -405,5 +407,122 @@ func TestPartialReviewsNoPending(t *testing.T) {
 	// Should NOT have pending CSS class
 	if strings.Contains(body, "review-pending") {
 		t.Errorf("expected NO review-pending CSS class when no pending reviews")
+	}
+}
+
+func TestPartialDeleteReview(t *testing.T) {
+	detailsURL, _, ratingsURL := setupMockServers(t)
+
+	deleteReceived := false
+	reviewsMux := http.NewServeMux()
+	reviewsMux.HandleFunc("GET /v1/reviews/{id}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"product_id": r.PathValue("id"),
+			"reviews":    []any{},
+			"pagination": map[string]any{"page": 1, "page_size": 10, "total_items": 0, "total_pages": 0},
+		})
+	})
+	reviewsMux.HandleFunc("POST /v1/reviews/delete", func(w http.ResponseWriter, _ *http.Request) {
+		deleteReceived = true
+		w.WriteHeader(http.StatusOK)
+	})
+	reviewsServer := httptest.NewServer(reviewsMux)
+	t.Cleanup(reviewsServer.Close)
+
+	detailsClient := client.NewDetailsClient(detailsURL)
+	reviewsClient := client.NewReviewsClient(reviewsServer.URL)
+	ratingsClient := client.NewRatingsClient(ratingsURL)
+
+	mr := miniredis.RunT(t)
+	store, err := pending.NewRedisStore("redis://" + mr.Addr())
+	if err != nil {
+		t.Fatalf("failed to create redis store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, store, templateDir(t))
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/partials/reviews/review-1/delete?product_id=product-1", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	if !deleteReceived {
+		t.Error("expected delete request to be sent to reviews service")
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "hx-get") {
+		t.Error("expected HTMX refresh trigger in response")
+	}
+}
+
+func TestPartialReviewsWithDeleting(t *testing.T) {
+	detailsURL, _, ratingsURL := setupMockServers(t)
+
+	reviewsMux := http.NewServeMux()
+	reviewsMux.HandleFunc("GET /v1/reviews/{id}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"product_id": r.PathValue("id"),
+			"reviews": []map[string]any{
+				{
+					"id":         "review-1",
+					"product_id": r.PathValue("id"),
+					"reviewer":   "alice",
+					"text":       "Great book!",
+					"rating":     map[string]any{"stars": 5, "average": 4.5, "count": 10},
+				},
+			},
+			"pagination": map[string]any{"page": 1, "page_size": 10, "total_items": 1, "total_pages": 1},
+		})
+	})
+	reviewsServer := httptest.NewServer(reviewsMux)
+	t.Cleanup(reviewsServer.Close)
+
+	detailsClient := client.NewDetailsClient(detailsURL)
+	reviewsClient := client.NewReviewsClient(reviewsServer.URL)
+	ratingsClient := client.NewRatingsClient(ratingsURL)
+
+	mr := miniredis.RunT(t)
+	store, err := pending.NewRedisStore("redis://" + mr.Addr())
+	if err != nil {
+		t.Fatalf("failed to create redis store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	ctx := context.Background()
+	_ = store.StoreDeleting(ctx, "product-1", "review-1")
+
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, store, templateDir(t))
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/partials/reviews/product-1", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "review-deleting") {
+		t.Errorf("expected 'review-deleting' CSS class in response, got:\n%s", body)
+	}
+	if !strings.Contains(body, "Deleting") {
+		t.Errorf("expected 'Deleting' label in response, got:\n%s", body)
+	}
+	if !strings.Contains(body, "every 2s") {
+		t.Errorf("expected HTMX polling trigger 'every 2s' in response")
 	}
 }

@@ -108,3 +108,92 @@ export default function (data) {
   // Small random sleep to add jitter between requests within an iteration
   sleep(Math.random() * 0.5);
 }
+
+export function teardown(data) {
+  const productId = data.productId;
+  if (!productId) return;
+
+  // Phase 1: Wait for async writes to settle (review count stops growing)
+  console.log('Waiting for async writes to settle...');
+  let lastCount = -1;
+  let stableChecks = 0;
+  for (let attempt = 1; attempt <= 15; attempt++) {
+    const res = http.get(`${BASE_URL}/v1/reviews/${productId}?page=1&page_size=1`,
+      { tags: { name: 'teardown: check count' } });
+    if (res.status === 200) {
+      const count = JSON.parse(res.body).pagination.total_items;
+      if (count === lastCount) {
+        stableChecks++;
+        if (stableChecks >= 3) {
+          console.log(`Review count stable at ${count} after ${attempt} checks.`);
+          break;
+        }
+      } else {
+        stableChecks = 0;
+        lastCount = count;
+      }
+    }
+    sleep(2);
+  }
+
+  // Phase 2: Wait for Redis pending cache to reconcile (no more "Processing" badges)
+  console.log('Waiting for pending reviews to reconcile...');
+  for (let attempt = 1; attempt <= 15; attempt++) {
+    const res = http.get(`${BASE_URL}/partials/reviews/${productId}`,
+      { tags: { name: 'teardown: check reconciliation' } });
+    if (res.status === 200 && !res.body.includes('Processing')) {
+      console.log(`All pending reviews reconciled after ${attempt} checks.`);
+      break;
+    }
+    if (attempt === 15) {
+      console.log('Warning: some reviews still pending after 30s, proceeding with cleanup.');
+    }
+    sleep(2);
+  }
+
+  // Phase 3: Delete all k6-generated reviews
+  console.log('Cleaning up k6-generated reviews...');
+  const maxRounds = 5;
+  let totalDeleted = 0;
+
+  for (let round = 1; round <= maxRounds; round++) {
+    let page = 1;
+    let totalPages = 1;
+    let roundDeleted = 0;
+
+    while (page <= totalPages) {
+      const res = http.get(`${BASE_URL}/v1/reviews/${productId}?page=${page}&page_size=100`,
+        { tags: { name: 'teardown: GET reviews' } });
+
+      if (res.status !== 200) {
+        console.log(`Failed to fetch reviews page ${page}: status ${res.status}`);
+        break;
+      }
+
+      const body = JSON.parse(res.body);
+      totalPages = body.pagination.total_pages;
+
+      for (const review of body.reviews) {
+        if (review.text && review.text.startsWith('k6 load test review')) {
+          http.post(`${BASE_URL}/v1/reviews/delete`,
+            JSON.stringify({ review_id: review.id }),
+            { headers: { 'Content-Type': 'application/json' }, tags: { name: 'teardown: DELETE review' } });
+          roundDeleted++;
+        }
+      }
+
+      page++;
+    }
+
+    totalDeleted += roundDeleted;
+    if (roundDeleted === 0) {
+      console.log(`Round ${round}: no k6 reviews found. Cleanup complete.`);
+      break;
+    }
+
+    console.log(`Round ${round}: sent ${roundDeleted} delete requests. Waiting for async processing...`);
+    sleep(10);
+  }
+
+  console.log(`Cleanup total: ${totalDeleted} delete requests sent.`);
+}

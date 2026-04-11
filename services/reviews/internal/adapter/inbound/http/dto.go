@@ -24,10 +24,19 @@ type ReviewResponse struct {
 	Rating    *ReviewRatingResponse `json:"rating,omitempty"`
 }
 
+// PaginationResponse contains pagination metadata.
+type PaginationResponse struct {
+	Page       int `json:"page"`
+	PageSize   int `json:"page_size"`
+	TotalItems int `json:"total_items"`
+	TotalPages int `json:"total_pages"`
+}
+
 // ProductReviewsResponse wraps multiple reviews for a product.
 type ProductReviewsResponse struct {
-	ProductID string           `json:"product_id"`
-	Reviews   []ReviewResponse `json:"reviews"`
+	ProductID  string             `json:"product_id"`
+	Reviews    []ReviewResponse   `json:"reviews"`
+	Pagination PaginationResponse `json:"pagination"`
 }
 
 // ErrorResponse is a standard error body.

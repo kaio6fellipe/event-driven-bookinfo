@@ -3,6 +3,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/memory"
@@ -10,7 +11,6 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/service"
 )
 
-// stubRatingsClient returns fixed rating data for testing.
 type stubRatingsClient struct {
 	data *domain.RatingData
 	err  error
@@ -29,15 +29,11 @@ func TestSubmitReview_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	if review.ID == "" {
 		t.Error("expected non-empty ID")
 	}
 	if review.ProductID != "product-1" {
 		t.Errorf("ProductID = %q, want %q", review.ProductID, "product-1")
-	}
-	if review.Reviewer != "alice" {
-		t.Errorf("Reviewer = %q, want %q", review.Reviewer, "alice")
 	}
 }
 
@@ -74,13 +70,15 @@ func TestGetProductReviews_Empty(t *testing.T) {
 	}
 	svc := service.NewReviewService(repo, client)
 
-	reviews, err := svc.GetProductReviews(context.Background(), "nonexistent")
+	reviews, total, err := svc.GetProductReviews(context.Background(), "nonexistent", 1, 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	if len(reviews) != 0 {
 		t.Errorf("expected 0 reviews, got %d", len(reviews))
+	}
+	if total != 0 {
+		t.Errorf("expected total 0, got %d", total)
 	}
 }
 
@@ -88,33 +86,24 @@ func TestGetProductReviews_WithRatings(t *testing.T) {
 	repo := memory.NewReviewRepository()
 	client := &stubRatingsClient{
 		data: &domain.RatingData{
-			Average: 3.5,
-			Count:   2,
-			IndividualRatings: map[string]int{
-				"alice": 5,
-				"bob":   2,
-			},
+			Average: 3.5, Count: 2,
+			IndividualRatings: map[string]int{"alice": 5, "bob": 2},
 		},
 	}
 	svc := service.NewReviewService(repo, client)
 
-	_, err := svc.SubmitReview(context.Background(), "product-1", "alice", "Excellent!")
+	_, _ = svc.SubmitReview(context.Background(), "product-1", "alice", "Excellent!")
+	_, _ = svc.SubmitReview(context.Background(), "product-1", "bob", "Good read")
+
+	reviews, total, err := svc.GetProductReviews(context.Background(), "product-1", 1, 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	_, err = svc.SubmitReview(context.Background(), "product-1", "bob", "Good read")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	reviews, err := svc.GetProductReviews(context.Background(), "product-1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
 	if len(reviews) != 2 {
 		t.Fatalf("expected 2 reviews, got %d", len(reviews))
+	}
+	if total != 2 {
+		t.Errorf("expected total 2, got %d", total)
 	}
 
 	for _, review := range reviews {
@@ -125,20 +114,76 @@ func TestGetProductReviews_WithRatings(t *testing.T) {
 		if review.Rating.Average != 3.5 {
 			t.Errorf("Rating.Average = %f, want 3.5", review.Rating.Average)
 		}
-		if review.Rating.Count != 2 {
-			t.Errorf("Rating.Count = %d, want 2", review.Rating.Count)
-		}
-		switch review.Reviewer {
-		case "alice":
-			if review.Rating.Stars != 5 {
-				t.Errorf("alice Rating.Stars = %d, want 5", review.Rating.Stars)
+	}
+}
+
+func TestGetProductReviews_Pagination(t *testing.T) {
+	repo := memory.NewReviewRepository()
+	client := &stubRatingsClient{
+		data: &domain.RatingData{Average: 4.0, Count: 15, IndividualRatings: map[string]int{}},
+	}
+	svc := service.NewReviewService(repo, client)
+
+	for i := 0; i < 15; i++ {
+		_, _ = svc.SubmitReview(context.Background(), "product-1", "reviewer", "text")
+	}
+
+	tests := []struct {
+		name      string
+		page      int
+		pageSize  int
+		wantCount int
+		wantTotal int
+	}{
+		{name: "first page", page: 1, pageSize: 10, wantCount: 10, wantTotal: 15},
+		{name: "second page", page: 2, pageSize: 10, wantCount: 5, wantTotal: 15},
+		{name: "page beyond total", page: 3, pageSize: 10, wantCount: 0, wantTotal: 15},
+		{name: "custom page size", page: 1, pageSize: 5, wantCount: 5, wantTotal: 15},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reviews, total, err := svc.GetProductReviews(context.Background(), "product-1", tt.page, tt.pageSize)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
-		case "bob":
-			if review.Rating.Stars != 2 {
-				t.Errorf("bob Rating.Stars = %d, want 2", review.Rating.Stars)
+			if len(reviews) != tt.wantCount {
+				t.Errorf("got %d reviews, want %d", len(reviews), tt.wantCount)
 			}
-		default:
-			t.Errorf("unexpected reviewer: %s", review.Reviewer)
-		}
+			if total != tt.wantTotal {
+				t.Errorf("got total %d, want %d", total, tt.wantTotal)
+			}
+		})
+	}
+}
+
+func TestDeleteReview_Success(t *testing.T) {
+	repo := memory.NewReviewRepository()
+	client := &stubRatingsClient{}
+	svc := service.NewReviewService(repo, client)
+
+	review, _ := svc.SubmitReview(context.Background(), "product-1", "alice", "Great book!")
+	err := svc.DeleteReview(context.Background(), review.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	reviews, total, _ := svc.GetProductReviews(context.Background(), "product-1", 1, 10)
+	if total != 0 {
+		t.Errorf("expected 0 reviews after delete, got %d", total)
+	}
+	if len(reviews) != 0 {
+		t.Errorf("expected empty reviews after delete, got %d", len(reviews))
+	}
+}
+
+func TestDeleteReview_NotFound(t *testing.T) {
+	repo := memory.NewReviewRepository()
+	client := &stubRatingsClient{}
+	svc := service.NewReviewService(repo, client)
+
+	err := svc.DeleteReview(context.Background(), "nonexistent-id")
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }

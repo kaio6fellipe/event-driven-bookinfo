@@ -30,7 +30,7 @@ func TestStorePending(t *testing.T) {
 	}
 
 	// Should retrieve 1 pending review with no confirmed reviews
-	reviews, err := store.GetAndReconcile(ctx, "product-1", nil)
+	reviews, _, err := store.GetAndReconcile(ctx, "product-1", nil, nil)
 	if err != nil {
 		t.Fatalf("GetAndReconcile failed: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestGetAndReconcile_RemovesConfirmed(t *testing.T) {
 		{Reviewer: "alice", Text: "Great book!"},
 	}
 
-	reviews, err := store.GetAndReconcile(ctx, "product-1", confirmed)
+	reviews, _, err := store.GetAndReconcile(ctx, "product-1", confirmed, nil)
 	if err != nil {
 		t.Fatalf("GetAndReconcile failed: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestGetAndReconcile_RemovesConfirmed(t *testing.T) {
 	}
 
 	// Second call with no confirmed: alice should be gone from Redis
-	reviews, err = store.GetAndReconcile(ctx, "product-1", nil)
+	reviews, _, err = store.GetAndReconcile(ctx, "product-1", nil, nil)
 	if err != nil {
 		t.Fatalf("GetAndReconcile failed: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestGetAndReconcile_EmptyProduct(t *testing.T) {
 	store := setupRedisStore(t)
 	ctx := context.Background()
 
-	reviews, err := store.GetAndReconcile(ctx, "nonexistent", nil)
+	reviews, _, err := store.GetAndReconcile(ctx, "nonexistent", nil, nil)
 	if err != nil {
 		t.Fatalf("GetAndReconcile failed: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestGetAndReconcile_IsolatesProducts(t *testing.T) {
 	_ = store.StorePending(ctx, "product-1", pending.NewReview("alice", "Review for P1", 5))
 	_ = store.StorePending(ctx, "product-2", pending.NewReview("bob", "Review for P2", 4))
 
-	reviews, err := store.GetAndReconcile(ctx, "product-1", nil)
+	reviews, _, err := store.GetAndReconcile(ctx, "product-1", nil, nil)
 	if err != nil {
 		t.Fatalf("GetAndReconcile failed: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestNewRedisStore_HasTracingHook(t *testing.T) {
 		t.Fatalf("StorePending with tracing hook failed: %v", err)
 	}
 
-	reviews, err := store.GetAndReconcile(ctx, "trace-test", nil)
+	reviews, _, err := store.GetAndReconcile(ctx, "trace-test", nil, nil)
 	if err != nil {
 		t.Fatalf("GetAndReconcile with tracing hook failed: %v", err)
 	}

@@ -56,10 +56,26 @@ spec:
         steps: 3
         duration: 2s
     - template:
-        name: delete-review
+        name: delete-review-write
         conditions: review-deleted-dep
         http:
           url: http://reviews-write.bookinfo.svc.cluster.local/v1/reviews/delete
+          method: POST
+          headers:
+            Content-Type: application/json
+          payload:
+            - src:
+                dependencyName: review-deleted-dep
+                dataKey: body.review_id
+              dest: review_id
+      retryStrategy:
+        steps: 3
+        duration: 2s
+    - template:
+        name: delete-review-read
+        conditions: review-deleted-dep
+        http:
+          url: http://reviews.bookinfo.svc.cluster.local/v1/reviews/delete
           method: POST
           headers:
             Content-Type: application/json

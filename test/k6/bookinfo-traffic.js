@@ -113,8 +113,23 @@ export function teardown(data) {
   const productId = data.productId;
   if (!productId) return;
 
-  console.log('Cleaning up k6-generated reviews...');
+  // Phase 1: Wait for all pending reviews to be confirmed (no more "Processing" badges)
+  console.log('Waiting for all pending reviews to be processed...');
+  for (let attempt = 1; attempt <= 30; attempt++) {
+    const res = http.get(`${BASE_URL}/partials/reviews/${productId}`,
+      { tags: { name: 'teardown: check pending' } });
+    if (res.status === 200 && !res.body.includes('Processing')) {
+      console.log(`All reviews confirmed after ${attempt} checks.`);
+      break;
+    }
+    if (attempt === 30) {
+      console.log('Warning: some reviews still pending after 60s, proceeding with cleanup.');
+    }
+    sleep(2);
+  }
 
+  // Phase 2: Delete all k6-generated reviews
+  console.log('Cleaning up k6-generated reviews...');
   const maxRounds = 5;
   let totalDeleted = 0;
 

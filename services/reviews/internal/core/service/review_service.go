@@ -25,14 +25,15 @@ func NewReviewService(repo port.ReviewRepository, ratingsClient port.RatingsClie
 	}
 }
 
-// GetProductReviews returns all reviews for a product, enriched with ratings data.
-func (s *ReviewService) GetProductReviews(ctx context.Context, productID string) ([]domain.Review, error) {
-	reviews, err := s.repo.FindByProductID(ctx, productID)
+// GetProductReviews returns paginated reviews for a product, enriched with ratings data.
+func (s *ReviewService) GetProductReviews(ctx context.Context, productID string, page, pageSize int) ([]domain.Review, int, error) {
+	offset := (page - 1) * pageSize
+
+	reviews, total, err := s.repo.FindByProductID(ctx, productID, offset, pageSize)
 	if err != nil {
-		return nil, fmt.Errorf("finding reviews for product %s: %w", productID, err)
+		return nil, 0, fmt.Errorf("finding reviews for product %s: %w", productID, err)
 	}
 
-	// Fetch ratings from the ratings service
 	ratingData, err := s.ratingsClient.GetProductRatings(ctx, productID)
 	if err != nil {
 		logger := logging.FromContext(ctx)
@@ -40,10 +41,9 @@ func (s *ReviewService) GetProductReviews(ctx context.Context, productID string)
 			slog.String("product_id", productID),
 			slog.String("error", err.Error()),
 		)
-		return reviews, nil
+		return reviews, total, nil
 	}
 
-	// Enrich each review with product-level stats and individual reviewer score
 	for i := range reviews {
 		reviews[i].Rating = &domain.ReviewRating{
 			Stars:   ratingData.IndividualRatings[reviews[i].Reviewer],
@@ -52,7 +52,7 @@ func (s *ReviewService) GetProductReviews(ctx context.Context, productID string)
 		}
 	}
 
-	return reviews, nil
+	return reviews, total, nil
 }
 
 // SubmitReview creates and persists a new review.
@@ -67,4 +67,12 @@ func (s *ReviewService) SubmitReview(ctx context.Context, productID, reviewer, t
 	}
 
 	return review, nil
+}
+
+// DeleteReview removes a review by its ID.
+func (s *ReviewService) DeleteReview(ctx context.Context, id string) error {
+	if err := s.repo.DeleteByID(ctx, id); err != nil {
+		return fmt.Errorf("deleting review %s: %w", id, err)
+	}
+	return nil
 }

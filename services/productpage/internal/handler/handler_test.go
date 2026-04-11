@@ -446,7 +446,7 @@ func TestPartialDeleteReview(t *testing.T) {
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodDelete, "/partials/reviews/review-1?product_id=product-1", nil)
+	req := httptest.NewRequest(http.MethodPost, "/partials/reviews/review-1/delete?product_id=product-1", nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -455,7 +455,7 @@ func TestPartialDeleteReview(t *testing.T) {
 	}
 
 	if !deleteReceived {
-		t.Error("expected DELETE request to be sent to reviews service")
+		t.Error("expected delete request to be sent to reviews service")
 	}
 
 	body := rec.Body.String()

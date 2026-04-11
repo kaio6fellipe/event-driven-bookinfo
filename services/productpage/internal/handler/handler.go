@@ -63,7 +63,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /partials/details/{id}", h.partialDetails)
 	mux.HandleFunc("GET /partials/reviews/{id}", h.partialReviews)
 	mux.HandleFunc("POST /partials/rating", h.partialRatingSubmit)
-	mux.HandleFunc("DELETE /partials/reviews/{id}", h.partialDeleteReview)
+	mux.HandleFunc("POST /partials/reviews/{id}/delete", h.partialDeleteReview)
 }
 
 func (h *Handler) homePage(w http.ResponseWriter, r *http.Request) {

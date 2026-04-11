@@ -292,7 +292,7 @@ k8s-platform: ##@Kubernetes Install platform: Envoy Gateway, Strimzi, Kafka, Arg
 	@$(KUBECTL) apply -k deploy/gateway/base/
 	@printf "  Waiting for Gateway to be programmed...\n"
 	@$(KUBECTL) wait gateway/default-gw -n $(K8S_NS_PLATFORM) \
-		--for=condition=Programmed --timeout=120s || \
+		--for=condition=Programmed --timeout=10s || \
 		printf "  $(YELLOW)Gateway not yet programmed (will reconcile after observability stack is deployed).$(NC)\n"
 	@printf "\n$(GREEN)$(BOLD)Platform layer complete.$(NC)\n\n"
 

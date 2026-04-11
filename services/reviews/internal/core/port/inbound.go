@@ -9,9 +9,14 @@ import (
 
 // ReviewService defines the inbound operations for the reviews domain.
 type ReviewService interface {
-	// GetProductReviews returns all reviews for a product, enriched with ratings data.
-	GetProductReviews(ctx context.Context, productID string) ([]domain.Review, error)
+	// GetProductReviews returns paginated reviews for a product, enriched with ratings data.
+	// Returns the matching reviews and the total count for the product.
+	GetProductReviews(ctx context.Context, productID string, page, pageSize int) ([]domain.Review, int, error)
 
 	// SubmitReview creates and stores a new review.
 	SubmitReview(ctx context.Context, productID, reviewer, text string) (*domain.Review, error)
+
+	// DeleteReview removes a review by its ID.
+	// Returns domain.ErrNotFound if the review does not exist.
+	DeleteReview(ctx context.Context, id string) error
 }

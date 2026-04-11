@@ -59,8 +59,8 @@ spec:
         name: delete-review
         conditions: review-deleted-dep
         http:
-          url: http://reviews-write.bookinfo.svc.cluster.local/v1/reviews
-          method: DELETE
+          url: http://reviews-write.bookinfo.svc.cluster.local/v1/reviews/delete
+          method: POST
           headers:
             Content-Type: application/json
           payload:

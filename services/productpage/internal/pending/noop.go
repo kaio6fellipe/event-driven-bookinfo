@@ -10,7 +10,12 @@ func (NoopStore) StorePending(_ context.Context, _ string, _ Review) error {
 	return nil
 }
 
+// StoreDeleting is a no-op.
+func (NoopStore) StoreDeleting(_ context.Context, _ string, _ string) error {
+	return nil
+}
+
 // GetAndReconcile is a no-op that always returns nil.
-func (NoopStore) GetAndReconcile(_ context.Context, _ string, _ []ConfirmedReview) ([]Review, error) {
-	return nil, nil
+func (NoopStore) GetAndReconcile(_ context.Context, _ string, _ []ConfirmedReview, _ []string) ([]Review, []string, error) {
+	return nil, nil, nil
 }

@@ -9,7 +9,10 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const keyPrefix = "pending:reviews:"
+const (
+	pendingKeyPrefix  = "pending:reviews:"
+	deletingKeyPrefix = "deleting:reviews:"
+)
 
 // RedisStore implements Store backed by Redis lists.
 type RedisStore struct {
@@ -52,12 +55,31 @@ func (s *RedisStore) StorePending(ctx context.Context, productID string, review 
 	if err != nil {
 		return fmt.Errorf("marshaling pending review: %w", err)
 	}
-	return s.client.RPush(ctx, keyPrefix+productID, data).Err()
+	return s.client.RPush(ctx, pendingKeyPrefix+productID, data).Err()
 }
 
-// GetAndReconcile returns pending reviews after removing any that match confirmed reviews.
-func (s *RedisStore) GetAndReconcile(ctx context.Context, productID string, confirmed []ConfirmedReview) ([]Review, error) {
-	key := keyPrefix + productID
+// StoreDeleting marks a review as being deleted by adding its ID to a Redis set.
+func (s *RedisStore) StoreDeleting(ctx context.Context, productID string, reviewID string) error {
+	return s.client.SAdd(ctx, deletingKeyPrefix+productID, reviewID).Err()
+}
+
+// GetAndReconcile returns pending reviews and deleting review IDs after reconciliation.
+func (s *RedisStore) GetAndReconcile(ctx context.Context, productID string, confirmed []ConfirmedReview, confirmedIDs []string) ([]Review, []string, error) {
+	pendingReviews, err := s.reconcilePending(ctx, productID, confirmed)
+	if err != nil {
+		return nil, nil, fmt.Errorf("reconciling pending reviews: %w", err)
+	}
+
+	deletingIDs, err := s.reconcileDeleting(ctx, productID, confirmedIDs)
+	if err != nil {
+		return pendingReviews, nil, fmt.Errorf("reconciling deleting reviews: %w", err)
+	}
+
+	return pendingReviews, deletingIDs, nil
+}
+
+func (s *RedisStore) reconcilePending(ctx context.Context, productID string, confirmed []ConfirmedReview) ([]Review, error) {
+	key := pendingKeyPrefix + productID
 
 	vals, err := s.client.LRange(ctx, key, 0, -1).Result()
 	if err != nil {
@@ -82,13 +104,43 @@ func (s *RedisStore) GetAndReconcile(ctx context.Context, productID string, conf
 
 		matchKey := r.Reviewer + "\x00" + r.Text
 		if _, found := confirmedSet[matchKey]; found {
-			// Review confirmed — remove from Redis
 			s.client.LRem(ctx, key, 1, raw)
-			delete(confirmedSet, matchKey) // only remove first match
+			delete(confirmedSet, matchKey)
 		} else {
 			remaining = append(remaining, r)
 		}
 	}
 
 	return remaining, nil
+}
+
+func (s *RedisStore) reconcileDeleting(ctx context.Context, productID string, confirmedIDs []string) ([]string, error) {
+	key := deletingKeyPrefix + productID
+
+	deletingIDs, err := s.client.SMembers(ctx, key).Result()
+	if err != nil {
+		return nil, fmt.Errorf("fetching deleting review IDs: %w", err)
+	}
+
+	if len(deletingIDs) == 0 {
+		return nil, nil
+	}
+
+	confirmedSet := make(map[string]struct{}, len(confirmedIDs))
+	for _, id := range confirmedIDs {
+		confirmedSet[id] = struct{}{}
+	}
+
+	var stillDeleting []string
+	for _, id := range deletingIDs {
+		if _, found := confirmedSet[id]; !found {
+			// Review no longer in confirmed list — deletion confirmed
+			s.client.SRem(ctx, key, id)
+		} else {
+			// Review still exists — still deleting
+			stillDeleting = append(stillDeleting, id)
+		}
+	}
+
+	return stillDeleting, nil
 }

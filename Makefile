@@ -432,6 +432,8 @@ k8s-rebuild: ##@Kubernetes Fast iteration: rebuild images, reimport, rollout res
 	@for svc in $(SERVICES); do \
 		$(KUBECTL) apply -k deploy/$$svc/overlays/local/ || exit 1; \
 	done
+	@printf "  Applying HTTPRoutes...\n"
+	@$(KUBECTL) apply -k deploy/gateway/overlays/local/
 	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification; do \
 		$(KUBECTL) rollout restart deployment/$$dep -n $(K8S_NS_BOOKINFO) 2>/dev/null || true; \
 	done

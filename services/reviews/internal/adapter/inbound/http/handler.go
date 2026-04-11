@@ -33,6 +33,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/reviews/{id}", h.getProductReviews)
 	mux.HandleFunc("POST /v1/reviews", h.submitReview)
 	mux.HandleFunc("DELETE /v1/reviews/{id}", h.deleteReview)
+	mux.HandleFunc("DELETE /v1/reviews", h.deleteReview)
 }
 
 func (h *Handler) getProductReviews(w http.ResponseWriter, r *http.Request) {

@@ -15,17 +15,6 @@ spec:
       labels:
         app: reviews
         part-of: event-driven-bookinfo
-      annotations:
-        profiles.grafana.com/cpu.scrape: "true"
-        profiles.grafana.com/cpu.port: "9090"
-        profiles.grafana.com/memory.scrape: "true"
-        profiles.grafana.com/memory.port: "9090"
-        profiles.grafana.com/goroutine.scrape: "true"
-        profiles.grafana.com/goroutine.port: "9090"
-        profiles.grafana.com/block.scrape: "true"
-        profiles.grafana.com/block.port: "9090"
-        profiles.grafana.com/mutex.scrape: "true"
-        profiles.grafana.com/mutex.port: "9090"
     spec:
       containers:
         - name: reviews
@@ -38,6 +27,15 @@ spec:
           envFrom:
             - configMapRef:
                 name: reviews
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           livenessProbe:
             httpGet:
               path: /healthz

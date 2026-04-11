@@ -297,46 +297,52 @@ k8s-platform: ##@Kubernetes Install platform: Envoy Gateway, Strimzi, Kafka, Arg
 	@printf "\n$(GREEN)$(BOLD)Platform layer complete.$(NC)\n\n"
 
 .PHONY: k8s-observability
-k8s-observability: ##@Kubernetes Install observability: Prometheus, Grafana, Tempo, Loki, Alloy, Headlamp
+k8s-observability: ##@Kubernetes Install observability: Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy, Headlamp
 	$(k8s-guard)
 	@printf "\n$(BOLD)═══ Observability Layer ═══$(NC)\n\n"
 	@$(KUBECTL) create namespace $(K8S_NS_OBSERVABILITY) --dry-run=client -o yaml | $(KUBECTL) apply -f -
-	@printf "$(BOLD)[1/7] Installing kube-prometheus-stack...$(NC)\n"
+	@printf "$(BOLD)[1/8] Installing kube-prometheus-stack...$(NC)\n"
 	@$(HELM) repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update 2>/dev/null || true
 	@$(HELM) upgrade --install prometheus prometheus-community/kube-prometheus-stack \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/kube-prometheus-stack-values.yaml \
 		--wait --timeout 300s
 	@printf "  $(GREEN)kube-prometheus-stack ready.$(NC)\n"
-	@printf "$(BOLD)[2/7] Installing Tempo...$(NC)\n"
+	@printf "$(BOLD)[2/8] Installing Tempo...$(NC)\n"
 	@$(HELM) repo add grafana https://grafana.github.io/helm-charts --force-update 2>/dev/null || true
 	@$(HELM) upgrade --install tempo grafana/tempo \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/tempo-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Tempo ready.$(NC)\n"
-	@printf "$(BOLD)[3/7] Installing Loki...$(NC)\n"
+	@printf "$(BOLD)[3/8] Installing Loki...$(NC)\n"
 	@$(HELM) upgrade --install loki grafana/loki \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/loki-values.yaml \
 		--wait --timeout 300s
 	@printf "  $(GREEN)Loki ready.$(NC)\n"
-	@printf "$(BOLD)[4/7] Installing Alloy (logs)...$(NC)\n"
+	@printf "$(BOLD)[4/8] Installing Pyroscope...$(NC)\n"
+	@$(HELM) upgrade --install pyroscope grafana/pyroscope \
+		-n $(K8S_NS_OBSERVABILITY) \
+		-f deploy/observability/local/pyroscope-values.yaml \
+		--wait --timeout 120s
+	@printf "  $(GREEN)Pyroscope ready.$(NC)\n"
+	@printf "$(BOLD)[5/8] Installing Alloy (logs)...$(NC)\n"
 	@$(HELM) upgrade --install alloy-logs grafana/alloy \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/alloy-logs-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Alloy (logs) ready.$(NC)\n"
-	@printf "$(BOLD)[5/7] Installing Alloy (metrics+traces)...$(NC)\n"
+	@printf "$(BOLD)[6/8] Installing Alloy (metrics+traces)...$(NC)\n"
 	@$(HELM) upgrade --install alloy-metrics-traces grafana/alloy \
 		-n $(K8S_NS_OBSERVABILITY) \
 		-f deploy/observability/local/alloy-metrics-traces-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Alloy (metrics+traces) ready.$(NC)\n"
-	@printf "$(BOLD)[6/7] Applying Grafana dashboards...$(NC)\n"
+	@printf "$(BOLD)[7/8] Applying Grafana dashboards...$(NC)\n"
 	@$(KUBECTL) apply -k deploy/observability/local/dashboards/
 	@printf "  $(GREEN)Grafana dashboards applied.$(NC)\n"
-	@printf "$(BOLD)[7/7] Installing Headlamp dashboard...$(NC)\n"
+	@printf "$(BOLD)[8/8] Installing Headlamp dashboard...$(NC)\n"
 	@$(HELM) repo add headlamp https://kubernetes-sigs.github.io/headlamp/ --force-update 2>/dev/null || true
 	@$(HELM) upgrade --install headlamp headlamp/headlamp \
 		-n $(K8S_NS_OBSERVABILITY) \

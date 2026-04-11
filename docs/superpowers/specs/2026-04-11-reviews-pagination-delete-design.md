@@ -244,12 +244,14 @@ Changes:
 - `GetAndReconcile` returns nil for deleting slice
 
 **Template** (`partials/reviews.html`):
-- Each review card gets a delete button:
+- Each review card gets a delete button with a browser confirmation dialog:
   ```html
   <button hx-delete="/partials/reviews/{{.ID}}?product_id={{.ProductID}}"
+          hx-confirm="Are you sure you want to delete this review?"
           hx-target="#reviews-section"
           hx-swap="innerHTML">Delete</button>
   ```
+- `hx-confirm` is a built-in HTMX attribute that shows a native browser confirm dialog before issuing the request. No custom modal or JS needed.
 - Reviews in "deleting" state render with "Deleting..." badge (red/gray tone)
 - New `.review-deleting` CSS class — dashed border, semi-transparent background (red/gray variant of `.review-pending`)
 - `.deleting-badge` — same structure as `.pending-badge` with different color

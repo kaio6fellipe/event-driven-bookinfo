@@ -36,7 +36,7 @@ func main() {
 
 	ctx := context.Background()
 
-	shutdown, err := telemetry.Setup(ctx, cfg.ServiceName)
+	shutdown, err := telemetry.Setup(ctx, cfg.ServiceName, cfg.PyroscopeServerAddress != "")
 	if err != nil {
 		logger.Error("failed to setup telemetry", "error", err)
 		os.Exit(1)

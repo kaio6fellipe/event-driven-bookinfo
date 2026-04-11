@@ -9,3 +9,4 @@ data:
   RUN_MIGRATIONS: "true"
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
   RATINGS_SERVICE_URL: "http://gateway.envoy-gateway-system.svc.cluster.local"
+  PYROSCOPE_SERVER_ADDRESS: "http://pyroscope.observability.svc.cluster.local:4040"

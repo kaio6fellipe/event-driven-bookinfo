@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	otelpyroscope "github.com/grafana/otel-profiling-go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
@@ -15,8 +16,10 @@ import (
 )
 
 // Setup initializes OpenTelemetry tracing with an OTLP gRPC exporter when
-// OTEL_EXPORTER_OTLP_ENDPOINT is set. Returns a shutdown function.
-func Setup(ctx context.Context, serviceName string) (func(context.Context) error, error) {
+// OTEL_EXPORTER_OTLP_ENDPOINT is set. When pyroscopeEnabled is true, the
+// TracerProvider is wrapped with otelpyroscope to tag profiling samples with
+// span IDs for trace-to-profile correlation. Returns a shutdown function.
+func Setup(ctx context.Context, serviceName string, pyroscopeEnabled bool) (func(context.Context) error, error) {
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	if endpoint == "" {
 		return func(context.Context) error { return nil }, nil
@@ -46,7 +49,12 @@ func Setup(ctx context.Context, serviceName string) (func(context.Context) error
 		sdktrace.WithResource(r),
 	)
 
-	otel.SetTracerProvider(tp)
+	if pyroscopeEnabled {
+		otel.SetTracerProvider(otelpyroscope.NewTracerProvider(tp))
+	} else {
+		otel.SetTracerProvider(tp)
+	}
+
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},

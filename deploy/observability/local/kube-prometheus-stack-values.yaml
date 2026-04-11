@@ -73,8 +73,7 @@ grafana:
         tracesToProfilesV2:
           datasourceUid: pyroscope
           profileTypeId: "process_cpu:cpu:nanoseconds:cpu:nanoseconds"
-          customQuery: true
-          query: '{service_name="${__span.tags["service.name"]}"}'
+          customQuery: false
           tags:
             - key: "service.name"
               value: "service_name"

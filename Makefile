@@ -461,33 +461,37 @@ k8s-logs: ##@Kubernetes Tail logs from bookinfo namespace
 	$(k8s-guard)
 	$(KUBECTL) logs -n $(K8S_NS_BOOKINFO) -l part-of=event-driven-bookinfo -f --max-log-requests=10
 
-# ─── Traffic ─────────────────────────────────────────────────────────────────
+# ─── Load Testing ────────────────────────────────────────────────────────────
 
-GATEWAY_URL := http://localhost:8080
+DURATION  ?= 30s
+BASE_RATE ?= 2
 
-.PHONY: k8s-traffic
-k8s-traffic: ##@Kubernetes Generate sample traffic through the productpage
-	@printf "$(BOLD)Generating sample traffic against $(GATEWAY_URL)...$(NC)\n\n"
-	@printf "$(BOLD)── Read path (GET via productpage → fan-out to backends) ──$(NC)\n"
-	@printf "$(CYAN)[GET]$(NC)  / — home page (productpage → details)\n"
-	@curl -s $(GATEWAY_URL)/ -o /dev/null -w "  HTTP %{http_code}\n"
-	@PRODUCT_ID=$$(curl -s $(GATEWAY_URL)/ | grep -o '/products/[^"]*' | head -1 | sed 's|/products/||'); \
-	if [ -z "$$PRODUCT_ID" ]; then \
-		printf "  $(RED)No products found, skipping product-specific requests$(NC)\n"; \
-	else \
-		printf "$(CYAN)[GET]$(NC)  /products/$$PRODUCT_ID — product page (productpage → details + reviews + ratings)\n"; \
-		curl -s $(GATEWAY_URL)/products/$$PRODUCT_ID -o /dev/null -w "  HTTP %{http_code}\n"; \
-		printf "$(CYAN)[GET]$(NC)  /partials/details/$$PRODUCT_ID — HTMX partial details\n"; \
-		curl -s $(GATEWAY_URL)/partials/details/$$PRODUCT_ID -o /dev/null -w "  HTTP %{http_code}\n"; \
-		printf "$(CYAN)[GET]$(NC)  /partials/reviews/$$PRODUCT_ID — HTMX partial reviews\n"; \
-		curl -s $(GATEWAY_URL)/partials/reviews/$$PRODUCT_ID -o /dev/null -w "  HTTP %{http_code}\n"; \
-		printf "\n$(BOLD)── Write path (POST via productpage → gateway → Argo Events CQRS) ──$(NC)\n"; \
-		printf "$(CYAN)[POST]$(NC) /partials/rating — submit rating+review (productpage → ratings + reviews via gateway)\n"; \
-		curl -s -o /dev/null -X POST $(GATEWAY_URL)/partials/rating \
-			-d "product_id=$$PRODUCT_ID&reviewer=alice&stars=5&text=Excellent+book+on+Go" \
-			-w "  HTTP %{http_code}\n"; \
-	fi
-	@printf "\n$(GREEN)Done. Check traces at http://localhost:3000 (Grafana > Explore > Tempo)$(NC)\n"
+.PHONY: k8s-load
+k8s-load: ##@Kubernetes Run k6 load test via Docker (default 30s). Usage: DURATION=5m BASE_RATE=3 make k8s-load
+	@printf "$(BOLD)Running k6 load test (duration=$(DURATION), rate=$(BASE_RATE) req/s)...$(NC)\n"
+	@docker run --rm \
+		-v $(CURDIR)/test/k6:/scripts \
+		-e BASE_URL=http://host.docker.internal:8080 \
+		-e DURATION=$(DURATION) \
+		-e BASE_RATE=$(BASE_RATE) \
+		-e K6_PROMETHEUS_RW_SERVER_URL=http://host.docker.internal:9090/api/v1/write \
+		-e K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=true \
+		grafana/k6 run -o experimental-prometheus-rw /scripts/bookinfo-traffic.js
+
+.PHONY: k8s-load-start
+k8s-load-start: ##@Kubernetes Deploy k6 CronJob for continuous background load
+	$(k8s-guard)
+	@printf "$(BOLD)Deploying k6 load generator CronJob...$(NC)\n"
+	@$(KUBECTL) kustomize --load-restrictor LoadRestrictionsNone deploy/k6/overlays/local/ | $(KUBECTL) apply -f -
+	@printf "$(GREEN)k6 CronJob deployed. Runs every 10 minutes in namespace $(K8S_NS_BOOKINFO).$(NC)\n"
+	@printf "Use $(CYAN)make k8s-load-stop$(NC) to remove.\n"
+
+.PHONY: k8s-load-stop
+k8s-load-stop: ##@Kubernetes Remove k6 CronJob from the cluster
+	$(k8s-guard)
+	@printf "$(BOLD)Removing k6 load generator CronJob...$(NC)\n"
+	@$(KUBECTL) kustomize --load-restrictor LoadRestrictionsNone deploy/k6/overlays/local/ | $(KUBECTL) delete --ignore-not-found -f -
+	@printf "$(GREEN)k6 CronJob removed.$(NC)\n"
 
 # ─── Help ───────────────────────────────────────────────────────────────────
 

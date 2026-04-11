@@ -1,0 +1,110 @@
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+
+// Configuration via environment variables with defaults
+const BASE_URL = __ENV.BASE_URL || 'http://host.docker.internal:8080';
+const BASE_RATE = parseInt(__ENV.BASE_RATE || '2', 10);
+const DURATION = __ENV.DURATION || '30s';
+
+// Parse duration string to seconds for stage calculation
+function parseDuration(d) {
+  const match = d.match(/^(\d+)(s|m|h)$/);
+  if (!match) return 30;
+  const val = parseInt(match[1], 10);
+  switch (match[2]) {
+    case 'h': return val * 3600;
+    case 'm': return val * 60;
+    default:  return val;
+  }
+}
+
+const totalSeconds = parseDuration(DURATION);
+
+// Build aleatory stages: cycle through variable rates
+// Each stage is ~1/6 of total duration
+function buildStages() {
+  const segment = Math.max(Math.ceil(totalSeconds / 6), 1);
+  return [
+    { duration: `${segment}s`, target: BASE_RATE },                    // base
+    { duration: `${segment}s`, target: Math.ceil(BASE_RATE * 2) },     // ramp up
+    { duration: `${segment}s`, target: BASE_RATE },                    // base
+    { duration: `${segment}s`, target: Math.max(1, Math.ceil(BASE_RATE * 0.5)) }, // low
+    { duration: `${segment}s`, target: Math.ceil(BASE_RATE * 3) },     // spike
+    { duration: `${segment}s`, target: BASE_RATE },                    // base
+  ];
+}
+
+export const options = {
+  scenarios: {
+    bookinfo: {
+      executor: 'ramping-arrival-rate',
+      startRate: BASE_RATE,
+      timeUnit: '1s',
+      preAllocatedVUs: 5,
+      maxVUs: 20,
+      stages: buildStages(),
+    },
+  },
+  thresholds: {
+    http_req_duration: ['p(95)<2000'],
+    http_req_failed: ['rate<0.1'],
+  },
+  tags: {
+    testid: `bookinfo-${new Date().toISOString().slice(0, 19)}`,
+  },
+};
+
+// Discover a product ID from the home page
+function discoverProductId() {
+  const res = http.get(`${BASE_URL}/`);
+  if (res.status === 200 && res.body) {
+    const match = res.body.match(/\/products\/([^"]+)/);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+// Cache the product ID across iterations (discovered in setup)
+export function setup() {
+  const productId = discoverProductId();
+  return { productId };
+}
+
+export default function (data) {
+  const productId = data.productId;
+
+  // --- Read path ---
+  // Home page: productpage -> details fan-out
+  const homeRes = http.get(`${BASE_URL}/`, { tags: { name: 'GET /' } });
+  check(homeRes, { 'home 200': (r) => r.status === 200 });
+
+  if (productId) {
+    // Product page: productpage -> details + reviews + ratings
+    const productRes = http.get(`${BASE_URL}/products/${productId}`, { tags: { name: 'GET /products/{id}' } });
+    check(productRes, { 'product 200': (r) => r.status === 200 });
+
+    // HTMX partials
+    const detailsRes = http.get(`${BASE_URL}/partials/details/${productId}`, { tags: { name: 'GET /partials/details/{id}' } });
+    check(detailsRes, { 'details 200': (r) => r.status === 200 });
+
+    const reviewsRes = http.get(`${BASE_URL}/partials/reviews/${productId}`, { tags: { name: 'GET /partials/reviews/{id}' } });
+    check(reviewsRes, { 'reviews 200': (r) => r.status === 200 });
+
+    // --- Write path ---
+    // Submit rating + review: productpage -> gateway -> EventSource -> Sensor -> write services
+    const reviewers = ['alice', 'bob', 'carol', 'dave', 'eve'];
+    const reviewer = reviewers[Math.floor(Math.random() * reviewers.length)];
+    const stars = Math.floor(Math.random() * 5) + 1;
+
+    const ratingRes = http.post(`${BASE_URL}/partials/rating`, {
+      product_id: productId,
+      reviewer: reviewer,
+      stars: String(stars),
+      text: `k6 load test review by ${reviewer}`,
+    }, { tags: { name: 'POST /partials/rating' } });
+    check(ratingRes, { 'rating 200': (r) => r.status === 200 });
+  }
+
+  // Small random sleep to add jitter between requests within an iteration
+  sleep(Math.random() * 0.5);
+}

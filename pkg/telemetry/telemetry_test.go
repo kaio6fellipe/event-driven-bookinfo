@@ -9,7 +9,21 @@ import (
 
 func TestSetup_NoOpWhenEndpointUnset(t *testing.T) {
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
-	shutdown, err := telemetry.Setup(context.Background(), "test-service")
+	shutdown, err := telemetry.Setup(context.Background(), "test-service", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if shutdown == nil {
+		t.Fatal("shutdown func should not be nil")
+	}
+	if err := shutdown(context.Background()); err != nil {
+		t.Fatalf("no-op shutdown returned error: %v", err)
+	}
+}
+
+func TestSetup_NoOpWhenEndpointUnsetWithPyroscope(t *testing.T) {
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+	shutdown, err := telemetry.Setup(context.Background(), "test-service", true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

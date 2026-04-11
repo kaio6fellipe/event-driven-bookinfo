@@ -12,5 +12,5 @@ spec:
           value: "review-deleted-eventsource"
   webhook:
     review-deleted:
-      endpoint: /v1/reviews
-      method: DELETE
+      endpoint: /v1/reviews/delete
+      method: POST

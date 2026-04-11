@@ -98,8 +98,8 @@ func (c *ReviewsClient) DeleteReview(ctx context.Context, reviewID string) error
 		return fmt.Errorf("marshaling delete request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/v1/reviews", c.baseURL)
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, bytes.NewReader(jsonBody))
+	url := fmt.Sprintf("%s/v1/reviews/delete", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}

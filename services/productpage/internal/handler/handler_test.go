@@ -423,9 +423,9 @@ func TestPartialDeleteReview(t *testing.T) {
 			"pagination": map[string]any{"page": 1, "page_size": 10, "total_items": 0, "total_pages": 0},
 		})
 	})
-	reviewsMux.HandleFunc("DELETE /v1/reviews", func(w http.ResponseWriter, _ *http.Request) {
+	reviewsMux.HandleFunc("POST /v1/reviews/delete", func(w http.ResponseWriter, _ *http.Request) {
 		deleteReceived = true
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusOK)
 	})
 	reviewsServer := httptest.NewServer(reviewsMux)
 	t.Cleanup(reviewsServer.Close)

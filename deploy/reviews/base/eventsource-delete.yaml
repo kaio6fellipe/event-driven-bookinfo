@@ -8,4 +8,4 @@ spec:
     review-deleted:
       port: "12003"
       endpoint: /review-deleted
-      method: DELETE
+      method: POST

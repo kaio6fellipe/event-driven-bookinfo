@@ -166,7 +166,8 @@ spec:
         - name: productpage
           port: 80
 ---
-# DELETE /v1/reviews → review-deleted EventSource (write path)
+# POST /v1/reviews/delete → review-deleted EventSource (write path)
+# Uses POST because Argo Events webhooks don't support DELETE method body extraction.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -181,8 +182,8 @@ spec:
     - matches:
         - path:
             type: Exact
-            value: /v1/reviews
-          method: DELETE
+            value: /v1/reviews/delete
+          method: POST
       backendRefs:
         - name: review-deleted-eventsource-svc
           port: 12003

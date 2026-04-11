@@ -8,6 +8,7 @@ resources:
   - deployment-write.yaml
   - service-write.yaml
   - eventsource-service.yaml
+  - eventsource-delete-service.yaml
 
 patches:
   - path: deployment-read-patch.yaml
@@ -22,6 +23,10 @@ patches:
     target:
       kind: EventSource
       name: review-submitted
+  - path: eventsource-delete-patch.yaml
+    target:
+      kind: EventSource
+      name: review-deleted
   - path: sensor-patch.yaml
     target:
       kind: Sensor

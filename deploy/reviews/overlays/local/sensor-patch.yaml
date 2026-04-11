@@ -13,6 +13,7 @@ spec:
   triggers:
     - template:
         name: create-review
+        conditions: review-submitted-dep
         http:
           url: http://reviews-write.bookinfo.svc.cluster.local/v1/reviews
           method: POST
@@ -28,6 +29,7 @@ spec:
         duration: 2s
     - template:
         name: notify-review-submitted
+        conditions: review-submitted-dep
         http:
           url: http://notification.bookinfo.svc.cluster.local/v1/notifications
           method: POST
@@ -48,6 +50,50 @@ spec:
               dest: recipient
             - src:
                 dependencyName: review-submitted-dep
+                value: "email"
+              dest: channel
+      retryStrategy:
+        steps: 3
+        duration: 2s
+    - template:
+        name: delete-review
+        conditions: review-deleted-dep
+        http:
+          url: http://reviews-write.bookinfo.svc.cluster.local/v1/reviews
+          method: DELETE
+          headers:
+            Content-Type: application/json
+          payload:
+            - src:
+                dependencyName: review-deleted-dep
+                dataKey: body.review_id
+              dest: review_id
+      retryStrategy:
+        steps: 3
+        duration: 2s
+    - template:
+        name: notify-review-deleted
+        conditions: review-deleted-dep
+        http:
+          url: http://notification.bookinfo.svc.cluster.local/v1/notifications
+          method: POST
+          headers:
+            Content-Type: application/json
+          payload:
+            - src:
+                dependencyName: review-deleted-dep
+                dataKey: body.review_id
+              dest: subject
+            - src:
+                dependencyName: review-deleted-dep
+                value: "Review deleted"
+              dest: body
+            - src:
+                dependencyName: review-deleted-dep
+                value: "system@bookinfo"
+              dest: recipient
+            - src:
+                dependencyName: review-deleted-dep
                 value: "email"
               dest: channel
       retryStrategy:

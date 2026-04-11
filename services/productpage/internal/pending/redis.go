@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 )
+
+const pendingTTL = 2 * time.Minute
 
 const (
 	pendingKeyPrefix  = "pending:reviews:"
@@ -55,12 +58,22 @@ func (s *RedisStore) StorePending(ctx context.Context, productID string, review 
 	if err != nil {
 		return fmt.Errorf("marshaling pending review: %w", err)
 	}
-	return s.client.RPush(ctx, pendingKeyPrefix+productID, data).Err()
+	key := pendingKeyPrefix + productID
+	if err := s.client.RPush(ctx, key, data).Err(); err != nil {
+		return err
+	}
+	s.client.Expire(ctx, key, pendingTTL)
+	return nil
 }
 
 // StoreDeleting marks a review as being deleted by adding its ID to a Redis set.
 func (s *RedisStore) StoreDeleting(ctx context.Context, productID string, reviewID string) error {
-	return s.client.SAdd(ctx, deletingKeyPrefix+productID, reviewID).Err()
+	key := deletingKeyPrefix + productID
+	if err := s.client.SAdd(ctx, key, reviewID).Err(); err != nil {
+		return err
+	}
+	s.client.Expire(ctx, key, pendingTTL)
+	return nil
 }
 
 // GetAndReconcile returns pending reviews and deleting review IDs after reconciliation.

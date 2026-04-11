@@ -1,7 +1,3 @@
-pyroscope:
-  extraArgs:
-    store.max-disk-usage: 1GB
-
 persistence:
   enabled: true
   size: 2Gi

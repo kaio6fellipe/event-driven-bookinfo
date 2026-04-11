@@ -3,7 +3,6 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"net/http"
 	"path/filepath"
@@ -338,7 +337,9 @@ func (h *Handler) partialDeleteReview(w http.ResponseWriter, r *http.Request) {
 	// Trigger a refresh of the reviews section
 	if productID != "" {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = fmt.Fprintf(w, `<div hx-get="/partials/reviews/%s" hx-trigger="load" hx-target="#reviews-section" hx-swap="innerHTML"></div>`, productID)
+		_ = h.templates.ExecuteTemplate(w, "delete-refresh.html", map[string]string{
+			"ProductID": productID,
+		})
 	} else {
 		w.WriteHeader(http.StatusNoContent)
 	}

@@ -32,7 +32,6 @@ func NewHandler(svc port.ReviewService) *Handler {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/reviews/{id}", h.getProductReviews)
 	mux.HandleFunc("POST /v1/reviews", h.submitReview)
-	mux.HandleFunc("DELETE /v1/reviews/{id}", h.deleteReview)
 	mux.HandleFunc("POST /v1/reviews/delete", h.deleteReview)
 }
 
@@ -115,24 +114,16 @@ func (h *Handler) submitReview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) deleteReview(w http.ResponseWriter, r *http.Request) {
-	reviewID := r.PathValue("id")
 	logger := logging.FromContext(r.Context())
 
-	// The Sensor forwards the review ID in the JSON body (event-driven path),
-	// while direct API calls use the URL path param. Support both.
-	if reviewID == "" {
-		var body struct {
-			ReviewID string `json:"review_id"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err == nil && body.ReviewID != "" {
-			reviewID = body.ReviewID
-		}
+	var req struct {
+		ReviewID string `json:"review_id"`
 	}
-
-	if reviewID == "" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "review ID is required"})
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ReviewID == "" {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "review_id is required"})
 		return
 	}
+	reviewID := req.ReviewID
 
 	err := h.svc.DeleteReview(r.Context(), reviewID)
 	if err != nil {

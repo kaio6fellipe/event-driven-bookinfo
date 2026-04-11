@@ -302,7 +302,9 @@ func TestDeleteReview_Success(t *testing.T) {
 	var created handler.ReviewResponse
 	_ = json.NewDecoder(createRec.Body).Decode(&created)
 
-	deleteReq := httptest.NewRequest(http.MethodDelete, "/v1/reviews/"+created.ID, nil)
+	delBody, _ := json.Marshal(map[string]string{"review_id": created.ID})
+	deleteReq := httptest.NewRequest(http.MethodPost, "/v1/reviews/delete", bytes.NewReader(delBody))
+	deleteReq.Header.Set("Content-Type", "application/json")
 	deleteRec := httptest.NewRecorder()
 	mux.ServeHTTP(deleteRec, deleteReq)
 
@@ -324,7 +326,9 @@ func TestDeleteReview_Success(t *testing.T) {
 func TestDeleteReview_NotFound(t *testing.T) {
 	mux := setupHandler(t)
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/reviews/nonexistent-id", nil)
+	delBody, _ := json.Marshal(map[string]string{"review_id": "nonexistent-id"})
+	req := httptest.NewRequest(http.MethodPost, "/v1/reviews/delete", bytes.NewReader(delBody))
+	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 

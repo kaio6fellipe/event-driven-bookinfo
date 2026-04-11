@@ -89,12 +89,21 @@ func (c *ReviewsClient) GetProductReviews(ctx context.Context, productID string,
 
 // DeleteReview sends a delete request for a review.
 func (c *ReviewsClient) DeleteReview(ctx context.Context, reviewID string) error {
-	url := fmt.Sprintf("%s/v1/reviews/%s", c.baseURL, reviewID)
+	body := map[string]string{
+		"review_id": reviewID,
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("marshaling delete request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/v1/reviews", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req) //nolint:gosec // URL comes from operator-controlled config, not user input
 	if err != nil {

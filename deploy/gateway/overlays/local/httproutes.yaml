@@ -166,7 +166,7 @@ spec:
         - name: productpage
           port: 80
 ---
-# DELETE /v1/reviews/* → review-deleted EventSource (write path)
+# DELETE /v1/reviews → review-deleted EventSource (write path)
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -180,7 +180,7 @@ spec:
   rules:
     - matches:
         - path:
-            type: PathPrefix
+            type: Exact
             value: /v1/reviews
           method: DELETE
       backendRefs:

@@ -133,8 +133,9 @@ export function teardown(data) {
 
     for (const review of body.reviews) {
       if (review.text && review.text.startsWith('k6 load test review')) {
-        const delRes = http.del(`${BASE_URL}/v1/reviews/${review.id}`,
-          null, { tags: { name: 'teardown: DELETE review' } });
+        const delRes = http.del(`${BASE_URL}/v1/reviews`,
+          JSON.stringify({ review_id: review.id }),
+          { headers: { 'Content-Type': 'application/json' }, tags: { name: 'teardown: DELETE review' } });
         if (delRes.status === 204 || delRes.status === 200) {
           deleted++;
         }

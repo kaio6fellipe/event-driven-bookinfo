@@ -115,35 +115,47 @@ export function teardown(data) {
 
   console.log('Cleaning up k6-generated reviews...');
 
-  let page = 1;
-  let totalPages = 1;
-  let deleted = 0;
+  const maxRounds = 5;
+  let totalDeleted = 0;
 
-  while (page <= totalPages) {
-    const res = http.get(`${BASE_URL}/v1/reviews/${productId}?page=${page}&page_size=100`,
-      { tags: { name: 'teardown: GET reviews' } });
+  for (let round = 1; round <= maxRounds; round++) {
+    let page = 1;
+    let totalPages = 1;
+    let roundDeleted = 0;
 
-    if (res.status !== 200) {
-      console.log(`Failed to fetch reviews page ${page}: status ${res.status}`);
+    while (page <= totalPages) {
+      const res = http.get(`${BASE_URL}/v1/reviews/${productId}?page=${page}&page_size=100`,
+        { tags: { name: 'teardown: GET reviews' } });
+
+      if (res.status !== 200) {
+        console.log(`Failed to fetch reviews page ${page}: status ${res.status}`);
+        break;
+      }
+
+      const body = JSON.parse(res.body);
+      totalPages = body.pagination.total_pages;
+
+      for (const review of body.reviews) {
+        if (review.text && review.text.startsWith('k6 load test review')) {
+          http.post(`${BASE_URL}/v1/reviews/delete`,
+            JSON.stringify({ review_id: review.id }),
+            { headers: { 'Content-Type': 'application/json' }, tags: { name: 'teardown: DELETE review' } });
+          roundDeleted++;
+        }
+      }
+
+      page++;
+    }
+
+    totalDeleted += roundDeleted;
+    if (roundDeleted === 0) {
+      console.log(`Round ${round}: no k6 reviews found. Cleanup complete.`);
       break;
     }
 
-    const body = JSON.parse(res.body);
-    totalPages = body.pagination.total_pages;
-
-    for (const review of body.reviews) {
-      if (review.text && review.text.startsWith('k6 load test review')) {
-        const delRes = http.post(`${BASE_URL}/v1/reviews/delete`,
-          JSON.stringify({ review_id: review.id }),
-          { headers: { 'Content-Type': 'application/json' }, tags: { name: 'teardown: DELETE review' } });
-        if (delRes.status === 204 || delRes.status === 200) {
-          deleted++;
-        }
-      }
-    }
-
-    page++;
+    console.log(`Round ${round}: sent ${roundDeleted} delete requests. Waiting for async processing...`);
+    sleep(10);
   }
 
-  console.log(`Cleanup complete: deleted ${deleted} k6-generated reviews.`);
+  console.log(`Cleanup total: ${totalDeleted} delete requests sent.`);
 }

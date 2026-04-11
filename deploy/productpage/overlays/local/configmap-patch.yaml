@@ -9,3 +9,4 @@ data:
   REVIEWS_SERVICE_URL: "http://gateway.envoy-gateway-system.svc.cluster.local"
   RATINGS_SERVICE_URL: "http://gateway.envoy-gateway-system.svc.cluster.local"
   REDIS_URL: "redis://redis-master.bookinfo.svc.cluster.local:6379"
+  PYROSCOPE_SERVER_ADDRESS: "http://pyroscope.observability.svc.cluster.local:4040"

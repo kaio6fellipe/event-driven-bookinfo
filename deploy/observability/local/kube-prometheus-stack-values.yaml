@@ -70,6 +70,18 @@ grafana:
           datasourceUid: prometheus
         nodeGraph:
           enabled: true
+        tracesToProfilesV2:
+          datasourceUid: pyroscope
+          profileTypeId: "process_cpu:cpu:nanoseconds:cpu:nanoseconds"
+          customQuery: true
+          query: '{service_name="${__span.tags["service.name"]}"}'
+          tags:
+            - key: "service.name"
+              value: "service_name"
+            - key: "k8s.namespace.name"
+              value: "namespace"
+            - key: "k8s.pod.name"
+              value: "pod"
     - name: Loki
       type: loki
       uid: loki
@@ -82,6 +94,12 @@ grafana:
             matcherRegex: '"trace_id":"(\w+)"'
             name: TraceID
             url: "$${__value.raw}"
+    - name: Pyroscope
+      type: grafana-pyroscope-datasource
+      uid: pyroscope
+      url: http://pyroscope.observability.svc.cluster.local:4040
+      access: proxy
+      isDefault: false
   persistence:
     enabled: true
     size: 1Gi

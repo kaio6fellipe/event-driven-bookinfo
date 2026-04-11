@@ -113,17 +113,25 @@ export function teardown(data) {
   const productId = data.productId;
   if (!productId) return;
 
-  // Phase 1: Wait for all pending reviews to be confirmed (no more "Processing" badges)
-  console.log('Waiting for all pending reviews to be processed...');
-  for (let attempt = 1; attempt <= 30; attempt++) {
-    const res = http.get(`${BASE_URL}/partials/reviews/${productId}`,
-      { tags: { name: 'teardown: check pending' } });
-    if (res.status === 200 && !res.body.includes('Processing')) {
-      console.log(`All reviews confirmed after ${attempt} checks.`);
-      break;
-    }
-    if (attempt === 30) {
-      console.log('Warning: some reviews still pending after 60s, proceeding with cleanup.');
+  // Phase 1: Wait for async writes to settle (review count stops growing)
+  console.log('Waiting for async writes to settle...');
+  let lastCount = -1;
+  let stableChecks = 0;
+  for (let attempt = 1; attempt <= 15; attempt++) {
+    const res = http.get(`${BASE_URL}/v1/reviews/${productId}?page=1&page_size=1`,
+      { tags: { name: 'teardown: check count' } });
+    if (res.status === 200) {
+      const count = JSON.parse(res.body).pagination.total_items;
+      if (count === lastCount) {
+        stableChecks++;
+        if (stableChecks >= 3) {
+          console.log(`Review count stable at ${count} after ${attempt} checks.`);
+          break;
+        }
+      } else {
+        stableChecks = 0;
+        lastCount = count;
+      }
     }
     sleep(2);
   }

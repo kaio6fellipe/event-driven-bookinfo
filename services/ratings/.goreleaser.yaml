@@ -58,5 +58,8 @@ docker_manifests:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/ratings:{{ .Tag }}-amd64"
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/ratings:{{ .Tag }}-arm64"
 
+release:
+  disable: true
+
 changelog:
   use: github

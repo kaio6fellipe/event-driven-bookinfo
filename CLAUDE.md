@@ -159,23 +159,6 @@ feat(pkg/logging): add request_id to middleware
 chore: update go.mod dependencies
 ```
 
-## Release Process
-
-Each service is released independently with its own version tag.
-
-**Tag format**: `<service>-v<major>.<minor>.<patch>` (e.g., `details-v0.1.0`, `reviews-v1.2.3`)
-
-**Auto-release on PR merge to `main`:**
-1. `auto-tag.yml` detects which services changed (`services/<name>/` paths + `pkg/`/`go.mod`/`go.sum` triggers all)
-2. Determines bump type: PR labels (`major`/`minor`) → conventional commits → default `patch`
-3. Creates prefixed tag and dispatches `release.yml` via `workflow_dispatch`
-
-**Manual release:** `gh workflow run release.yml -f service=<name> -f tag=<name>-v<X.Y.Z>`
-
-**GoReleaser configs:** `services/<name>/.goreleaser.yaml` (per-service, GoReleaser OSS with `GORELEASER_CURRENT_TAG`)
-
-**Version source of truth:** git tags (`git tag -l "<service>-v*"`)
-
 ## Hex Arch Boundary Rules
 
 - **Domain** (`core/domain/`): no imports from `adapter/`, no framework imports, pure Go types only.

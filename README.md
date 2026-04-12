@@ -235,7 +235,7 @@ make clean-data   # stop and remove containers + postgres data volume
 docker compose -f test/e2e/docker-compose.yml up
 ```
 
-Images are tagged `event-driven-bookinfo/<service>:latest` locally. Released images are pushed to GitHub Container Registry with the service version tag:
+Images are tagged `event-driven-bookinfo/<service>:latest` locally. Released images are pushed to GitHub Container Registry:
 
 ```
 ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:<tag>
@@ -554,53 +554,10 @@ event-driven-bookinfo/
 │   └── Dockerfile.<service>    # One per service (5 total)
 ├── Makefile
 ├── .golangci.yml               # golangci-lint v2 configuration
-├── .github/workflows/
-│   ├── release.yml             # Per-service release via workflow_dispatch
-│   └── auto-tag.yml            # Auto-tag on PR merge, dispatches release
+├── .goreleaser.yaml            # GoReleaser v2 multi-binary release config
 ├── go.mod                      # Single module: github.com/kaio6fellipe/event-driven-bookinfo
 └── go.sum
 ```
-
----
-
-## Releasing
-
-Each service is versioned and released independently. Releases are fully automated on PR merge to `main`.
-
-### How It Works
-
-1. **PR merged to `main`** → `auto-tag.yml` runs
-2. **Detects changed services** — file paths under `services/<name>/`; changes to `pkg/`, `go.mod`, or `go.sum` trigger all 5 services
-3. **Determines version bump** — PR labels (`major`/`minor`) take priority, then conventional commit prefixes (`feat` → minor, `fix` → patch, `BREAKING CHANGE` → major), default is `patch`
-4. **Creates tag** — e.g., `details-v0.2.0`
-5. **Dispatches release** — `release.yml` builds binaries, Docker images (multi-arch), and creates a GitHub release
-
-### Tag Format
-
-```
-<service>-v<major>.<minor>.<patch>
-```
-
-Examples: `details-v0.1.0`, `reviews-v1.2.3`, `productpage-v0.3.0`
-
-### Manual Release
-
-```bash
-# Trigger a release for a specific service
-gh workflow run release.yml -f service=details -f tag=details-v0.1.0
-```
-
-### Version Bump Labels
-
-| Label | Effect |
-|-------|--------|
-| `major` | Major version bump (breaking change) |
-| `minor` | Minor version bump (new feature) |
-| *(none)* | Determined by conventional commits, default patch |
-
-### GoReleaser Configs
-
-Per-service configs at `services/<name>/.goreleaser.yaml`. Uses GoReleaser OSS with `GORELEASER_CURRENT_TAG` environment variable for version resolution.
 
 ---
 

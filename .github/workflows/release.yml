@@ -1,22 +1,9 @@
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      service:
-        description: "Service to release"
-        required: true
-        type: choice
-        options:
-          - productpage
-          - details
-          - reviews
-          - ratings
-          - notification
-      tag:
-        description: "Full tag (e.g., details-v0.1.0)"
-        required: true
-        type: string
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
@@ -24,26 +11,9 @@ permissions:
 
 jobs:
   release:
-    name: Release ${{ inputs.service }}
+    name: GoReleaser Release
     runs-on: ubuntu-latest
     steps:
-      - name: Validate tag format
-        run: |
-          TAG="${{ inputs.tag }}"
-          SERVICE="${{ inputs.service }}"
-          if [[ ! "$TAG" =~ ^${SERVICE}-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Tag '$TAG' does not match expected format '${SERVICE}-vX.Y.Z'"
-            exit 1
-          fi
-
-      - name: Extract version from tag
-        id: version
-        run: |
-          TAG="${{ inputs.tag }}"
-          VERSION="${TAG#${{ inputs.service }}-}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Releasing ${{ inputs.service }} at $VERSION"
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -72,7 +42,6 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean -f services/${{ inputs.service }}/.goreleaser.yaml
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GORELEASER_CURRENT_TAG: ${{ steps.version.outputs.version }}

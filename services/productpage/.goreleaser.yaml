@@ -62,4 +62,4 @@ release:
   disable: true
 
 changelog:
-  use: github
+  disable: true

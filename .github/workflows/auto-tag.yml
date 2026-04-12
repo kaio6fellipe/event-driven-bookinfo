@@ -1,0 +1,126 @@
+name: Auto Tag
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  auto-tag:
+    name: Auto Tag Services
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed services
+        id: changes
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+
+          SERVICES=()
+          ALL_SERVICES=(productpage details reviews ratings notification)
+
+          # Check if shared packages changed — triggers all services
+          if echo "$CHANGED_FILES" | grep -qE '^(pkg/|go\.mod|go\.sum)'; then
+            SERVICES=("${ALL_SERVICES[@]}")
+          else
+            # Check each service directory
+            for svc in "${ALL_SERVICES[@]}"; do
+              if echo "$CHANGED_FILES" | grep -q "^services/${svc}/"; then
+                SERVICES+=("$svc")
+              fi
+            done
+          fi
+
+          if [ ${#SERVICES[@]} -eq 0 ]; then
+            echo "No service changes detected, skipping"
+            echo "services=" >> "$GITHUB_OUTPUT"
+          else
+            # Output as JSON array for matrix consumption
+            JSON=$(printf '%s\n' "${SERVICES[@]}" | jq -R . | jq -sc .)
+            echo "services=$JSON" >> "$GITHUB_OUTPUT"
+            echo "Changed services: $JSON"
+          fi
+
+      - name: Determine bump type
+        id: bump
+        if: steps.changes.outputs.services != ''
+        run: |
+          BUMP="patch"
+
+          # Priority 1: PR labels
+          LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
+          if echo "$LABELS" | jq -e 'index("major")' > /dev/null 2>&1; then
+            BUMP="major"
+          elif echo "$LABELS" | jq -e 'index("minor")' > /dev/null 2>&1; then
+            BUMP="minor"
+          else
+            # Priority 2: Conventional commits
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            COMMITS=$(git log --format="%s%n%b" "$BASE_SHA".."$HEAD_SHA")
+
+            if echo "$COMMITS" | grep -qE '(BREAKING CHANGE|^[a-z]+(\(.+\))?!:)'; then
+              BUMP="major"
+            elif echo "$COMMITS" | grep -qE '^feat(\(.+\))?:'; then
+              BUMP="minor"
+            fi
+          fi
+
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "Bump type: $BUMP"
+
+      - name: Tag and dispatch releases
+        if: steps.changes.outputs.services != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BUMP="${{ steps.bump.outputs.bump }}"
+          SERVICES='${{ steps.changes.outputs.services }}'
+
+          for SERVICE in $(echo "$SERVICES" | jq -r '.[]'); do
+            # Get latest tag for this service
+            LATEST_TAG=$(git tag -l "${SERVICE}-v*" --sort=-v:refversion | head -1)
+
+            if [ -z "$LATEST_TAG" ]; then
+              CURRENT="0.0.0"
+            else
+              CURRENT="${LATEST_TAG#${SERVICE}-v}"
+            fi
+
+            # Parse version components
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+
+            # Increment based on bump type
+            case "$BUMP" in
+              major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+              patch) PATCH=$((PATCH + 1)) ;;
+            esac
+
+            NEXT_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            NEXT_TAG="${SERVICE}-v${NEXT_VERSION}"
+
+            echo "Tagging ${SERVICE}: ${CURRENT} -> ${NEXT_VERSION} (${BUMP})"
+
+            # Create and push tag
+            git tag "$NEXT_TAG"
+            git push origin "$NEXT_TAG"
+
+            # Dispatch release workflow
+            gh workflow run release.yml \
+              -f service="$SERVICE" \
+              -f tag="$NEXT_TAG"
+
+            echo "Dispatched release for ${NEXT_TAG}"
+          done

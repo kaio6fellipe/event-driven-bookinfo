@@ -23,9 +23,10 @@ jobs:
       - name: Detect changed services
         id: changes
         run: |
-          BASE_SHA="${{ github.event.pull_request.base.sha }}"
-          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-          CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          # Use the merge commit on main and diff against its parent
+          # This works with squash merges where the PR branch SHAs may not exist
+          MERGE_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+          CHANGED_FILES=$(git diff --name-only "${MERGE_SHA}^" "$MERGE_SHA")
 
           SERVICES=()
           ALL_SERVICES=(productpage details reviews ratings notification)
@@ -65,10 +66,9 @@ jobs:
           elif echo "$LABELS" | jq -e 'index("minor")' > /dev/null 2>&1; then
             BUMP="minor"
           else
-            # Priority 2: Conventional commits
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-            COMMITS=$(git log --format="%s%n%b" "$BASE_SHA".."$HEAD_SHA")
+            # Priority 2: Conventional commits (from squash merge commit message)
+            MERGE_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+            COMMITS=$(git log --format="%s%n%b" -1 "$MERGE_SHA")
 
             if echo "$COMMITS" | grep -qE '(BREAKING CHANGE|^[a-z]+(\(.+\))?!:)'; then
               BUMP="major"

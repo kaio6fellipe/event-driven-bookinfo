@@ -29,8 +29,10 @@ dockers:
       - productpage
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:{{ .Tag }}-amd64"
-    dockerfile: build/Dockerfile.productpage
+    dockerfile: build/Dockerfile.goreleaser.productpage
     use: buildx
+    extra_files:
+      - services/productpage/templates/
     build_flag_templates:
       - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{ .Date }}"
@@ -43,8 +45,10 @@ dockers:
       - productpage
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:{{ .Tag }}-arm64"
-    dockerfile: build/Dockerfile.productpage
+    dockerfile: build/Dockerfile.goreleaser.productpage
     use: buildx
+    extra_files:
+      - services/productpage/templates/
     build_flag_templates:
       - "--platform=linux/arm64"
       - "--label=org.opencontainers.image.created={{ .Date }}"

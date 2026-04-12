@@ -1,0 +1,5 @@
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY productpage /bin/productpage
+COPY templates/ /templates/
+ENV TEMPLATE_DIR=/templates
+ENTRYPOINT ["/bin/productpage"]

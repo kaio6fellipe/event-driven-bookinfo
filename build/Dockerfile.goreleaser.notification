@@ -1,0 +1,4 @@
+FROM scratch
+COPY notification /bin/notification
+USER 65534:65534
+ENTRYPOINT ["/bin/notification"]

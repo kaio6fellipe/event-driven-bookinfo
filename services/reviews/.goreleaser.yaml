@@ -29,7 +29,7 @@ dockers:
       - reviews
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/reviews:{{ .Tag }}-amd64"
-    dockerfile: build/Dockerfile.reviews
+    dockerfile: build/Dockerfile.goreleaser.reviews
     use: buildx
     build_flag_templates:
       - "--platform=linux/amd64"
@@ -43,7 +43,7 @@ dockers:
       - reviews
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/reviews:{{ .Tag }}-arm64"
-    dockerfile: build/Dockerfile.reviews
+    dockerfile: build/Dockerfile.goreleaser.reviews
     use: buildx
     build_flag_templates:
       - "--platform=linux/arm64"

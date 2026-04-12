@@ -1,0 +1,4 @@
+FROM scratch
+COPY details /bin/details
+USER 65534:65534
+ENTRYPOINT ["/bin/details"]

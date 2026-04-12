@@ -29,7 +29,7 @@ dockers:
       - details
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/details:{{ .Tag }}-amd64"
-    dockerfile: build/Dockerfile.details
+    dockerfile: build/Dockerfile.goreleaser.details
     use: buildx
     build_flag_templates:
       - "--platform=linux/amd64"
@@ -43,7 +43,7 @@ dockers:
       - details
     image_templates:
       - "ghcr.io/kaio6fellipe/event-driven-bookinfo/details:{{ .Tag }}-arm64"
-    dockerfile: build/Dockerfile.details
+    dockerfile: build/Dockerfile.goreleaser.details
     use: buildx
     build_flag_templates:
       - "--platform=linux/arm64"

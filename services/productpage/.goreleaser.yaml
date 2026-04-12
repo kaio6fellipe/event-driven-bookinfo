@@ -1,0 +1,62 @@
+version: 2
+project_name: productpage
+
+builds:
+  - id: productpage
+    binary: productpage
+    main: ./services/productpage/cmd/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+archives:
+  - id: productpage
+    builds:
+      - productpage
+    name_template: "productpage_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+
+dockers:
+  - id: productpage-amd64
+    ids:
+      - productpage
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:{{ .Tag }}-amd64"
+    dockerfile: build/Dockerfile.productpage
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=productpage"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+  - id: productpage-arm64
+    ids:
+      - productpage
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:{{ .Tag }}-arm64"
+    dockerfile: build/Dockerfile.productpage
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=productpage"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+docker_manifests:
+  - name_template: "ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:{{ .Tag }}"
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:{{ .Tag }}-amd64"
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/productpage:{{ .Tag }}-arm64"
+
+changelog:
+  use: github

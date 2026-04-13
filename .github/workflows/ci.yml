@@ -59,8 +59,24 @@ jobs:
       - name: Run tests with race detector
         run: make test-race
 
-      - name: Run tests with coverage
+      - name: Run tests with coverage (combined)
         run: make test-cover
+
+      - name: Generate per-service coverage profiles
+        run: |
+          set -euo pipefail
+          mkdir -p coverage
+          for svc in productpage details reviews ratings notification dlqueue; do
+            go test -coverprofile="coverage/coverage-$svc.out" "./services/$svc/..." || \
+              echo "mode: set" > "coverage/coverage-$svc.out"
+          done
+
+      - name: Upload per-service coverage profiles
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-per-service
+          path: coverage/coverage-*.out
+          retention-days: 7
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -207,3 +223,63 @@ jobs:
 
       - name: Run E2E tests with PostgreSQL backend
         run: make e2e-postgres
+
+  coverage-badges:
+    name: Publish coverage badges
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download per-service coverage profiles
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-per-service
+          path: coverage
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.2"
+
+      - name: Generate badge JSON
+        run: |
+          set -euo pipefail
+          mkdir -p .github/badges
+          color_for() {
+            local pct=$1
+            local n=${pct%.*}
+            if   [ "$n" -ge 80 ]; then echo brightgreen
+            elif [ "$n" -ge 70 ]; then echo green
+            elif [ "$n" -ge 60 ]; then echo yellowgreen
+            elif [ "$n" -ge 50 ]; then echo yellow
+            elif [ "$n" -ge 40 ]; then echo orange
+            else                       echo red
+            fi
+          }
+          for svc in productpage details reviews ratings notification dlqueue; do
+            profile="coverage/coverage-$svc.out"
+            if [ ! -s "$profile" ] || [ "$(wc -l < "$profile")" -le 1 ]; then
+              pct="0.0"
+            else
+              pct=$(go tool cover -func="$profile" | awk '/^total:/ {gsub(/%/,"",$3); print $3}')
+              if [ -z "$pct" ]; then pct="0.0"; fi
+            fi
+            color=$(color_for "$pct")
+            printf '{"schemaVersion":1,"label":"coverage","message":"%s%%","color":"%s","cacheSeconds":60}\n' \
+              "$pct" "$color" > ".github/badges/coverage-$svc.json"
+            echo "$svc -> $pct% ($color)"
+          done
+
+      - name: Commit updated badges
+        uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9 # v7.1.0
+        with:
+          commit_message: "chore(badges): update coverage [skip ci]"
+          file_pattern: ".github/badges/coverage-*.json"
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
+          commit_author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"

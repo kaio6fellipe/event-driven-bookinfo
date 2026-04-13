@@ -232,14 +232,16 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout
+      - name: Checkout badges branch
         uses: actions/checkout@v4
+        with:
+          ref: badges
 
       - name: Download per-service coverage profiles
         uses: actions/download-artifact@v4
         with:
           name: coverage-per-service
-          path: coverage
+          path: ${{ runner.temp }}/coverage
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -249,7 +251,6 @@ jobs:
       - name: Generate badge JSON
         run: |
           set -euo pipefail
-          mkdir -p .github/badges
           color_for() {
             local pct=$1
             local n=${pct%.*}
@@ -262,7 +263,7 @@ jobs:
             fi
           }
           for svc in productpage details reviews ratings notification dlqueue; do
-            profile="coverage/coverage-$svc.out"
+            profile="${RUNNER_TEMP}/coverage/coverage-$svc.out"
             if [ ! -s "$profile" ] || [ "$(wc -l < "$profile")" -le 1 ]; then
               pct="0.0"
             else
@@ -271,15 +272,16 @@ jobs:
             fi
             color=$(color_for "$pct")
             printf '{"schemaVersion":1,"label":"coverage","message":"%s%%","color":"%s","cacheSeconds":60}\n' \
-              "$pct" "$color" > ".github/badges/coverage-$svc.json"
+              "$pct" "$color" > "coverage-$svc.json"
             echo "$svc -> $pct% ($color)"
           done
 
       - name: Commit updated badges
         uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9 # v7.1.0
         with:
+          branch: badges
           commit_message: "chore(badges): update coverage [skip ci]"
-          file_pattern: ".github/badges/coverage-*.json"
+          file_pattern: "coverage-*.json"
           commit_user_name: "github-actions[bot]"
           commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
           commit_author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"

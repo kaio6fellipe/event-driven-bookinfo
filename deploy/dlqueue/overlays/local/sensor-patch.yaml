@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: dlq-event-received-sensor
+spec:
+  template:
+    container:
+      env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+        - name: OTEL_SERVICE_NAME
+          value: "dlq-event-received-sensor"
+  triggers:
+    - template:
+        name: ingest-dlq-event
+        http:
+          url: http://dlqueue-write.bookinfo.svc.cluster.local/v1/events

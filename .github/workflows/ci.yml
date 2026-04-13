@@ -59,8 +59,24 @@ jobs:
       - name: Run tests with race detector
         run: make test-race
 
-      - name: Run tests with coverage
+      - name: Run tests with coverage (combined)
         run: make test-cover
+
+      - name: Generate per-service coverage profiles
+        run: |
+          set -euo pipefail
+          mkdir -p coverage
+          for svc in productpage details reviews ratings notification dlqueue; do
+            go test -coverprofile="coverage/coverage-$svc.out" "./services/$svc/..." || \
+              echo "mode: set" > "coverage/coverage-$svc.out"
+          done
+
+      - name: Upload per-service coverage profiles
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-per-service
+          path: coverage/coverage-*.out
+          retention-days: 7
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4

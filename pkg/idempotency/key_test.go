@@ -7,40 +7,29 @@ import (
 )
 
 func TestNaturalKey(t *testing.T) {
+	// Compute expected value so the test doesn't hard-code a brittle digest.
+	const wantLength = 64
+
 	tests := []struct {
 		name   string
 		fields []string
-		want   string
 	}{
-		{
-			name:   "single field",
-			fields: []string{"hello"},
-			want:   "", // length check only
-		},
-		{
-			name:   "same fields produce same key",
-			fields: []string{"a", "b", "c"},
-			want:   "",
-		},
+		{name: "single field", fields: []string{"hello"}},
+		{name: "three fields", fields: []string{"a", "b", "c"}},
+		{name: "empty field list", fields: nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := idempotency.NaturalKey(tt.fields...)
-			if len(got) != 64 {
-				t.Errorf("key length = %d, want 64 (SHA-256 hex)", len(got))
+			if len(got) != wantLength {
+				t.Errorf("key length = %d, want %d (SHA-256 hex)", len(got), wantLength)
 			}
-			if tt.want != "" && got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
+			// Determinism: calling again with same inputs returns same output.
+			again := idempotency.NaturalKey(tt.fields...)
+			if got != again {
+				t.Errorf("non-deterministic: %q != %q", got, again)
 			}
 		})
-	}
-}
-
-func TestNaturalKey_Deterministic(t *testing.T) {
-	k1 := idempotency.NaturalKey("a", "b", "c")
-	k2 := idempotency.NaturalKey("a", "b", "c")
-	if k1 != k2 {
-		t.Errorf("expected deterministic output, got %q and %q", k1, k2)
 	}
 }
 
@@ -84,11 +73,15 @@ func TestResolve(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := idempotency.Resolve(tt.explicitKey, tt.fields...)
-			if tt.wantExplicit && got != tt.explicitKey {
-				t.Errorf("got %q, want explicit key %q", got, tt.explicitKey)
+			if tt.wantExplicit {
+				if got != tt.explicitKey {
+					t.Errorf("got %q, want explicit key %q", got, tt.explicitKey)
+				}
+				return
 			}
-			if !tt.wantExplicit && got == tt.explicitKey {
-				t.Error("expected natural key, got explicit (or empty)")
+			want := idempotency.NaturalKey(tt.fields...)
+			if got != want {
+				t.Errorf("got %q, want natural key %q", got, want)
 			}
 		})
 	}

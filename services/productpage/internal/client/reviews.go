@@ -119,11 +119,12 @@ func (c *ReviewsClient) DeleteReview(ctx context.Context, reviewID string) error
 }
 
 // SubmitReview creates a new review for a product.
-func (c *ReviewsClient) SubmitReview(ctx context.Context, productID, reviewer, text string) error {
+func (c *ReviewsClient) SubmitReview(ctx context.Context, productID, reviewer, text, idempotencyKey string) error {
 	body := map[string]string{
-		"product_id": productID,
-		"reviewer":   reviewer,
-		"text":       text,
+		"product_id":      productID,
+		"reviewer":        reviewer,
+		"text":            text,
+		"idempotency_key": idempotencyKey,
 	}
 
 	jsonBody, err := json.Marshal(body)

@@ -14,9 +14,10 @@ import (
 
 // SubmitRatingRequest represents the request body for submitting a rating.
 type SubmitRatingRequest struct {
-	ProductID string `json:"product_id"`
-	Reviewer  string `json:"reviewer"`
-	Stars     int    `json:"stars"`
+	ProductID      string `json:"product_id"`
+	Reviewer       string `json:"reviewer"`
+	Stars          int    `json:"stars"`
+	IdempotencyKey string `json:"idempotency_key"`
 }
 
 // RatingResponse represents a single rating from the ratings service.
@@ -45,11 +46,12 @@ func NewRatingsClient(baseURL string) *RatingsClient {
 }
 
 // SubmitRating submits a new rating to the ratings service.
-func (c *RatingsClient) SubmitRating(ctx context.Context, productID, reviewer string, stars int) (*RatingResponse, error) {
+func (c *RatingsClient) SubmitRating(ctx context.Context, productID, reviewer string, stars int, idempotencyKey string) (*RatingResponse, error) {
 	reqBody := SubmitRatingRequest{
-		ProductID: productID,
-		Reviewer:  reviewer,
-		Stars:     stars,
+		ProductID:      productID,
+		Reviewer:       reviewer,
+		Stars:          stars,
+		IdempotencyKey: idempotencyKey,
 	}
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {

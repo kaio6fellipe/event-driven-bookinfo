@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/google/uuid"
+
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/productpage/internal/client"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/productpage/internal/model"
@@ -290,7 +292,9 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.ratingsClient.SubmitRating(r.Context(), productID, reviewer, stars)
+	idempotencyKey := uuid.NewString()
+
+	_, err = h.ratingsClient.SubmitRating(r.Context(), productID, reviewer, stars, idempotencyKey)
 	if err != nil {
 		logger.Warn("failed to submit rating", "error", err)
 		w.WriteHeader(http.StatusOK)
@@ -302,7 +306,7 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if reviewText != "" {
-		if err := h.reviewsClient.SubmitReview(r.Context(), productID, reviewer, reviewText); err != nil {
+		if err := h.reviewsClient.SubmitReview(r.Context(), productID, reviewer, reviewText, idempotencyKey); err != nil {
 			logger.Warn("failed to submit review", "error", err)
 		}
 

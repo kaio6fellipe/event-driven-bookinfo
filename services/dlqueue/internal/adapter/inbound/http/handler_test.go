@@ -23,7 +23,7 @@ func (fakeReplay) Replay(_ context.Context, _ string, _ []byte, _ map[string][]s
 func newServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	repo := memory.NewDLQRepository()
-	svc := service.NewDLQService(repo, fakeReplay{}, 3)
+	svc := service.NewDLQService(repo, fakeReplay{}, 3, nil)
 	h := dlqhttp.NewHandler(svc)
 	mux := stdhttp.NewServeMux()
 	h.RegisterRoutes(mux)

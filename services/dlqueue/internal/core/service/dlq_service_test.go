@@ -48,7 +48,7 @@ func newParams(eventID string) port.IngestEventParams {
 func TestIngest_NewEvent(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
-	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3, nil)
 
 	e, err := svc.IngestEvent(ctx, newParams("evt-1"))
 	if err != nil {
@@ -65,7 +65,7 @@ func TestIngest_NewEvent(t *testing.T) {
 func TestIngest_Duplicate_IncrementsRetry(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
-	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3, nil)
 
 	// First ingest.
 	e1, _ := svc.IngestEvent(ctx, newParams("evt-1"))
@@ -94,7 +94,7 @@ func TestReplay_HappyPath(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
 	client := &fakeReplayClient{}
-	svc := service.NewDLQService(repo, client, 3)
+	svc := service.NewDLQService(repo, client, 3, nil)
 
 	e, _ := svc.IngestEvent(ctx, newParams("evt-1"))
 	got, err := svc.ReplayEvent(ctx, e.ID)
@@ -115,7 +115,7 @@ func TestReplay_HappyPath(t *testing.T) {
 func TestResolve(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
-	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3, nil)
 
 	e, _ := svc.IngestEvent(ctx, newParams("evt-1"))
 	_, _ = svc.ReplayEvent(ctx, e.ID)
@@ -134,7 +134,7 @@ func TestResolve(t *testing.T) {
 func TestResetPoisoned(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
-	svc := service.NewDLQService(repo, &fakeReplayClient{}, 1) // max=1 → first ReIngest poisons
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 1, nil) // max=1 → first ReIngest poisons
 
 	e, _ := svc.IngestEvent(ctx, newParams("evt-1"))
 	_, _ = svc.ReplayEvent(ctx, e.ID)
@@ -160,7 +160,7 @@ func TestBatchReplay(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
 	client := &fakeReplayClient{}
-	svc := service.NewDLQService(repo, client, 3)
+	svc := service.NewDLQService(repo, client, 3, nil)
 
 	// 3 distinct pending events — distinct sensor OR trigger OR payload to avoid dedup.
 	for i := 0; i < 3; i++ {
@@ -185,7 +185,7 @@ func TestBatchReplay(t *testing.T) {
 func TestBatchResolve(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
-	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3, nil)
 
 	var ids []string
 	for i := 0; i < 3; i++ {
@@ -209,7 +209,7 @@ func TestBatchResolve(t *testing.T) {
 func TestGetEvent(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
-	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3, nil)
 
 	saved, _ := svc.IngestEvent(ctx, newParams("evt-1"))
 
@@ -230,7 +230,7 @@ func TestGetEvent(t *testing.T) {
 func TestListEvents(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
-	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3, nil)
 
 	p1 := newParams("evt-1")
 	p2 := newParams("evt-2")
@@ -260,7 +260,7 @@ func TestReplay_ReplayerError(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
 	client := &fakeReplayClient{err: errors.New("transport failure")}
-	svc := service.NewDLQService(repo, client, 3)
+	svc := service.NewDLQService(repo, client, 3, nil)
 
 	e, _ := svc.IngestEvent(ctx, newParams("evt-1"))
 
@@ -285,7 +285,7 @@ func TestReplay_ReplayerError(t *testing.T) {
 func TestReplayEvent_NotFound(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
-	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3, nil)
 
 	_, err := svc.ReplayEvent(ctx, "no-such-id")
 	if !errors.Is(err, domain.ErrNotFound) {
@@ -296,7 +296,7 @@ func TestReplayEvent_NotFound(t *testing.T) {
 func TestReplayEvent_InvalidTransition(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
-	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3, nil)
 
 	e, _ := svc.IngestEvent(ctx, newParams("evt-1"))
 	// Replay once to move to replayed state.
@@ -311,7 +311,7 @@ func TestReplayEvent_InvalidTransition(t *testing.T) {
 func TestResolveEvent_NotFound(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
-	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3, nil)
 
 	_, err := svc.ResolveEvent(ctx, "no-such-id", "operator")
 	if !errors.Is(err, domain.ErrNotFound) {
@@ -322,7 +322,7 @@ func TestResolveEvent_NotFound(t *testing.T) {
 func TestResetPoisoned_NotFound(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
-	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3, nil)
 
 	_, err := svc.ResetPoisoned(ctx, "no-such-id")
 	if !errors.Is(err, domain.ErrNotFound) {
@@ -334,7 +334,7 @@ func TestBatchReplay_TransportError(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
 	client := &fakeReplayClient{err: errors.New("transport failure")}
-	svc := service.NewDLQService(repo, client, 3)
+	svc := service.NewDLQService(repo, client, 3, nil)
 
 	p := newParams("evt-1")
 	_, _ = svc.IngestEvent(ctx, p)
@@ -351,7 +351,7 @@ func TestBatchReplay_TransportError(t *testing.T) {
 func TestBatchResolve_AlreadyResolved(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDLQRepository()
-	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3, nil)
 
 	e, _ := svc.IngestEvent(ctx, newParams("evt-1"))
 	_, _ = svc.ResolveEvent(ctx, e.ID, "first")

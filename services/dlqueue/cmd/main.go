@@ -23,6 +23,7 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/dlqueue/internal/adapter/outbound/postgres"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/dlqueue/internal/core/port"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/dlqueue/internal/core/service"
+	dlqmetrics "github.com/kaio6fellipe/event-driven-bookinfo/services/dlqueue/internal/metrics"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/dlqueue/migrations"
 )
 
@@ -59,6 +60,12 @@ func main() {
 	defer stopProfiler()
 
 	metrics.RegisterRuntimeMetrics()
+
+	dlqMetrics, err := dlqmetrics.New(cfg.ServiceName)
+	if err != nil {
+		logger.Error("failed to create dlq metrics", "error", err)
+		os.Exit(1)
+	}
 
 	maxRetries := defaultMaxRetries
 	if v := os.Getenv("MAX_RETRIES"); v != "" {
@@ -97,7 +104,7 @@ func main() {
 	}
 
 	replayClient := replayhttp.NewReplayClient(nil)
-	svc := service.NewDLQService(repo, replayClient, maxRetries)
+	svc := service.NewDLQService(repo, replayClient, maxRetries, dlqMetrics)
 	h := handler.NewHandler(svc)
 
 	registerRoutes := func(mux *stdhttp.ServeMux) {

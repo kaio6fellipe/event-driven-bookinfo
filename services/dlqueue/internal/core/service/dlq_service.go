@@ -9,6 +9,7 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/dlqueue/internal/core/domain"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/dlqueue/internal/core/port"
+	dlqmetrics "github.com/kaio6fellipe/event-driven-bookinfo/services/dlqueue/internal/metrics"
 )
 
 // DLQService implements port.DLQService.
@@ -16,14 +17,15 @@ type DLQService struct {
 	repo       port.DLQRepository
 	replayer   port.EventReplayClient
 	maxRetries int
+	metrics    *dlqmetrics.Metrics
 }
 
 // NewDLQService constructs a DLQService.
-func NewDLQService(repo port.DLQRepository, replayer port.EventReplayClient, maxRetries int) *DLQService {
+func NewDLQService(repo port.DLQRepository, replayer port.EventReplayClient, maxRetries int, m *dlqmetrics.Metrics) *DLQService {
 	if maxRetries < 1 {
 		maxRetries = 3
 	}
-	return &DLQService{repo: repo, replayer: replayer, maxRetries: maxRetries}
+	return &DLQService{repo: repo, replayer: replayer, maxRetries: maxRetries, metrics: m}
 }
 
 // IngestEvent persists a newly-received DLQ event or deduplicates against an
@@ -53,6 +55,12 @@ func (s *DLQService) IngestEvent(ctx context.Context, p port.IngestEventParams) 
 			"status", existing.Status,
 			"is_duplicate", true,
 		)
+		if s.metrics != nil {
+			s.metrics.Ingested().Add(ctx, existing.EventSource, existing.SensorName, existing.FailedTrigger)
+			if existing.Status == domain.StatusPoisoned {
+				s.metrics.Poisoned().Add(ctx, existing.EventSource, existing.SensorName)
+			}
+		}
 		return existing, nil
 	case errors.Is(err, domain.ErrNotFound):
 		// New event.
@@ -84,6 +92,12 @@ func (s *DLQService) IngestEvent(ctx context.Context, p port.IngestEventParams) 
 			"failed_trigger", e.FailedTrigger,
 			"is_duplicate", false,
 		)
+		if s.metrics != nil {
+			s.metrics.Ingested().Add(ctx, e.EventSource, e.SensorName, e.FailedTrigger)
+			if e.Status == domain.StatusPoisoned {
+				s.metrics.Poisoned().Add(ctx, e.EventSource, e.SensorName)
+			}
+		}
 		return e, nil
 	default:
 		return nil, fmt.Errorf("lookup by natural key: %w", err)
@@ -124,6 +138,9 @@ func (s *DLQService) ReplayEvent(ctx context.Context, id string) (*domain.DLQEve
 		"eventsource_url", e.EventSourceURL,
 		"retry_count", e.RetryCount,
 	)
+	if s.metrics != nil {
+		s.metrics.Replayed().Add(ctx, e.EventSource, e.SensorName)
+	}
 	return e, nil
 }
 
@@ -145,6 +162,9 @@ func (s *DLQService) ResolveEvent(ctx context.Context, id, resolvedBy string) (*
 		"dlq_event_id", e.ID,
 		"resolved_by", resolvedBy,
 	)
+	if s.metrics != nil {
+		s.metrics.Resolved().Add(ctx, e.EventSource, resolvedBy)
+	}
 	return e, nil
 }
 

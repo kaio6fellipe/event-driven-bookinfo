@@ -28,3 +28,25 @@ func TestDispatch_Idempotent(t *testing.T) {
 		t.Errorf("second: err = %v, want ErrAlreadyProcessed", err)
 	}
 }
+
+func TestDispatch_NaturalKey(t *testing.T) {
+	ctx := context.Background()
+	repo := memory.NewNotificationRepository()
+	dispatcher := log.NewDispatcher()
+	svc := service.NewNotificationService(repo, dispatcher, idempotency.NewMemoryStore())
+
+	_, err := svc.Dispatch(ctx, "bob@example.com", domain.ChannelEmail, "New Review", "A review was posted", "")
+	if err != nil {
+		t.Fatalf("first dispatch err = %v", err)
+	}
+
+	_, err = svc.Dispatch(ctx, "bob@example.com", domain.ChannelEmail, "New Review", "A review was posted", "")
+	if !errors.Is(err, service.ErrAlreadyProcessed) {
+		t.Errorf("duplicate natural key: err = %v, want ErrAlreadyProcessed", err)
+	}
+
+	_, err = svc.Dispatch(ctx, "bob@example.com", domain.ChannelEmail, "New Review", "A different review was posted", "")
+	if err != nil {
+		t.Errorf("different body should succeed, got err = %v", err)
+	}
+}

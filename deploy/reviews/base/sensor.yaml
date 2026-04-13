@@ -25,9 +25,75 @@ spec:
                 dependencyName: review-submitted-dep
                 dataKey: body
               dest: ""
+      atLeastOnce: true
       retryStrategy:
         steps: 3
         duration: 2s
+        factor: 2.0
+        jitter: 1
+      dlqTrigger:
+        template:
+          name: dlq-create-review
+          http:
+            url: http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/dlq-event-received
+            method: POST
+            headers:
+              Content-Type: application/json
+            payload:
+              - src:
+                  dependencyName: review-submitted-dep
+                  dataKey: body
+                dest: original_payload
+              - src:
+                  dependencyName: review-submitted-dep
+                  contextKey: id
+                dest: event_id
+              - src:
+                  dependencyName: review-submitted-dep
+                  contextKey: type
+                dest: event_type
+              - src:
+                  dependencyName: review-submitted-dep
+                  contextKey: source
+                dest: event_source
+              - src:
+                  dependencyName: review-submitted-dep
+                  contextKey: subject
+                dest: event_subject
+              - src:
+                  dependencyName: review-submitted-dep
+                  contextKey: time
+                dest: event_timestamp
+              - src:
+                  dependencyName: review-submitted-dep
+                  contextKey: datacontenttype
+                dest: datacontenttype
+              - src:
+                  dependencyName: review-submitted-dep
+                  dataKey: header
+                dest: original_headers
+              - src:
+                  dependencyName: review-submitted-dep
+                  value: "review-submitted-sensor"
+                dest: sensor_name
+              - src:
+                  dependencyName: review-submitted-dep
+                  value: "create-review"
+                dest: failed_trigger
+              - src:
+                  dependencyName: review-submitted-dep
+                  value: "http://review-submitted-eventsource-svc.bookinfo.svc.cluster.local:12001/review-submitted"
+                dest: eventsource_url
+              - src:
+                  dependencyName: review-submitted-dep
+                  value: "bookinfo"
+                dest: namespace
+        atLeastOnce: true
+        retryStrategy:
+          steps: 5
+          duration: 2s
+          factor: 2.0
+          jitter: 1
     - template:
         name: notify-review-submitted
         conditions: review-submitted-dep
@@ -53,9 +119,75 @@ spec:
                 dependencyName: review-submitted-dep
                 value: "email"
               dest: channel
+      atLeastOnce: true
       retryStrategy:
         steps: 3
         duration: 2s
+        factor: 2.0
+        jitter: 1
+      dlqTrigger:
+        template:
+          name: dlq-notify-review-submitted
+          http:
+            url: http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/dlq-event-received
+            method: POST
+            headers:
+              Content-Type: application/json
+            payload:
+              - src:
+                  dependencyName: review-submitted-dep
+                  dataKey: body
+                dest: original_payload
+              - src:
+                  dependencyName: review-submitted-dep
+                  contextKey: id
+                dest: event_id
+              - src:
+                  dependencyName: review-submitted-dep
+                  contextKey: type
+                dest: event_type
+              - src:
+                  dependencyName: review-submitted-dep
+                  contextKey: source
+                dest: event_source
+              - src:
+                  dependencyName: review-submitted-dep
+                  contextKey: subject
+                dest: event_subject
+              - src:
+                  dependencyName: review-submitted-dep
+                  contextKey: time
+                dest: event_timestamp
+              - src:
+                  dependencyName: review-submitted-dep
+                  contextKey: datacontenttype
+                dest: datacontenttype
+              - src:
+                  dependencyName: review-submitted-dep
+                  dataKey: header
+                dest: original_headers
+              - src:
+                  dependencyName: review-submitted-dep
+                  value: "review-submitted-sensor"
+                dest: sensor_name
+              - src:
+                  dependencyName: review-submitted-dep
+                  value: "notify-review-submitted"
+                dest: failed_trigger
+              - src:
+                  dependencyName: review-submitted-dep
+                  value: "http://review-submitted-eventsource-svc.bookinfo.svc.cluster.local:12001/review-submitted"
+                dest: eventsource_url
+              - src:
+                  dependencyName: review-submitted-dep
+                  value: "bookinfo"
+                dest: namespace
+        atLeastOnce: true
+        retryStrategy:
+          steps: 5
+          duration: 2s
+          factor: 2.0
+          jitter: 1
     - template:
         name: delete-review
         conditions: review-deleted-dep
@@ -69,9 +201,75 @@ spec:
                 dependencyName: review-deleted-dep
                 dataKey: body.review_id
               dest: review_id
+      atLeastOnce: true
       retryStrategy:
         steps: 3
         duration: 2s
+        factor: 2.0
+        jitter: 1
+      dlqTrigger:
+        template:
+          name: dlq-delete-review
+          http:
+            url: http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/dlq-event-received
+            method: POST
+            headers:
+              Content-Type: application/json
+            payload:
+              - src:
+                  dependencyName: review-deleted-dep
+                  dataKey: body
+                dest: original_payload
+              - src:
+                  dependencyName: review-deleted-dep
+                  contextKey: id
+                dest: event_id
+              - src:
+                  dependencyName: review-deleted-dep
+                  contextKey: type
+                dest: event_type
+              - src:
+                  dependencyName: review-deleted-dep
+                  contextKey: source
+                dest: event_source
+              - src:
+                  dependencyName: review-deleted-dep
+                  contextKey: subject
+                dest: event_subject
+              - src:
+                  dependencyName: review-deleted-dep
+                  contextKey: time
+                dest: event_timestamp
+              - src:
+                  dependencyName: review-deleted-dep
+                  contextKey: datacontenttype
+                dest: datacontenttype
+              - src:
+                  dependencyName: review-deleted-dep
+                  dataKey: header
+                dest: original_headers
+              - src:
+                  dependencyName: review-deleted-dep
+                  value: "review-submitted-sensor"
+                dest: sensor_name
+              - src:
+                  dependencyName: review-deleted-dep
+                  value: "delete-review"
+                dest: failed_trigger
+              - src:
+                  dependencyName: review-deleted-dep
+                  value: "http://review-deleted-eventsource-svc.bookinfo.svc.cluster.local:12003/review-deleted"
+                dest: eventsource_url
+              - src:
+                  dependencyName: review-deleted-dep
+                  value: "bookinfo"
+                dest: namespace
+        atLeastOnce: true
+        retryStrategy:
+          steps: 5
+          duration: 2s
+          factor: 2.0
+          jitter: 1
     - template:
         name: notify-review-deleted
         conditions: review-deleted-dep
@@ -97,6 +295,72 @@ spec:
                 dependencyName: review-deleted-dep
                 value: "email"
               dest: channel
+      atLeastOnce: true
       retryStrategy:
         steps: 3
         duration: 2s
+        factor: 2.0
+        jitter: 1
+      dlqTrigger:
+        template:
+          name: dlq-notify-review-deleted
+          http:
+            url: http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/dlq-event-received
+            method: POST
+            headers:
+              Content-Type: application/json
+            payload:
+              - src:
+                  dependencyName: review-deleted-dep
+                  dataKey: body
+                dest: original_payload
+              - src:
+                  dependencyName: review-deleted-dep
+                  contextKey: id
+                dest: event_id
+              - src:
+                  dependencyName: review-deleted-dep
+                  contextKey: type
+                dest: event_type
+              - src:
+                  dependencyName: review-deleted-dep
+                  contextKey: source
+                dest: event_source
+              - src:
+                  dependencyName: review-deleted-dep
+                  contextKey: subject
+                dest: event_subject
+              - src:
+                  dependencyName: review-deleted-dep
+                  contextKey: time
+                dest: event_timestamp
+              - src:
+                  dependencyName: review-deleted-dep
+                  contextKey: datacontenttype
+                dest: datacontenttype
+              - src:
+                  dependencyName: review-deleted-dep
+                  dataKey: header
+                dest: original_headers
+              - src:
+                  dependencyName: review-deleted-dep
+                  value: "review-submitted-sensor"
+                dest: sensor_name
+              - src:
+                  dependencyName: review-deleted-dep
+                  value: "notify-review-deleted"
+                dest: failed_trigger
+              - src:
+                  dependencyName: review-deleted-dep
+                  value: "http://review-deleted-eventsource-svc.bookinfo.svc.cluster.local:12003/review-deleted"
+                dest: eventsource_url
+              - src:
+                  dependencyName: review-deleted-dep
+                  value: "bookinfo"
+                dest: namespace
+        atLeastOnce: true
+        retryStrategy:
+          steps: 5
+          duration: 2s
+          factor: 2.0
+          jitter: 1

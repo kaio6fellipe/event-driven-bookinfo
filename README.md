@@ -20,6 +20,10 @@ flowchart LR
         WriteDB[(Write DB)]
     end
 
+    subgraph "Failure Recovery"
+        DLQ[(DLQueue)]
+    end
+
     User -->|GET Query| Gateway
     User -->|POST Command| Gateway
 
@@ -34,13 +38,18 @@ flowchart LR
 
     WriteDB -.->|replication| ReadDB
 
+    Sensor -.->|dlqTrigger<br/>retries exhausted| DLQ
+    DLQ -.->|replay| Webhook
+
     classDef queryStyle fill:#1e3a8a,stroke:#3b82f6,color:#fff
     classDef writeStyle fill:#7c2d12,stroke:#f97316,color:#fff
     classDef infraStyle fill:#1f2937,stroke:#06b6d4,color:#fff
+    classDef dlqStyle fill:#4a044e,stroke:#c026d3,color:#fff
 
     class ReadAPI,ReadDB queryStyle
     class WriteSvc,WriteDB writeStyle
     class Gateway,Webhook,Kafka,Sensor infraStyle
+    class DLQ dlqStyle
 ```
 
 Go hexagonal architecture monorepo adapting Istio's Bookinfo as a book review system, demonstrating real-time event-driven architecture with Argo Events and Kafka.
@@ -58,6 +67,7 @@ graph TD
     R["reviews<br/>:8082 / :9092"]
     RT["ratings<br/>:8083 / :9093"]
     N["notification<br/>:8084 / :9094<br/><i>event consumer only</i>"]
+    DLQ["dlqueue<br/>:8085 / :9095<br/><i>failure capture + replay</i>"]
     Redis["Redis<br/><i>pending review cache</i>"]
 
     PP -->|sync GET| D
@@ -70,6 +80,7 @@ graph TD
     style R fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
     style RT fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
     style N fill:#1a1d27,color:#e4e4e7,stroke:#f59e0b
+    style DLQ fill:#1a1d27,color:#e4e4e7,stroke:#a855f7
     style Redis fill:#ef4444,color:#fff,stroke:#dc2626
 ```
 
@@ -95,6 +106,10 @@ graph TD
     N2["notification<br/>POST /v1/notifications"]
     N3["notification<br/>POST /v1/notifications"]
 
+    DLQES["dlq-event-received<br/>EventSource"]
+    DLQS["Sensor: dlq-event-received"]
+    DLQW["dlqueue-write<br/>POST /v1/events"]
+
     Browser --> PP
     PP -->|"POST /v1/* via gateway"| GW
     WH --> GW
@@ -114,6 +129,14 @@ graph TD
     S3 -->|HTTP Trigger| RT
     S3 -->|HTTP Trigger| N3
 
+    S1 -.->|"dlqTrigger (retries exhausted)"| DLQES
+    S2 -.->|"dlqTrigger (retries exhausted)"| DLQES
+    S3 -.->|"dlqTrigger (retries exhausted)"| DLQES
+    DLQES --> K
+    K --> DLQS
+    DLQS -->|HTTP Trigger| DLQW
+    DLQW -.->|replay via POST to eventsource_url| WH
+
     style Browser fill:#6366f1,color:#fff,stroke:#818cf8
     style PP fill:#6366f1,color:#fff,stroke:#818cf8
     style GW fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
@@ -123,6 +146,9 @@ graph TD
     style S1 fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
     style S2 fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
     style S3 fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
+    style DLQES fill:#22c55e,color:#fff,stroke:#16a34a
+    style DLQS fill:#1a1d27,color:#e4e4e7,stroke:#a855f7
+    style DLQW fill:#1a1d27,color:#e4e4e7,stroke:#a855f7
 ```
 
 Reads are synchronous HTTP calls between services. Writes are fully async via the Envoy Gateway's method-based CQRS routing — POST requests are routed to Argo Events webhook EventSources, which publish to the Kafka EventBus. Sensors consume events and fire HTTP triggers against the write services. The gateway acts as the CQRS boundary, while services remain plain HTTP servers with no Kafka dependency.
@@ -357,6 +383,9 @@ graph TD
         RTW["ratings-write"]
         N["notification"]
 
+        DLQR["dlqueue"]
+        DLQW["dlqueue-write"]
+
         ES["EventSources"]
         EB["EventBus"]
         S["Sensors"]
@@ -389,15 +418,16 @@ graph TD
     S -->|trigger| RW
     S -->|trigger| RTW
     S -->|trigger| N
+    S -->|"dlqTrigger<br/>(on failure)"| DLQW
 
-    DR & DW & RR & RW & RTR & RTW & N --> PG
+    DR & DW & RR & RW & RTR & RTW & N & DLQR & DLQW --> PG
     PP --> Redis
 
     Alloy -.->|scrape :9090/metrics| PP
     Alloy -.->|OTLP traces| Tempo
     Alloy -.->|remote_write| Prom
     Alloy -.->|push logs| Loki
-    PP & DR & DW & RR & RW & RTR & RTW & N -.->|push profiles| Pyro
+    PP & DR & DW & RR & RW & RTR & RTW & N & DLQR & DLQW -.->|push profiles| Pyro
     Prom & Tempo & Loki & Pyro --> Grafana
 
     style Browser fill:#6366f1,color:#fff,stroke:#818cf8
@@ -409,6 +439,8 @@ graph TD
     style ES fill:#22c55e,color:#fff,stroke:#16a34a
     style S fill:#22c55e,color:#fff,stroke:#16a34a
     style ArgoCtrl fill:#22c55e,color:#fff,stroke:#16a34a
+    style DLQR fill:#1a1d27,color:#e4e4e7,stroke:#a855f7
+    style DLQW fill:#1a1d27,color:#e4e4e7,stroke:#a855f7
     style Grafana fill:#e879f9,color:#000,stroke:#c026d3
     style PG fill:#3b82f6,color:#fff,stroke:#2563eb
     style Redis fill:#ef4444,color:#fff,stroke:#dc2626
@@ -421,7 +453,7 @@ The cluster (`bookinfo-local`) runs four namespaces:
 | `platform` | Strimzi operator, Kafka (KRaft single-node), Argo Events controller, EventBus, Gateway `default-gw` |
 | `envoy-gateway-system` | Envoy Gateway controller, GatewayClass `eg`, stable `gateway` Service for CQRS routing |
 | `observability` | Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy (DaemonSet for logs + Deployment for metrics/traces) |
-| `bookinfo` | 8 app deployments (CQRS split), PostgreSQL, 3 EventSources, 3 Sensors, method-based HTTPRoutes |
+| `bookinfo` | 10 app deployments (CQRS split incl. dlqueue read/write), PostgreSQL, 4 EventSources (incl. `dlq-event-received`), 4 Sensors (incl. DLQ), method-based HTTPRoutes |
 
 ### CQRS Deployment Split
 

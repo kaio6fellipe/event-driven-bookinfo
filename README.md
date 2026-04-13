@@ -1,5 +1,15 @@
 <h1 align="center">Event-Driven Bookinfo</h1>
 
+<p align="center">
+  <a href="https://github.com/kaio6fellipe/event-driven-bookinfo/actions/workflows/ci.yml?query=branch%3Amain"><img src="https://github.com/kaio6fellipe/event-driven-bookinfo/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
+  <a href="https://pkg.go.dev/github.com/kaio6fellipe/event-driven-bookinfo"><img src="https://pkg.go.dev/badge/github.com/kaio6fellipe/event-driven-bookinfo.svg" alt="Go Reference" /></a>
+  <a href="https://goreportcard.com/report/github.com/kaio6fellipe/event-driven-bookinfo"><img src="https://goreportcard.com/badge/github.com/kaio6fellipe/event-driven-bookinfo" alt="Go Report Card" /></a>
+  <a href="https://go.dev/"><img src="https://img.shields.io/github/go-mod/go-version/kaio6fellipe/event-driven-bookinfo?color=%239F50DA&label=Go" alt="Go Version" /></a>
+  <a href="https://unlicense.org/"><img src="https://img.shields.io/badge/license-Unlicense-blue.svg" alt="License" /></a>
+  <a href="https://securityscorecards.dev/viewer/?uri=github.com/kaio6fellipe/event-driven-bookinfo"><img src="https://api.securityscorecards.dev/projects/github.com/kaio6fellipe/event-driven-bookinfo/badge" alt="OpenSSF Scorecard" /></a>
+  <a href="https://www.conventionalcommits.org"><img src="https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg" alt="Conventional Commits" /></a>
+</p>
+
 ```mermaid
 flowchart LR
     User([User])

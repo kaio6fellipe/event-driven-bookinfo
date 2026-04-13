@@ -10,6 +10,7 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/port"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/service"
 )
 
 const (
@@ -96,8 +97,13 @@ func (h *Handler) submitReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	review, err := h.svc.SubmitReview(r.Context(), req.ProductID, req.Reviewer, req.Text)
+	review, err := h.svc.SubmitReview(r.Context(), req.ProductID, req.Reviewer, req.Text, req.IdempotencyKey)
 	if err != nil {
+		if errors.Is(err, service.ErrAlreadyProcessed) {
+			logger.Info("duplicate submit skipped")
+			writeJSON(w, http.StatusOK, ErrorResponse{Error: "already processed"})
+			return
+		}
 		logger.Warn("failed to submit review", "error", err)
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return

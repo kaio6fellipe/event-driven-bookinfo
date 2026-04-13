@@ -3,25 +3,32 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/port"
 )
 
+// ErrAlreadyProcessed signals that an idempotent request was previously processed.
+var ErrAlreadyProcessed = errors.New("request already processed")
+
 // ReviewService implements the port.ReviewService interface.
 type ReviewService struct {
 	repo          port.ReviewRepository
 	ratingsClient port.RatingsClient
+	idempotency   idempotency.Store
 }
 
 // NewReviewService creates a new ReviewService.
-func NewReviewService(repo port.ReviewRepository, ratingsClient port.RatingsClient) *ReviewService {
+func NewReviewService(repo port.ReviewRepository, ratingsClient port.RatingsClient, idem idempotency.Store) *ReviewService {
 	return &ReviewService{
 		repo:          repo,
 		ratingsClient: ratingsClient,
+		idempotency:   idem,
 	}
 }
 
@@ -55,8 +62,21 @@ func (s *ReviewService) GetProductReviews(ctx context.Context, productID string,
 	return reviews, total, nil
 }
 
-// SubmitReview creates and persists a new review.
-func (s *ReviewService) SubmitReview(ctx context.Context, productID, reviewer, text string) (*domain.Review, error) {
+// SubmitReview creates and persists a new review. Deduplicates on idempotencyKey
+// (falls back to a natural key derived from productID+reviewer+text).
+func (s *ReviewService) SubmitReview(ctx context.Context, productID, reviewer, text, idempotencyKey string) (*domain.Review, error) {
+	key := idempotency.Resolve(idempotencyKey, productID, reviewer, text)
+
+	alreadyProcessed, err := s.idempotency.CheckAndRecord(ctx, key)
+	if err != nil {
+		return nil, fmt.Errorf("checking idempotency: %w", err)
+	}
+	if alreadyProcessed {
+		logger := logging.FromContext(ctx)
+		logger.Info("review submit skipped: already processed", slog.String("idempotency_key", key))
+		return nil, ErrAlreadyProcessed
+	}
+
 	review, err := domain.NewReview(productID, reviewer, text)
 	if err != nil {
 		return nil, fmt.Errorf("creating review: %w", err)

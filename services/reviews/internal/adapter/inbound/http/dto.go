@@ -3,9 +3,10 @@ package http //nolint:revive // package name matches directory convention
 
 // SubmitReviewRequest is the JSON body for POST /v1/reviews.
 type SubmitReviewRequest struct {
-	ProductID string `json:"product_id"`
-	Reviewer  string `json:"reviewer"`
-	Text      string `json:"text"`
+	ProductID      string `json:"product_id"`
+	Reviewer       string `json:"reviewer"`
+	Text           string `json:"text"`
+	IdempotencyKey string `json:"idempotency_key,omitempty"` // optional; falls back to natural key
 }
 
 // ReviewRatingResponse represents rating data embedded in a review response.

@@ -4,8 +4,10 @@ package service_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/memory"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/service"
@@ -23,9 +25,9 @@ func (s *stubRatingsClient) GetProductRatings(_ context.Context, _ string) (*dom
 func TestSubmitReview_Success(t *testing.T) {
 	repo := memory.NewReviewRepository()
 	client := &stubRatingsClient{}
-	svc := service.NewReviewService(repo, client)
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
 
-	review, err := svc.SubmitReview(context.Background(), "product-1", "alice", "Great book!")
+	review, err := svc.SubmitReview(context.Background(), "product-1", "alice", "Great book!", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -40,7 +42,7 @@ func TestSubmitReview_Success(t *testing.T) {
 func TestSubmitReview_ValidationError(t *testing.T) {
 	repo := memory.NewReviewRepository()
 	client := &stubRatingsClient{}
-	svc := service.NewReviewService(repo, client)
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
 
 	tests := []struct {
 		name      string
@@ -55,7 +57,7 @@ func TestSubmitReview_ValidationError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := svc.SubmitReview(context.Background(), tt.productID, tt.reviewer, tt.text)
+			_, err := svc.SubmitReview(context.Background(), tt.productID, tt.reviewer, tt.text, "")
 			if err == nil {
 				t.Fatal("expected validation error")
 			}
@@ -68,7 +70,7 @@ func TestGetProductReviews_Empty(t *testing.T) {
 	client := &stubRatingsClient{
 		data: &domain.RatingData{Average: 0, Count: 0, IndividualRatings: map[string]int{}},
 	}
-	svc := service.NewReviewService(repo, client)
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
 
 	reviews, total, err := svc.GetProductReviews(context.Background(), "nonexistent", 1, 10)
 	if err != nil {
@@ -90,10 +92,10 @@ func TestGetProductReviews_WithRatings(t *testing.T) {
 			IndividualRatings: map[string]int{"alice": 5, "bob": 2},
 		},
 	}
-	svc := service.NewReviewService(repo, client)
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
 
-	_, _ = svc.SubmitReview(context.Background(), "product-1", "alice", "Excellent!")
-	_, _ = svc.SubmitReview(context.Background(), "product-1", "bob", "Good read")
+	_, _ = svc.SubmitReview(context.Background(), "product-1", "alice", "Excellent!", "")
+	_, _ = svc.SubmitReview(context.Background(), "product-1", "bob", "Good read", "")
 
 	reviews, total, err := svc.GetProductReviews(context.Background(), "product-1", 1, 10)
 	if err != nil {
@@ -122,10 +124,10 @@ func TestGetProductReviews_Pagination(t *testing.T) {
 	client := &stubRatingsClient{
 		data: &domain.RatingData{Average: 4.0, Count: 15, IndividualRatings: map[string]int{}},
 	}
-	svc := service.NewReviewService(repo, client)
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
 
 	for i := 0; i < 15; i++ {
-		_, _ = svc.SubmitReview(context.Background(), "product-1", "reviewer", "text")
+		_, _ = svc.SubmitReview(context.Background(), "product-1", "reviewer", fmt.Sprintf("review text %d", i), "")
 	}
 
 	tests := []struct {
@@ -160,9 +162,9 @@ func TestGetProductReviews_Pagination(t *testing.T) {
 func TestDeleteReview_Success(t *testing.T) {
 	repo := memory.NewReviewRepository()
 	client := &stubRatingsClient{}
-	svc := service.NewReviewService(repo, client)
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
 
-	review, _ := svc.SubmitReview(context.Background(), "product-1", "alice", "Great book!")
+	review, _ := svc.SubmitReview(context.Background(), "product-1", "alice", "Great book!", "")
 	err := svc.DeleteReview(context.Background(), review.ID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -180,7 +182,7 @@ func TestDeleteReview_Success(t *testing.T) {
 func TestDeleteReview_NotFound(t *testing.T) {
 	repo := memory.NewReviewRepository()
 	client := &stubRatingsClient{}
-	svc := service.NewReviewService(repo, client)
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
 
 	err := svc.DeleteReview(context.Background(), "nonexistent-id")
 	if !errors.Is(err, domain.ErrNotFound) {

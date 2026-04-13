@@ -10,8 +10,11 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/config"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/database"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/metrics"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/profiling"
@@ -69,11 +72,13 @@ func main() {
 
 	// Wire hex arch — select adapter based on storage backend
 	var repo port.ReviewRepository
+	var pool *pgxpool.Pool
 	var readinessChecks []func() error
 
 	switch cfg.StorageBackend {
 	case "postgres":
-		pool, err := database.NewPool(ctx, cfg.DatabaseURL)
+		var err error
+		pool, err = database.NewPool(ctx, cfg.DatabaseURL)
 		if err != nil {
 			logger.Error("failed to create database pool", "error", err)
 			os.Exit(1)
@@ -96,9 +101,16 @@ func main() {
 		logger.Info("using memory storage backend")
 	}
 
+	var idemStore idempotency.Store
+	if pool != nil {
+		idemStore = idempotency.NewPostgresStore(pool)
+	} else {
+		idemStore = idempotency.NewMemoryStore()
+	}
+
 	ratingsURL := envOrDefault("RATINGS_SERVICE_URL", "http://localhost:8080")
 	ratingsClient := ratingshttp.NewRatingsClient(ratingsURL)
-	svc := service.NewReviewService(repo, ratingsClient)
+	svc := service.NewReviewService(repo, ratingsClient, idemStore)
 	h := handler.NewHandler(svc)
 
 	registerRoutes := func(mux *http.ServeMux) {

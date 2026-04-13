@@ -1,8 +1,51 @@
-# Event-Driven Bookinfo
+<h1 align="center">Event-Driven Bookinfo</h1>
+
+```mermaid
+flowchart LR
+    User([User])
+    Gateway[Envoy Gateway]
+
+    subgraph "Query Side"
+        ReadAPI[Read API]
+        ReadDB[(Read DB)]
+    end
+
+    subgraph "Command Side"
+        subgraph "Argo Events"
+            Webhook[Webhook]
+            Kafka[[Kafka EventBus]]
+            Sensor[Sensor]
+        end
+        WriteSvc[Write Services]
+        WriteDB[(Write DB)]
+    end
+
+    User -->|GET Query| Gateway
+    User -->|POST Command| Gateway
+
+    Gateway -->|method: GET| ReadAPI
+    ReadAPI --> ReadDB
+
+    Gateway -->|method: POST| Webhook
+    Webhook --> Kafka
+    Kafka --> Sensor
+    Sensor -->|HTTP Trigger| WriteSvc
+    WriteSvc --> WriteDB
+
+    WriteDB -.->|replication| ReadDB
+
+    classDef queryStyle fill:#1e3a8a,stroke:#3b82f6,color:#fff
+    classDef writeStyle fill:#7c2d12,stroke:#f97316,color:#fff
+    classDef infraStyle fill:#1f2937,stroke:#06b6d4,color:#fff
+
+    class ReadAPI,ReadDB queryStyle
+    class WriteSvc,WriteDB writeStyle
+    class Gateway,Webhook,Kafka,Sensor infraStyle
+```
 
 Go hexagonal architecture monorepo adapting Istio's Bookinfo as a book review system, demonstrating real-time event-driven architecture with Argo Events and Kafka.
 
-Services are plain REST APIs — all event-driven complexity (Kafka consumers, retries, dead-letter queues) is abstracted by Argo Events EventSources and Sensors. The write path flows through Kafka via Argo Events, ensuring every mutation is event-sourced, while the read path remains synchronous HTTP. This demonstrates using Argo Events not only for workflow automation, but as a real-time event-driven architecture platform — a self-hosted alternative to Google Eventarc or AWS EventBridge.
+Services are plain REST APIs — all event-driven complexity (Kafka consumers, retries, dead-letter queues) is abstracted by Argo Events EventSources and Sensors. The write path flows through Kafka via Argo Events, ensuring every mutation is event-sourced, while the read path remains synchronous HTTP. Failure recovery is built into the pipeline — a `dlqTrigger` on every sensor captures events that exhaust retries into the `dlqueue` service, where they can be inspected, replayed, or marked resolved. This demonstrates using Argo Events not only for workflow automation, but as a real-time event-driven architecture platform — a self-hosted alternative to Google Eventarc or AWS EventBridge.
 
 ## Architecture Overview
 
@@ -105,6 +148,7 @@ All service wiring happens in `services/<name>/cmd/main.go`. The shared `pkg/` p
 | **reviews** | Backend | 8082 | 9092 | User reviews. Makes sync GET to ratings service. Event-written via `review-submitted` sensor. |
 | **ratings** | Backend | 8083 | 9093 | Star ratings per reviewer. Event-written via `rating-submitted` sensor. |
 | **notification** | Event consumer | 8084 | 9094 | Receives POST from sensors, stores audit log. Exposes GET for review. |
+| **dlqueue** | Backend (hex arch) | 8085 | 9095 | Captures events failing sensor retry exhaustion; stores in PostgreSQL; supports replay via REST API |
 
 All services expose their business API on the API port and observability endpoints (`/metrics`, `/healthz`, `/readyz`, `/debug/pprof/*`) on the admin port.
 
@@ -121,6 +165,7 @@ All services expose their business API on the API port and observability endpoin
 | `pkg/profiling` | Pyroscope SDK wrapper. No-op when `PYROSCOPE_SERVER_ADDRESS` is unset. Enables CPU, alloc, inuse, goroutine, mutex, and block profiles. |
 | `pkg/server` | Dual-port HTTP server. API port gets the full middleware chain (logging -> metrics -> tracing -> handler). Admin port gets observability routes. Graceful shutdown on SIGINT/SIGTERM. |
 | `pkg/telemetry` | OTel tracing setup with OTLP exporter. No-op when `OTEL_EXPORTER_OTLP_ENDPOINT` is unset. |
+| `pkg/idempotency` | `Store` interface (`CheckAndRecord`) with memory + postgres adapters; `NaturalKey` (SHA-256 with `0x1f` separator to prevent boundary collisions); `Resolve` picks explicit `idempotency_key` when present, otherwise derives a natural key from business fields. |
 
 ---
 
@@ -157,6 +202,8 @@ SERVICE_NAME=reviews HTTP_PORT=8082 ADMIN_PORT=9092 \
 
 SERVICE_NAME=notification HTTP_PORT=8084 ADMIN_PORT=9094 ./bin/notification
 
+SERVICE_NAME=dlqueue HTTP_PORT=8085 ADMIN_PORT=9095 ./bin/dlqueue
+
 # Optional: REDIS_URL=redis://localhost:6379 (enables pending review cache)
 SERVICE_NAME=productpage HTTP_PORT=8080 ADMIN_PORT=9090 \
   DETAILS_SERVICE_URL=http://localhost:8081 \
@@ -186,7 +233,7 @@ make stop         # Stop and remove containers
 | Target | Description |
 |---|---|
 | `make build SERVICE=<name>` | Build a single service binary to `bin/<name>` |
-| `make build-all` | Build all 5 service binaries |
+| `make build-all` | Build all 6 service binaries |
 | `make test` | Run all tests |
 | `make test-cover` | Run tests with HTML coverage report |
 | `make test-race` | Run tests with the race detector |
@@ -195,7 +242,7 @@ make stop         # Stop and remove containers
 | `make vet` | Run go vet |
 | `make mod-tidy` | Tidy go module dependencies |
 | `make docker-build SERVICE=<name>` | Build Docker image for one service |
-| `make docker-build-all` | Build Docker images for all 5 services |
+| `make docker-build-all` | Build Docker images for all 6 services |
 | `make run` | Start all services via Docker Compose (PostgreSQL backend) |
 | `make stop` | Stop services and remove containers |
 | `make e2e` | Run E2E tests via docker-compose |
@@ -243,6 +290,7 @@ ghcr.io/kaio6fellipe/event-driven-bookinfo/details:<tag>
 ghcr.io/kaio6fellipe/event-driven-bookinfo/reviews:<tag>
 ghcr.io/kaio6fellipe/event-driven-bookinfo/ratings:<tag>
 ghcr.io/kaio6fellipe/event-driven-bookinfo/notification:<tag>
+ghcr.io/kaio6fellipe/event-driven-bookinfo/dlqueue:<tag>
 ```
 
 ---
@@ -386,6 +434,7 @@ Each backend service deploys as two separate Deployments sharing the same image 
 | `reviews` / `reviews-write` | Read / Write | productpage / review-submitted sensor |
 | `ratings` / `ratings-write` | Read / Write | reviews (read) / rating-submitted sensor |
 | `notification` | Write-only | All 3 sensors |
+| `dlqueue` / `dlqueue-write` | Read / Write | operator/service API (GET) / `dlq-event-received` sensor (POST) |
 
 ### Usage
 
@@ -524,10 +573,20 @@ event-driven-bookinfo/
 │   │           └── outbound/   # memory/ and postgres/
 │   ├── reviews/                # User reviews (hex arch, calls ratings)
 │   ├── ratings/                # Star ratings (hex arch)
-│   └── notification/           # Event consumer + audit log (hex arch)
+│   ├── notification/           # Event consumer + audit log (hex arch)
+│   └── dlqueue/                # Dead letter queue (hex arch) — NEW
+│       ├── cmd/main.go
+│       ├── migrations/         # dlq_events + processed_events
+│       └── internal/
+│           ├── core/           # domain/, port/, service/
+│           ├── adapter/
+│           │   ├── inbound/http/
+│           │   └── outbound/   # memory/, postgres/, http/ (replay client)
+│           └── metrics/        # dlq_events_* counters
 ├── pkg/
 │   ├── config/                 # Env-based configuration
 │   ├── health/                 # /healthz and /readyz handlers
+│   ├── idempotency/            # Store interface + adapters; natural-key hashing
 │   ├── logging/                # slog + otelslog bridge + HTTP middleware
 │   ├── metrics/                # OTel -> Prometheus + HTTP middleware + runtime
 │   ├── profiling/              # Pyroscope SDK wrapper
@@ -570,7 +629,7 @@ Each service is versioned and released independently. Releases are fully automat
 ### How It Works
 
 1. **PR merged to `main`** → `auto-tag.yml` runs
-2. **Detects changed services** — file paths under `services/<name>/`; changes to `pkg/`, `go.mod`, or `go.sum` trigger all 5 services
+2. **Detects changed services** — file paths under `services/<name>/`; changes to `pkg/`, `go.mod`, or `go.sum` trigger all 6 services
 3. **Determines version bump** — PR labels (`major`/`minor`) take priority, then conventional commit prefixes (`feat` → minor, `fix` → patch, `BREAKING CHANGE` → major), default is `patch`
 4. **Creates tag** — e.g., `details-v0.2.0`
 5. **Dispatches release** — `release.yml` builds binaries, Docker images (multi-arch), and creates a GitHub release

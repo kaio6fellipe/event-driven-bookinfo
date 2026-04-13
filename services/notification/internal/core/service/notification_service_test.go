@@ -6,6 +6,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/notification/internal/adapter/outbound/log"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/notification/internal/adapter/outbound/memory"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/notification/internal/core/domain"
@@ -15,9 +16,9 @@ import (
 func TestDispatch_Success(t *testing.T) {
 	repo := memory.NewNotificationRepository()
 	dispatcher := log.NewDispatcher()
-	svc := service.NewNotificationService(repo, dispatcher)
+	svc := service.NewNotificationService(repo, dispatcher, idempotency.NewMemoryStore())
 
-	n, err := svc.Dispatch(context.Background(), "alice@example.com", domain.ChannelEmail, "New Review", "A review was posted")
+	n, err := svc.Dispatch(context.Background(), "alice@example.com", domain.ChannelEmail, "New Review", "A review was posted", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -33,9 +34,9 @@ func TestDispatch_Success(t *testing.T) {
 func TestDispatch_ValidationError(t *testing.T) {
 	repo := memory.NewNotificationRepository()
 	dispatcher := log.NewDispatcher()
-	svc := service.NewNotificationService(repo, dispatcher)
+	svc := service.NewNotificationService(repo, dispatcher, idempotency.NewMemoryStore())
 
-	_, err := svc.Dispatch(context.Background(), "", domain.ChannelEmail, "Subject", "Body")
+	_, err := svc.Dispatch(context.Background(), "", domain.ChannelEmail, "Subject", "Body", "")
 	if err == nil {
 		t.Fatal("expected validation error")
 	}
@@ -44,9 +45,9 @@ func TestDispatch_ValidationError(t *testing.T) {
 func TestDispatch_DispatcherFailure(t *testing.T) {
 	repo := memory.NewNotificationRepository()
 	dispatcher := &failingDispatcher{}
-	svc := service.NewNotificationService(repo, dispatcher)
+	svc := service.NewNotificationService(repo, dispatcher, idempotency.NewMemoryStore())
 
-	n, err := svc.Dispatch(context.Background(), "alice@example.com", domain.ChannelEmail, "Subject", "Body")
+	n, err := svc.Dispatch(context.Background(), "alice@example.com", domain.ChannelEmail, "Subject", "Body", "")
 	// Dispatch should still succeed but the notification should be marked as failed
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -66,9 +67,9 @@ func (d *failingDispatcher) Send(_ context.Context, _ *domain.Notification) erro
 func TestGetByID_Found(t *testing.T) {
 	repo := memory.NewNotificationRepository()
 	dispatcher := log.NewDispatcher()
-	svc := service.NewNotificationService(repo, dispatcher)
+	svc := service.NewNotificationService(repo, dispatcher, idempotency.NewMemoryStore())
 
-	created, _ := svc.Dispatch(context.Background(), "alice@example.com", domain.ChannelEmail, "Subject", "Body")
+	created, _ := svc.Dispatch(context.Background(), "alice@example.com", domain.ChannelEmail, "Subject", "Body", "")
 
 	found, err := svc.GetByID(context.Background(), created.ID)
 	if err != nil {
@@ -83,7 +84,7 @@ func TestGetByID_Found(t *testing.T) {
 func TestGetByID_NotFound(t *testing.T) {
 	repo := memory.NewNotificationRepository()
 	dispatcher := log.NewDispatcher()
-	svc := service.NewNotificationService(repo, dispatcher)
+	svc := service.NewNotificationService(repo, dispatcher, idempotency.NewMemoryStore())
 
 	_, err := svc.GetByID(context.Background(), "nonexistent")
 	if err == nil {
@@ -94,11 +95,11 @@ func TestGetByID_NotFound(t *testing.T) {
 func TestGetByRecipient(t *testing.T) {
 	repo := memory.NewNotificationRepository()
 	dispatcher := log.NewDispatcher()
-	svc := service.NewNotificationService(repo, dispatcher)
+	svc := service.NewNotificationService(repo, dispatcher, idempotency.NewMemoryStore())
 
-	_, _ = svc.Dispatch(context.Background(), "alice@example.com", domain.ChannelEmail, "Subject 1", "Body 1")
-	_, _ = svc.Dispatch(context.Background(), "alice@example.com", domain.ChannelSMS, "Subject 2", "Body 2")
-	_, _ = svc.Dispatch(context.Background(), "bob@example.com", domain.ChannelEmail, "Subject 3", "Body 3")
+	_, _ = svc.Dispatch(context.Background(), "alice@example.com", domain.ChannelEmail, "Subject 1", "Body 1", "")
+	_, _ = svc.Dispatch(context.Background(), "alice@example.com", domain.ChannelSMS, "Subject 2", "Body 2", "")
+	_, _ = svc.Dispatch(context.Background(), "bob@example.com", domain.ChannelEmail, "Subject 3", "Body 3", "")
 
 	notifications, err := svc.GetByRecipient(context.Background(), "alice@example.com")
 	if err != nil {

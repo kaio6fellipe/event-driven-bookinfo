@@ -10,7 +10,7 @@ import (
 // NotificationService defines the inbound operations for the notification domain.
 type NotificationService interface {
 	// Dispatch creates and dispatches a notification.
-	Dispatch(ctx context.Context, recipient string, channel domain.Channel, subject, body string) (*domain.Notification, error)
+	Dispatch(ctx context.Context, recipient string, channel domain.Channel, subject, body, idempotencyKey string) (*domain.Notification, error)
 
 	// GetByID returns a notification by its ID.
 	GetByID(ctx context.Context, id string) (*domain.Notification, error)

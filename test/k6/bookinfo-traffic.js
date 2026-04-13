@@ -151,15 +151,19 @@ export function teardown(data) {
     sleep(2);
   }
 
-  // Phase 3: Delete all k6-generated reviews
+  // Phase 3: Delete all k6-generated reviews via CQRS pipeline
+  // Strategy: collect-then-delete to avoid pagination drift, then poll
+  // for convergence instead of fixed sleep. Multiple rounds handle any
+  // events lost or delayed in the async pipeline.
   console.log('Cleaning up k6-generated reviews...');
-  const maxRounds = 5;
+  const maxRounds = 10;
   let totalDeleted = 0;
 
   for (let round = 1; round <= maxRounds; round++) {
+    // Step A: Collect all k6 review IDs (full scan before any deletes)
+    const k6Ids = [];
     let page = 1;
     let totalPages = 1;
-    let roundDeleted = 0;
 
     while (page <= totalPages) {
       const res = http.get(`${BASE_URL}/v1/reviews/${productId}?page=${page}&page_size=100`,
@@ -175,24 +179,48 @@ export function teardown(data) {
 
       for (const review of body.reviews) {
         if (review.text && review.text.startsWith('k6 load test review')) {
-          http.post(`${BASE_URL}/v1/reviews/delete`,
-            JSON.stringify({ review_id: review.id }),
-            { headers: { 'Content-Type': 'application/json' }, tags: { name: 'teardown: DELETE review' } });
-          roundDeleted++;
+          k6Ids.push(review.id);
         }
       }
 
       page++;
     }
 
-    totalDeleted += roundDeleted;
-    if (roundDeleted === 0) {
+    if (k6Ids.length === 0) {
       console.log(`Round ${round}: no k6 reviews found. Cleanup complete.`);
       break;
     }
 
-    console.log(`Round ${round}: sent ${roundDeleted} delete requests. Waiting for async processing...`);
-    sleep(10);
+    // Step B: Send all delete requests through the CQRS pipeline
+    for (const id of k6Ids) {
+      http.post(`${BASE_URL}/v1/reviews/delete`,
+        JSON.stringify({ review_id: id }),
+        { headers: { 'Content-Type': 'application/json' }, tags: { name: 'teardown: DELETE review' } });
+    }
+    totalDeleted += k6Ids.length;
+    console.log(`Round ${round}: sent ${k6Ids.length} delete requests. Waiting for propagation...`);
+
+    // Step C: Poll until review count stabilizes (deletes fully propagated)
+    let prevCount = -1;
+    let stableChecks = 0;
+    for (let attempt = 1; attempt <= 30; attempt++) {
+      sleep(2);
+      const res = http.get(`${BASE_URL}/v1/reviews/${productId}?page=1&page_size=1`,
+        { tags: { name: 'teardown: wait propagation' } });
+      if (res.status === 200) {
+        const count = JSON.parse(res.body).pagination.total_items;
+        if (count === prevCount) {
+          stableChecks++;
+          if (stableChecks >= 3) {
+            console.log(`Round ${round}: count stabilized at ${count} after ${attempt * 2}s.`);
+            break;
+          }
+        } else {
+          stableChecks = 0;
+          prevCount = count;
+        }
+      }
+    }
   }
 
   console.log(`Cleanup total: ${totalDeleted} delete requests sent.`);

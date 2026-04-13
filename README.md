@@ -515,6 +515,14 @@ kubectl apply --dry-run=client -f deploy/argo-events/eventsources/
 kubectl apply --dry-run=client -f deploy/argo-events/sensors/
 ```
 
+### Dead Letter Queue
+
+Every primary sensor trigger carries `atLeastOnce: true` + exponential backoff and a `dlqTrigger` that fires after retry exhaustion. The dlqTrigger captures the full CloudEvents context (`id`, `type`, `source`, `subject`, `time`, `datacontenttype`) via `contextKey`, plus the original body and HTTP headers (preserving `traceparent` for distributed trace correlation), and POSTs the structured payload to a dedicated `dlq-event-received` EventSource. The DLQ event then flows through the standard Argo Events pipeline: EventSource → Kafka → DLQ sensor → `dlqueue-write` service → PostgreSQL.
+
+The dlqueue service deduplicates arrivals by a natural composite key (`sensor_name + failed_trigger + SHA-256(original_payload)`). The CloudEvents `id` cannot be used as a dedup key because Argo Events regenerates it on every EventSource pass — per the CNCF CloudEvents spec, `id` is a hop-level identifier, not an end-to-end correlation key. Events are tracked through a state machine (`pending → replayed → resolved` on success; `poisoned` after `max_retries` failed replays).
+
+Replay is operator- or service-initiated via `POST /v1/events/{id}/replay`: dlqueue re-POSTs the original payload and headers to the source EventSource URL stored on the DLQ record, re-entering the full CQRS pipeline. All write services are idempotent (see `pkg/idempotency`) so replays are safe. For the full domain model, API surface, and metric definitions, see [docs/superpowers/specs/2026-04-13-dlqueue-service-design.md](docs/superpowers/specs/2026-04-13-dlqueue-service-design.md).
+
 ---
 
 ## E2E Tests

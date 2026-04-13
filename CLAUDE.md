@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review system with event-driven architecture**. Services are plain REST APIs — all event-driven complexity (Kafka consumers, retries, DLQ) is abstracted by Argo Events EventSources and Sensors. Full observability: structured logging, distributed tracing, metrics, continuous profiling.
+Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review system with event-driven architecture**. Services are plain REST APIs — all event-driven complexity (Kafka consumers, retries) is abstracted by Argo Events EventSources and Sensors. Failed events that exhaust sensor retries are captured by the `dlqueue` service for inspection and replay. Full observability: structured logging, distributed tracing, metrics, continuous profiling.
 
 **Module**: `github.com/kaio6fellipe/event-driven-bookinfo`
 
@@ -15,6 +15,7 @@ Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review 
 | **reviews** | Backend (hex arch) | :8080 / :9090 admin | User reviews; sync call to ratings service |
 | **ratings** | Backend (hex arch) | :8080 / :9090 admin | Star ratings |
 | **notification** | Backend (hex arch) | :8080 / :9090 admin | Event consumer audit log |
+| **dlqueue** | Backend (hex arch) | :8080 / :9090 admin | Dead letter queue for failed sensor deliveries; REST API for inspection, replay, and resolution |
 
 ## Architecture
 
@@ -26,15 +27,17 @@ Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review 
 - **CQRS deployments** (local k8s): each backend service has separate read and write Deployments; read serves GET via gateway, write receives POST from Argo Events sensors. The Envoy Gateway acts as the CQRS routing boundary (GET -> read services, POST -> EventSource webhooks)
 - **Pending review cache**: productpage stores submitted reviews in Redis immediately after async POST; merges into read responses with "Processing" badge; HTMX auto-polls to reconcile when confirmed. Disabled when `REDIS_URL` is unset.
 - **Local k8s** (`make run-k8s`): k3d cluster with Envoy Gateway API, Strimzi Kafka (KRaft), full observability stack (Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy)
+- **DLQ**: sensor `dlqTrigger` → `dlq-event-received` EventSource → `dlqueue-write` → PostgreSQL. Dedup by natural key (`sensor_name + failed_trigger + SHA-256(payload)`). State machine: `pending → replayed → resolved / poisoned`. REST API at `/v1/events` supports list/get/replay/resolve/reset plus batch operations.
+- **Idempotency**: all write services (reviews, ratings, details, notification, dlqueue) dedupe on client-supplied `idempotency_key` or derived natural key (SHA-256 of business fields). Prerequisite for safe DLQ replay — CloudEvents `id` cannot be used because Argo Events regenerates it per EventSource pass.
 
 ## Build Commands
 
 ```bash
-make build-all          # Build all 5 service binaries to bin/
+make build-all          # Build all 6 service binaries to bin/
 make test               # go test -race -count=1 ./...
 make lint               # golangci-lint run
 make e2e                # Docker Compose + shell smoke tests (memory backend)
-make docker-build-all   # Build all 5 Docker images
+make docker-build-all   # Build all 6 Docker images
 ```
 
 ## Local Kubernetes
@@ -91,6 +94,11 @@ SERVICE_NAME=reviews HTTP_PORT=8083 ADMIN_PORT=9093 RATINGS_SERVICE_URL=http://l
 SERVICE_NAME=notification HTTP_PORT=8084 ADMIN_PORT=9094 go run ./services/notification/cmd/
 ```
 
+**dlqueue** (no dependencies):
+```bash
+SERVICE_NAME=dlqueue HTTP_PORT=8085 ADMIN_PORT=9095 go run ./services/dlqueue/cmd/
+```
+
 **productpage** (depends on details + reviews):
 ```bash
 SERVICE_NAME=productpage HTTP_PORT=8080 ADMIN_PORT=9090 \
@@ -107,6 +115,7 @@ Optional env vars (all services): `LOG_LEVEL` (debug/info/warn/error, default in
 |---|---|
 | `pkg/config` | Env-based config struct: ServiceName, HTTPPort, AdminPort, LogLevel, StorageBackend, DatabaseURL, RedisURL, OTLPEndpoint, PyroscopeServerAddress |
 | `pkg/health` | `/healthz` (liveness) and `/readyz` (readiness with optional check functions) |
+| `pkg/idempotency` | `Store` interface (`CheckAndRecord`) with memory + postgres adapters; `NaturalKey(fields...)` (SHA-256 with `0x1f` separator); `Resolve(explicitKey, fields...)` picks explicit when present, natural key otherwise |
 | `pkg/logging` | slog + otelslog bridge, JSON output, `FromContext`/`WithContext`, request-scoped HTTP middleware |
 | `pkg/metrics` | OTel meter provider + Prometheus exporter, HTTP middleware (duration, requests_total, active_requests), runtime metrics |
 | `pkg/profiling` | Pyroscope SDK wrapper, no-op when `PYROSCOPE_SERVER_ADDRESS` is unset |

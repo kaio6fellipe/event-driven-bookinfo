@@ -13,8 +13,9 @@ type ReviewService interface {
 	// Returns the matching reviews and the total count for the product.
 	GetProductReviews(ctx context.Context, productID string, page, pageSize int) ([]domain.Review, int, error)
 
-	// SubmitReview creates and stores a new review.
-	SubmitReview(ctx context.Context, productID, reviewer, text string) (*domain.Review, error)
+	// SubmitReview creates and stores a new review. idempotencyKey deduplicates
+	// repeated requests; if empty, a natural key is derived from productID, reviewer, and text.
+	SubmitReview(ctx context.Context, productID, reviewer, text, idempotencyKey string) (*domain.Review, error)
 
 	// DeleteReview removes a review by its ID.
 	// Returns domain.ErrNotFound if the review does not exist.

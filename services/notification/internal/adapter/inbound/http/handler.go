@@ -3,11 +3,13 @@ package http //nolint:revive // package name matches directory convention
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/notification/internal/core/domain"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/notification/internal/core/port"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/notification/internal/core/service"
 )
 
 // Handler holds the HTTP handlers for the notification service.
@@ -36,8 +38,13 @@ func (h *Handler) dispatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	notification, err := h.svc.Dispatch(r.Context(), req.Recipient, domain.Channel(req.Channel), req.Subject, req.Body)
+	notification, err := h.svc.Dispatch(r.Context(), req.Recipient, domain.Channel(req.Channel), req.Subject, req.Body, req.IdempotencyKey)
 	if err != nil {
+		if errors.Is(err, service.ErrAlreadyProcessed) {
+			logger.Info("duplicate dispatch skipped")
+			writeJSON(w, http.StatusOK, ErrorResponse{Error: "already processed"})
+			return
+		}
 		logger.Warn("failed to dispatch notification", "error", err)
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return

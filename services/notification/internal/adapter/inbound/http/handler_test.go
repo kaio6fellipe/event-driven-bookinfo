@@ -3,10 +3,12 @@ package http_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/notification/internal/adapter/inbound/http"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/notification/internal/adapter/outbound/log"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/notification/internal/adapter/outbound/memory"
@@ -17,7 +19,7 @@ func setupHandler(t *testing.T) *http.ServeMux {
 	t.Helper()
 	repo := memory.NewNotificationRepository()
 	dispatcher := log.NewDispatcher()
-	svc := service.NewNotificationService(repo, dispatcher)
+	svc := service.NewNotificationService(repo, dispatcher, idempotency.NewMemoryStore())
 	mux := http.NewServeMux()
 	h := handler.NewHandler(svc)
 	h.RegisterRoutes(mux)
@@ -145,13 +147,13 @@ func TestGetNotificationByID_NotFound(t *testing.T) {
 func TestGetNotificationsByRecipient(t *testing.T) {
 	mux := setupHandler(t)
 
-	// Create two notifications for alice
+	// Create two notifications for alice with distinct subjects to avoid dedup
 	for i := 0; i < 2; i++ {
 		reqBody := handler.DispatchNotificationRequest{
 			Recipient: "alice@example.com",
 			Channel:   "email",
-			Subject:   "Subject",
-			Body:      "Body",
+			Subject:   fmt.Sprintf("Subject %d", i+1),
+			Body:      fmt.Sprintf("Body %d", i+1),
 		}
 		bodyBytes, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest(http.MethodPost, "/v1/notifications", bytes.NewReader(bodyBytes))

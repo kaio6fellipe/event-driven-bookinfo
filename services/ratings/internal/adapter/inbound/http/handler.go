@@ -3,10 +3,12 @@ package http //nolint:revive // package name matches directory convention
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/core/port"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/core/service"
 )
 
 // Handler holds the HTTP handlers for the ratings service.
@@ -63,8 +65,13 @@ func (h *Handler) submitRating(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rating, err := h.svc.SubmitRating(r.Context(), req.ProductID, req.Reviewer, req.Stars)
+	rating, err := h.svc.SubmitRating(r.Context(), req.ProductID, req.Reviewer, req.Stars, req.IdempotencyKey)
 	if err != nil {
+		if errors.Is(err, service.ErrAlreadyProcessed) {
+			logger.Info("duplicate submit skipped")
+			writeJSON(w, http.StatusOK, ErrorResponse{Error: "already processed"})
+			return
+		}
 		logger.Warn("failed to submit rating", "error", err)
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return

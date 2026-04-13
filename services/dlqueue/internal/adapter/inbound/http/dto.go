@@ -16,8 +16,8 @@ type IngestEventRequest struct {
 	FailedTrigger   string              `json:"failed_trigger"`
 	EventSourceURL  string              `json:"eventsource_url"`
 	Namespace       string              `json:"namespace"`
-	OriginalPayload any                 `json:"original_payload"` // passes through as JSON
-	OriginalHeaders map[string][]string `json:"original_headers"`
+	OriginalPayload any                 `json:"original_payload"` // JSON object, JSON-encoded string, or []byte
+	OriginalHeaders any                 `json:"original_headers"` // map[string][]string or JSON-encoded string
 	DataContentType string              `json:"datacontenttype"`
 	EventTimestamp  string              `json:"event_timestamp"` // ISO-8601
 }

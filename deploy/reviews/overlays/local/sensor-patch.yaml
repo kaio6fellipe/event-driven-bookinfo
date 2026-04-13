@@ -81,7 +81,7 @@ spec:
                 dest: failed_trigger
               - src:
                   dependencyName: review-submitted-dep
-                  value: "http://review-submitted-eventsource-svc.bookinfo.svc.cluster.local:12001/review-submitted"
+                  value: "http://review-submitted-eventsource-svc.bookinfo.svc.cluster.local:12001/v1/reviews"
                 dest: eventsource_url
               - src:
                   dependencyName: review-submitted-dep
@@ -175,7 +175,7 @@ spec:
                 dest: failed_trigger
               - src:
                   dependencyName: review-submitted-dep
-                  value: "http://review-submitted-eventsource-svc.bookinfo.svc.cluster.local:12001/review-submitted"
+                  value: "http://review-submitted-eventsource-svc.bookinfo.svc.cluster.local:12001/v1/reviews"
                 dest: eventsource_url
               - src:
                   dependencyName: review-submitted-dep
@@ -257,7 +257,7 @@ spec:
                 dest: failed_trigger
               - src:
                   dependencyName: review-deleted-dep
-                  value: "http://review-deleted-eventsource-svc.bookinfo.svc.cluster.local:12003/review-deleted"
+                  value: "http://review-deleted-eventsource-svc.bookinfo.svc.cluster.local:12003/v1/reviews/delete"
                 dest: eventsource_url
               - src:
                   dependencyName: review-deleted-dep
@@ -339,7 +339,7 @@ spec:
                 dest: failed_trigger
               - src:
                   dependencyName: review-deleted-dep
-                  value: "http://review-deleted-eventsource-svc.bookinfo.svc.cluster.local:12003/review-deleted"
+                  value: "http://review-deleted-eventsource-svc.bookinfo.svc.cluster.local:12003/v1/reviews/delete"
                 dest: eventsource_url
               - src:
                   dependencyName: review-deleted-dep
@@ -433,7 +433,7 @@ spec:
                 dest: failed_trigger
               - src:
                   dependencyName: review-deleted-dep
-                  value: "http://review-deleted-eventsource-svc.bookinfo.svc.cluster.local:12003/review-deleted"
+                  value: "http://review-deleted-eventsource-svc.bookinfo.svc.cluster.local:12003/v1/reviews/delete"
                 dest: eventsource_url
               - src:
                   dependencyName: review-deleted-dep

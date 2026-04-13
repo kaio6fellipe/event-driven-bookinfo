@@ -4,6 +4,7 @@ package http //nolint:revive // package name matches directory convention
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	stdhttp "net/http"
 	"strconv"
 	"time"
@@ -55,6 +56,12 @@ func (h *Handler) ingestEvent(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		return
 	}
 
+	headers, err := coerceHeaders(req.OriginalHeaders)
+	if err != nil {
+		writeJSON(w, stdhttp.StatusBadRequest, ErrorResponse{Error: "invalid original_headers"})
+		return
+	}
+
 	var ts time.Time
 	if req.EventTimestamp != "" {
 		ts, _ = time.Parse(time.RFC3339, req.EventTimestamp)
@@ -70,7 +77,7 @@ func (h *Handler) ingestEvent(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		EventSourceURL:  req.EventSourceURL,
 		Namespace:       req.Namespace,
 		OriginalPayload: payloadBytes,
-		OriginalHeaders: req.OriginalHeaders,
+		OriginalHeaders: headers,
 		DataContentType: req.DataContentType,
 		EventTimestamp:  ts,
 	}
@@ -242,7 +249,41 @@ func marshalPayload(p any) ([]byte, error) {
 	if b, ok := p.([]byte); ok {
 		return b, nil
 	}
+	// Argo Events forwards `dataKey: body` as a JSON-encoded string.
+	// Treat strings as already-serialized JSON bytes.
+	if s, ok := p.(string); ok {
+		return []byte(s), nil
+	}
 	return json.Marshal(p)
+}
+
+// coerceHeaders accepts either a native map[string][]string (direct API calls)
+// or a JSON-encoded string (Argo Events sensor forwards `dataKey: header` as a
+// quoted JSON string). Returns nil for absent/empty input.
+func coerceHeaders(h any) (map[string][]string, error) {
+	if h == nil {
+		return nil, nil
+	}
+	if s, ok := h.(string); ok {
+		if s == "" || s == "null" {
+			return nil, nil
+		}
+		var m map[string][]string
+		if err := json.Unmarshal([]byte(s), &m); err != nil {
+			return nil, fmt.Errorf("parsing headers string: %w", err)
+		}
+		return m, nil
+	}
+	// Re-marshal then unmarshal to coerce map[string]any → map[string][]string.
+	raw, err := json.Marshal(h)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling headers: %w", err)
+	}
+	var m map[string][]string
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil, fmt.Errorf("coercing headers to map[string][]string: %w", err)
+	}
+	return m, nil
 }
 
 func writeJSON(w stdhttp.ResponseWriter, status int, v any) {

@@ -80,7 +80,7 @@ spec:
                 dest: failed_trigger
               - src:
                   dependencyName: book-added-dep
-                  value: "http://book-added-eventsource-svc.bookinfo.svc.cluster.local:12000/book-added"
+                  value: "http://book-added-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/details"
                 dest: eventsource_url
               - src:
                   dependencyName: book-added-dep
@@ -173,7 +173,7 @@ spec:
                 dest: failed_trigger
               - src:
                   dependencyName: book-added-dep
-                  value: "http://book-added-eventsource-svc.bookinfo.svc.cluster.local:12000/book-added"
+                  value: "http://book-added-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/details"
                 dest: eventsource_url
               - src:
                   dependencyName: book-added-dep

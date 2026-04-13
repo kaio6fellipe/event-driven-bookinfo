@@ -80,7 +80,7 @@ spec:
                 dest: failed_trigger
               - src:
                   dependencyName: rating-submitted-dep
-                  value: "http://rating-submitted-eventsource-svc.bookinfo.svc.cluster.local:12002/rating-submitted"
+                  value: "http://rating-submitted-eventsource-svc.bookinfo.svc.cluster.local:12002/v1/ratings"
                 dest: eventsource_url
               - src:
                   dependencyName: rating-submitted-dep
@@ -173,7 +173,7 @@ spec:
                 dest: failed_trigger
               - src:
                   dependencyName: rating-submitted-dep
-                  value: "http://rating-submitted-eventsource-svc.bookinfo.svc.cluster.local:12002/rating-submitted"
+                  value: "http://rating-submitted-eventsource-svc.bookinfo.svc.cluster.local:12002/v1/ratings"
                 dest: eventsource_url
               - src:
                   dependencyName: rating-submitted-dep

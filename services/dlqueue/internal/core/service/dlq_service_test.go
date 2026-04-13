@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -202,5 +203,165 @@ func TestBatchResolve(t *testing.T) {
 	}
 	if n != 3 {
 		t.Errorf("resolved count = %d, want 3", n)
+	}
+}
+
+func TestGetEvent(t *testing.T) {
+	ctx := context.Background()
+	repo := memory.NewDLQRepository()
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+
+	saved, _ := svc.IngestEvent(ctx, newParams("evt-1"))
+
+	got, err := svc.GetEvent(ctx, saved.ID)
+	if err != nil {
+		t.Fatalf("GetEvent err = %v", err)
+	}
+	if got.ID != saved.ID {
+		t.Errorf("id = %q, want %q", got.ID, saved.ID)
+	}
+
+	_, err = svc.GetEvent(ctx, "missing")
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestListEvents(t *testing.T) {
+	ctx := context.Background()
+	repo := memory.NewDLQRepository()
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+
+	p1 := newParams("evt-1")
+	p2 := newParams("evt-2")
+	p2.SensorName = "other-sensor"
+	p2.OriginalPayload = []byte(`{"other":true}`)
+	_, _ = svc.IngestEvent(ctx, p1)
+	_, _ = svc.IngestEvent(ctx, p2)
+
+	items, total, err := svc.ListEvents(ctx, port.ListFilter{Limit: 10})
+	if err != nil {
+		t.Fatalf("ListEvents err = %v", err)
+	}
+	if total != 2 {
+		t.Errorf("total = %d, want 2", total)
+	}
+	if len(items) != 2 {
+		t.Errorf("items len = %d, want 2", len(items))
+	}
+
+	_, total, _ = svc.ListEvents(ctx, port.ListFilter{Status: string(domain.StatusResolved), Limit: 10})
+	if total != 0 {
+		t.Errorf("resolved total = %d, want 0", total)
+	}
+}
+
+func TestReplay_ReplayerError(t *testing.T) {
+	ctx := context.Background()
+	repo := memory.NewDLQRepository()
+	client := &fakeReplayClient{err: errors.New("transport failure")}
+	svc := service.NewDLQService(repo, client, 3)
+
+	e, _ := svc.IngestEvent(ctx, newParams("evt-1"))
+
+	_, err := svc.ReplayEvent(ctx, e.ID)
+	if err == nil {
+		t.Fatal("expected replay error, got nil")
+	}
+
+	// Rollback contract: transport failure leaves status as pending.
+	got, err := svc.GetEvent(ctx, e.ID)
+	if err != nil {
+		t.Fatalf("GetEvent err = %v", err)
+	}
+	if got.Status != domain.StatusPending {
+		t.Errorf("status = %v, want pending (replay should not persist on transport error)", got.Status)
+	}
+	if got.LastReplayedAt != nil {
+		t.Errorf("expected LastReplayedAt to remain nil after failed replay")
+	}
+}
+
+func TestReplayEvent_NotFound(t *testing.T) {
+	ctx := context.Background()
+	repo := memory.NewDLQRepository()
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+
+	_, err := svc.ReplayEvent(ctx, "no-such-id")
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestReplayEvent_InvalidTransition(t *testing.T) {
+	ctx := context.Background()
+	repo := memory.NewDLQRepository()
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+
+	e, _ := svc.IngestEvent(ctx, newParams("evt-1"))
+	// Replay once to move to replayed state.
+	_, _ = svc.ReplayEvent(ctx, e.ID)
+	// Second replay from replayed state should fail.
+	_, err := svc.ReplayEvent(ctx, e.ID)
+	if !errors.Is(err, domain.ErrInvalidTransition) {
+		t.Errorf("err = %v, want ErrInvalidTransition", err)
+	}
+}
+
+func TestResolveEvent_NotFound(t *testing.T) {
+	ctx := context.Background()
+	repo := memory.NewDLQRepository()
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+
+	_, err := svc.ResolveEvent(ctx, "no-such-id", "operator")
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestResetPoisoned_NotFound(t *testing.T) {
+	ctx := context.Background()
+	repo := memory.NewDLQRepository()
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+
+	_, err := svc.ResetPoisoned(ctx, "no-such-id")
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestBatchReplay_TransportError(t *testing.T) {
+	ctx := context.Background()
+	repo := memory.NewDLQRepository()
+	client := &fakeReplayClient{err: errors.New("transport failure")}
+	svc := service.NewDLQService(repo, client, 3)
+
+	p := newParams("evt-1")
+	_, _ = svc.IngestEvent(ctx, p)
+
+	n, err := svc.BatchReplay(ctx, port.BatchFilter{Status: string(domain.StatusPending), Limit: 10})
+	if err == nil {
+		t.Fatal("expected error from BatchReplay, got nil")
+	}
+	if n != 0 {
+		t.Errorf("replayed count = %d, want 0", n)
+	}
+}
+
+func TestBatchResolve_AlreadyResolved(t *testing.T) {
+	ctx := context.Background()
+	repo := memory.NewDLQRepository()
+	svc := service.NewDLQService(repo, &fakeReplayClient{}, 3)
+
+	e, _ := svc.IngestEvent(ctx, newParams("evt-1"))
+	_, _ = svc.ResolveEvent(ctx, e.ID, "first")
+
+	// Resolving an already-resolved event must return an error.
+	n, err := svc.BatchResolve(ctx, []string{e.ID}, "second")
+	if err == nil {
+		t.Fatal("expected error resolving already-resolved event, got nil")
+	}
+	if n != 0 {
+		t.Errorf("resolved count = %d, want 0", n)
 	}
 }

@@ -5,15 +5,16 @@ import (
 	"context"
 	"testing"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/memory"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/core/service"
 )
 
 func TestSubmitRating_Success(t *testing.T) {
 	repo := memory.NewRatingRepository()
-	svc := service.NewRatingService(repo)
+	svc := service.NewRatingService(repo, idempotency.NewMemoryStore())
 
-	rating, err := svc.SubmitRating(context.Background(), "product-1", "alice", 5)
+	rating, err := svc.SubmitRating(context.Background(), "product-1", "alice", 5, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -34,7 +35,7 @@ func TestSubmitRating_Success(t *testing.T) {
 
 func TestSubmitRating_ValidationError(t *testing.T) {
 	repo := memory.NewRatingRepository()
-	svc := service.NewRatingService(repo)
+	svc := service.NewRatingService(repo, idempotency.NewMemoryStore())
 
 	tests := []struct {
 		name      string
@@ -50,7 +51,7 @@ func TestSubmitRating_ValidationError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := svc.SubmitRating(context.Background(), tt.productID, tt.reviewer, tt.stars)
+			_, err := svc.SubmitRating(context.Background(), tt.productID, tt.reviewer, tt.stars, "")
 			if err == nil {
 				t.Fatal("expected validation error")
 			}
@@ -60,7 +61,7 @@ func TestSubmitRating_ValidationError(t *testing.T) {
 
 func TestGetProductRatings_Empty(t *testing.T) {
 	repo := memory.NewRatingRepository()
-	svc := service.NewRatingService(repo)
+	svc := service.NewRatingService(repo, idempotency.NewMemoryStore())
 
 	pr, err := svc.GetProductRatings(context.Background(), "nonexistent")
 	if err != nil {
@@ -80,19 +81,19 @@ func TestGetProductRatings_Empty(t *testing.T) {
 
 func TestGetProductRatings_WithRatings(t *testing.T) {
 	repo := memory.NewRatingRepository()
-	svc := service.NewRatingService(repo)
+	svc := service.NewRatingService(repo, idempotency.NewMemoryStore())
 
-	_, err := svc.SubmitRating(context.Background(), "product-1", "alice", 4)
+	_, err := svc.SubmitRating(context.Background(), "product-1", "alice", 4, "")
 	if err != nil {
 		t.Fatalf("unexpected error submitting rating 1: %v", err)
 	}
 
-	_, err = svc.SubmitRating(context.Background(), "product-1", "bob", 2)
+	_, err = svc.SubmitRating(context.Background(), "product-1", "bob", 2, "")
 	if err != nil {
 		t.Fatalf("unexpected error submitting rating 2: %v", err)
 	}
 
-	_, err = svc.SubmitRating(context.Background(), "product-2", "charlie", 5)
+	_, err = svc.SubmitRating(context.Background(), "product-2", "charlie", 5, "")
 	if err != nil {
 		t.Fatalf("unexpected error submitting rating 3: %v", err)
 	}

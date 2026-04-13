@@ -13,5 +13,5 @@ type RatingService interface {
 	GetProductRatings(ctx context.Context, productID string) (*domain.ProductRatings, error)
 
 	// SubmitRating creates and stores a new rating.
-	SubmitRating(ctx context.Context, productID, reviewer string, stars int) (*domain.Rating, error)
+	SubmitRating(ctx context.Context, productID, reviewer string, stars int, idempotencyKey string) (*domain.Rating, error)
 }

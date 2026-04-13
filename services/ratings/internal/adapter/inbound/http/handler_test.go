@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/inbound/http"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/memory"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/core/service"
@@ -16,7 +17,7 @@ import (
 func setupHandler(t *testing.T) *http.ServeMux {
 	t.Helper()
 	repo := memory.NewRatingRepository()
-	svc := service.NewRatingService(repo)
+	svc := service.NewRatingService(repo, idempotency.NewMemoryStore())
 	mux := http.NewServeMux()
 	h := handler.NewHandler(svc)
 	h.RegisterRoutes(mux)

@@ -1,5 +1,5 @@
 // Package metrics declares dlqueue-specific Prometheus metrics.
-package metrics
+package metrics //nolint:revive // package name is intentional; does not shadow stdlib
 
 import (
 	"context"

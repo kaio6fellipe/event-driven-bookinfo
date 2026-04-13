@@ -38,7 +38,7 @@ func (c *ReplayClient) Replay(ctx context.Context, url string, payload []byte, h
 		}
 	}
 
-	resp, err := c.client.Do(req)
+	resp, err := c.client.Do(req) //nolint:gosec // URL comes from stored DLQ record written by operator-controlled sensor config, not user input
 	if err != nil {
 		return fmt.Errorf("executing request: %w", err)
 	}

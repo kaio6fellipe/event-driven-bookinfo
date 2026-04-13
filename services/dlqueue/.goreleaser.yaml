@@ -1,0 +1,65 @@
+version: 2
+project_name: dlqueue
+
+builds:
+  - id: dlqueue
+    binary: dlqueue
+    main: ./services/dlqueue/cmd/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+archives:
+  - id: dlqueue
+    builds:
+      - dlqueue
+    name_template: "dlqueue_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+
+dockers:
+  - id: dlqueue-amd64
+    ids:
+      - dlqueue
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/dlqueue:{{ .Tag }}-amd64"
+    dockerfile: build/Dockerfile.goreleaser.dlqueue
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=dlqueue"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+  - id: dlqueue-arm64
+    ids:
+      - dlqueue
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/dlqueue:{{ .Tag }}-arm64"
+    dockerfile: build/Dockerfile.goreleaser.dlqueue
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=dlqueue"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+docker_manifests:
+  - name_template: "ghcr.io/kaio6fellipe/event-driven-bookinfo/dlqueue:{{ .Tag }}"
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/dlqueue:{{ .Tag }}-amd64"
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/dlqueue:{{ .Tag }}-arm64"
+
+release:
+  disable: true
+
+changelog:
+  disable: true

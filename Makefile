@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 
 MODULE := github.com/kaio6fellipe/event-driven-bookinfo
-SERVICES := productpage details reviews ratings notification
+SERVICES := productpage details reviews ratings notification dlqueue
 
 # ─── Build ──────────────────────────────────────────────────────────────────
 

@@ -9,3 +9,4 @@ data:
     CREATE DATABASE bookinfo_details;
     CREATE DATABASE bookinfo_reviews;
     CREATE DATABASE bookinfo_notification;
+    CREATE DATABASE bookinfo_dlqueue;

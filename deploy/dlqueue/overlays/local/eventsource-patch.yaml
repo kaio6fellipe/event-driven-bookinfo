@@ -10,6 +10,3 @@ spec:
           value: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
         - name: OTEL_SERVICE_NAME
           value: "dlq-event-received-eventsource"
-  webhook:
-    dlq-event-received:
-      endpoint: /v1/events

@@ -3,10 +3,12 @@ package http //nolint:revive // package name matches directory convention
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/core/port"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/core/service"
 )
 
 // Handler holds the HTTP handlers for the details service.
@@ -87,9 +89,14 @@ func (h *Handler) addDetail(w http.ResponseWriter, r *http.Request) {
 
 	detail, err := h.svc.AddDetail(r.Context(),
 		req.Title, req.Author, req.Year, req.Type,
-		req.Pages, req.Publisher, req.Language, req.ISBN10, req.ISBN13,
+		req.Pages, req.Publisher, req.Language, req.ISBN10, req.ISBN13, req.IdempotencyKey,
 	)
 	if err != nil {
+		if errors.Is(err, service.ErrAlreadyProcessed) {
+			logger.Info("duplicate add skipped")
+			writeJSON(w, http.StatusOK, ErrorResponse{Error: "already processed"})
+			return
+		}
 		logger.Warn("failed to add detail", "error", err)
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return

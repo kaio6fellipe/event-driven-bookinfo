@@ -90,7 +90,7 @@ jobs:
 
           for SERVICE in $(echo "$SERVICES" | jq -r '.[]'); do
             # Get latest tag for this service
-            LATEST_TAG=$(git tag -l "${SERVICE}-v*" --sort=-v:refversion | head -1)
+            LATEST_TAG=$(git tag -l "${SERVICE}-v*" --sort=-v:refname | head -1)
 
             if [ -z "$LATEST_TAG" ]; then
               CURRENT="0.0.0"

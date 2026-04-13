@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dlqueue-write
+  namespace: bookinfo
+  labels:
+    app: dlqueue
+    role: write
+    part-of: event-driven-bookinfo
+spec:
+  type: ClusterIP
+  selector:
+    app: dlqueue
+    role: write
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

@@ -13,6 +13,7 @@ on:
           - reviews
           - ratings
           - notification
+          - dlqueue
       tag:
         description: "Full tag (e.g., details-v0.1.0)"
         required: true

@@ -1,8 +1,60 @@
-# Event-Driven Bookinfo
+<h1 align="center">Event-Driven Bookinfo</h1>
+
+```mermaid
+flowchart LR
+    User([User])
+    Gateway[Envoy Gateway]
+
+    subgraph "Query Side"
+        ReadAPI[Read API]
+        ReadDB[(Read DB)]
+    end
+
+    subgraph "Command Side"
+        subgraph "Argo Events"
+            Webhook[Webhook]
+            Kafka[[Kafka EventBus]]
+            Sensor[Sensor]
+        end
+        WriteSvc[Write Services]
+        WriteDB[(Write DB)]
+    end
+
+    subgraph "Failure Recovery"
+        DLQ[(DLQueue)]
+    end
+
+    User -->|GET Query| Gateway
+    User -->|POST Command| Gateway
+
+    Gateway -->|method: GET| ReadAPI
+    ReadAPI --> ReadDB
+
+    Gateway -->|method: POST| Webhook
+    Webhook --> Kafka
+    Kafka --> Sensor
+    Sensor -->|HTTP Trigger| WriteSvc
+    WriteSvc --> WriteDB
+
+    WriteDB -.->|replication| ReadDB
+
+    Sensor -.->|dlqTrigger<br/>retries exhausted| DLQ
+    DLQ -.->|replay| Webhook
+
+    classDef queryStyle fill:#1e3a8a,stroke:#3b82f6,color:#fff
+    classDef writeStyle fill:#7c2d12,stroke:#f97316,color:#fff
+    classDef infraStyle fill:#1f2937,stroke:#06b6d4,color:#fff
+    classDef dlqStyle fill:#4a044e,stroke:#c026d3,color:#fff
+
+    class ReadAPI,ReadDB queryStyle
+    class WriteSvc,WriteDB writeStyle
+    class Gateway,Webhook,Kafka,Sensor infraStyle
+    class DLQ dlqStyle
+```
 
 Go hexagonal architecture monorepo adapting Istio's Bookinfo as a book review system, demonstrating real-time event-driven architecture with Argo Events and Kafka.
 
-Services are plain REST APIs — all event-driven complexity (Kafka consumers, retries, dead-letter queues) is abstracted by Argo Events EventSources and Sensors. The write path flows through Kafka via Argo Events, ensuring every mutation is event-sourced, while the read path remains synchronous HTTP. This demonstrates using Argo Events not only for workflow automation, but as a real-time event-driven architecture platform — a self-hosted alternative to Google Eventarc or AWS EventBridge.
+Services are plain REST APIs — all event-driven complexity (Kafka consumers, retries, dead-letter queues) is abstracted by Argo Events EventSources and Sensors. The write path flows through Kafka via Argo Events, ensuring every mutation is event-sourced, while the read path remains synchronous HTTP. Failure recovery is built into the pipeline — a `dlqTrigger` on every sensor captures events that exhaust retries into the `dlqueue` service, where they can be inspected, replayed, or marked resolved. This demonstrates using Argo Events not only for workflow automation, but as a real-time event-driven architecture platform — a self-hosted alternative to Google Eventarc or AWS EventBridge.
 
 ## Architecture Overview
 
@@ -15,6 +67,7 @@ graph TD
     R["reviews<br/>:8082 / :9092"]
     RT["ratings<br/>:8083 / :9093"]
     N["notification<br/>:8084 / :9094<br/><i>event consumer only</i>"]
+    DLQ["dlqueue<br/>:8085 / :9095<br/><i>failure capture + replay</i>"]
     Redis["Redis<br/><i>pending review cache</i>"]
 
     PP -->|sync GET| D
@@ -27,6 +80,7 @@ graph TD
     style R fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
     style RT fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
     style N fill:#1a1d27,color:#e4e4e7,stroke:#f59e0b
+    style DLQ fill:#1a1d27,color:#e4e4e7,stroke:#a855f7
     style Redis fill:#ef4444,color:#fff,stroke:#dc2626
 ```
 
@@ -52,6 +106,10 @@ graph TD
     N2["notification<br/>POST /v1/notifications"]
     N3["notification<br/>POST /v1/notifications"]
 
+    DLQES["dlq-event-received<br/>EventSource"]
+    DLQS["Sensor: dlq-event-received"]
+    DLQW["dlqueue-write<br/>POST /v1/events"]
+
     Browser --> PP
     PP -->|"POST /v1/* via gateway"| GW
     WH --> GW
@@ -71,6 +129,14 @@ graph TD
     S3 -->|HTTP Trigger| RT
     S3 -->|HTTP Trigger| N3
 
+    S1 -.->|"dlqTrigger (retries exhausted)"| DLQES
+    S2 -.->|"dlqTrigger (retries exhausted)"| DLQES
+    S3 -.->|"dlqTrigger (retries exhausted)"| DLQES
+    DLQES --> K
+    K --> DLQS
+    DLQS -->|HTTP Trigger| DLQW
+    DLQW -.->|replay via POST to eventsource_url| WH
+
     style Browser fill:#6366f1,color:#fff,stroke:#818cf8
     style PP fill:#6366f1,color:#fff,stroke:#818cf8
     style GW fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
@@ -80,6 +146,9 @@ graph TD
     style S1 fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
     style S2 fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
     style S3 fill:#1a1d27,color:#e4e4e7,stroke:#2a2d3a
+    style DLQES fill:#22c55e,color:#fff,stroke:#16a34a
+    style DLQS fill:#1a1d27,color:#e4e4e7,stroke:#a855f7
+    style DLQW fill:#1a1d27,color:#e4e4e7,stroke:#a855f7
 ```
 
 Reads are synchronous HTTP calls between services. Writes are fully async via the Envoy Gateway's method-based CQRS routing — POST requests are routed to Argo Events webhook EventSources, which publish to the Kafka EventBus. Sensors consume events and fire HTTP triggers against the write services. The gateway acts as the CQRS boundary, while services remain plain HTTP servers with no Kafka dependency.
@@ -105,6 +174,7 @@ All service wiring happens in `services/<name>/cmd/main.go`. The shared `pkg/` p
 | **reviews** | Backend | 8082 | 9092 | User reviews. Makes sync GET to ratings service. Event-written via `review-submitted` sensor. |
 | **ratings** | Backend | 8083 | 9093 | Star ratings per reviewer. Event-written via `rating-submitted` sensor. |
 | **notification** | Event consumer | 8084 | 9094 | Receives POST from sensors, stores audit log. Exposes GET for review. |
+| **dlqueue** | Backend (hex arch) | 8085 | 9095 | Captures events failing sensor retry exhaustion; stores in PostgreSQL; supports replay via REST API |
 
 All services expose their business API on the API port and observability endpoints (`/metrics`, `/healthz`, `/readyz`, `/debug/pprof/*`) on the admin port.
 
@@ -116,6 +186,7 @@ All services expose their business API on the API port and observability endpoin
 |---|---|
 | `pkg/config` | Loads all service configuration from environment variables with defaults. |
 | `pkg/health` | `/healthz` (liveness) and `/readyz` (readiness) handlers. Readiness supports optional check functions (e.g., `db.Ping`). |
+| `pkg/idempotency` | `Store` interface (`CheckAndRecord`) with memory + postgres adapters; `NaturalKey` (SHA-256 with `0x1f` separator to prevent boundary collisions); `Resolve` picks explicit `idempotency_key` when present, otherwise derives a natural key from business fields. |
 | `pkg/logging` | JSON `slog` logger with `otelslog` bridge for automatic `trace_id`/`span_id` injection. HTTP middleware that creates a request-scoped logger with `request_id`, method, path. |
 | `pkg/metrics` | OTel Metrics SDK -> Prometheus exporter setup. HTTP middleware recording request duration, request count, and in-flight gauge. Go runtime metrics (goroutines, GC, memory). |
 | `pkg/profiling` | Pyroscope SDK wrapper. No-op when `PYROSCOPE_SERVER_ADDRESS` is unset. Enables CPU, alloc, inuse, goroutine, mutex, and block profiles. |
@@ -157,6 +228,8 @@ SERVICE_NAME=reviews HTTP_PORT=8082 ADMIN_PORT=9092 \
 
 SERVICE_NAME=notification HTTP_PORT=8084 ADMIN_PORT=9094 ./bin/notification
 
+SERVICE_NAME=dlqueue HTTP_PORT=8085 ADMIN_PORT=9095 ./bin/dlqueue
+
 # Optional: REDIS_URL=redis://localhost:6379 (enables pending review cache)
 SERVICE_NAME=productpage HTTP_PORT=8080 ADMIN_PORT=9090 \
   DETAILS_SERVICE_URL=http://localhost:8081 \
@@ -186,7 +259,7 @@ make stop         # Stop and remove containers
 | Target | Description |
 |---|---|
 | `make build SERVICE=<name>` | Build a single service binary to `bin/<name>` |
-| `make build-all` | Build all 5 service binaries |
+| `make build-all` | Build all 6 service binaries |
 | `make test` | Run all tests |
 | `make test-cover` | Run tests with HTML coverage report |
 | `make test-race` | Run tests with the race detector |
@@ -195,7 +268,7 @@ make stop         # Stop and remove containers
 | `make vet` | Run go vet |
 | `make mod-tidy` | Tidy go module dependencies |
 | `make docker-build SERVICE=<name>` | Build Docker image for one service |
-| `make docker-build-all` | Build Docker images for all 5 services |
+| `make docker-build-all` | Build Docker images for all 6 services |
 | `make run` | Start all services via Docker Compose (PostgreSQL backend) |
 | `make stop` | Stop services and remove containers |
 | `make e2e` | Run E2E tests via docker-compose |
@@ -243,6 +316,7 @@ ghcr.io/kaio6fellipe/event-driven-bookinfo/details:<tag>
 ghcr.io/kaio6fellipe/event-driven-bookinfo/reviews:<tag>
 ghcr.io/kaio6fellipe/event-driven-bookinfo/ratings:<tag>
 ghcr.io/kaio6fellipe/event-driven-bookinfo/notification:<tag>
+ghcr.io/kaio6fellipe/event-driven-bookinfo/dlqueue:<tag>
 ```
 
 ---
@@ -309,6 +383,9 @@ graph TD
         RTW["ratings-write"]
         N["notification"]
 
+        DLQR["dlqueue"]
+        DLQW["dlqueue-write"]
+
         ES["EventSources"]
         EB["EventBus"]
         S["Sensors"]
@@ -341,15 +418,16 @@ graph TD
     S -->|trigger| RW
     S -->|trigger| RTW
     S -->|trigger| N
+    S -->|"dlqTrigger<br/>(on failure)"| DLQW
 
-    DR & DW & RR & RW & RTR & RTW & N --> PG
+    DR & DW & RR & RW & RTR & RTW & N & DLQR & DLQW --> PG
     PP --> Redis
 
     Alloy -.->|scrape :9090/metrics| PP
     Alloy -.->|OTLP traces| Tempo
     Alloy -.->|remote_write| Prom
     Alloy -.->|push logs| Loki
-    PP & DR & DW & RR & RW & RTR & RTW & N -.->|push profiles| Pyro
+    PP & DR & DW & RR & RW & RTR & RTW & N & DLQR & DLQW -.->|push profiles| Pyro
     Prom & Tempo & Loki & Pyro --> Grafana
 
     style Browser fill:#6366f1,color:#fff,stroke:#818cf8
@@ -361,6 +439,8 @@ graph TD
     style ES fill:#22c55e,color:#fff,stroke:#16a34a
     style S fill:#22c55e,color:#fff,stroke:#16a34a
     style ArgoCtrl fill:#22c55e,color:#fff,stroke:#16a34a
+    style DLQR fill:#1a1d27,color:#e4e4e7,stroke:#a855f7
+    style DLQW fill:#1a1d27,color:#e4e4e7,stroke:#a855f7
     style Grafana fill:#e879f9,color:#000,stroke:#c026d3
     style PG fill:#3b82f6,color:#fff,stroke:#2563eb
     style Redis fill:#ef4444,color:#fff,stroke:#dc2626
@@ -373,7 +453,7 @@ The cluster (`bookinfo-local`) runs four namespaces:
 | `platform` | Strimzi operator, Kafka (KRaft single-node), Argo Events controller, EventBus, Gateway `default-gw` |
 | `envoy-gateway-system` | Envoy Gateway controller, GatewayClass `eg`, stable `gateway` Service for CQRS routing |
 | `observability` | Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy (DaemonSet for logs + Deployment for metrics/traces) |
-| `bookinfo` | 8 app deployments (CQRS split), PostgreSQL, 3 EventSources, 3 Sensors, method-based HTTPRoutes |
+| `bookinfo` | 10 app deployments (CQRS split incl. dlqueue read/write), PostgreSQL, 4 EventSources (incl. `dlq-event-received`), 4 Sensors (incl. DLQ), method-based HTTPRoutes |
 
 ### CQRS Deployment Split
 
@@ -386,6 +466,7 @@ Each backend service deploys as two separate Deployments sharing the same image 
 | `reviews` / `reviews-write` | Read / Write | productpage / review-submitted sensor |
 | `ratings` / `ratings-write` | Read / Write | reviews (read) / rating-submitted sensor |
 | `notification` | Write-only | All 3 sensors |
+| `dlqueue` / `dlqueue-write` | Read / Write | operator/service API (GET) / `dlq-event-received` sensor (POST) |
 
 ### Usage
 
@@ -433,6 +514,14 @@ OTel trace context propagates via `traceparent`/`tracestate` CloudEvent extensio
 kubectl apply --dry-run=client -f deploy/argo-events/eventsources/
 kubectl apply --dry-run=client -f deploy/argo-events/sensors/
 ```
+
+### Dead Letter Queue
+
+Every primary sensor trigger carries `atLeastOnce: true` + exponential backoff and a `dlqTrigger` that fires after retry exhaustion. The dlqTrigger captures the full CloudEvents context (`id`, `type`, `source`, `subject`, `time`, `datacontenttype`) via `contextKey`, plus the original body and HTTP headers (preserving `traceparent` for distributed trace correlation), and POSTs the structured payload to a dedicated `dlq-event-received` EventSource. The DLQ event then flows through the standard Argo Events pipeline: EventSource → Kafka → DLQ sensor → `dlqueue-write` service → PostgreSQL.
+
+The dlqueue service deduplicates arrivals by a natural composite key (`sensor_name + failed_trigger + SHA-256(original_payload)`). The CloudEvents `id` cannot be used as a dedup key because Argo Events regenerates it on every EventSource pass — per the CNCF CloudEvents spec, `id` is a hop-level identifier, not an end-to-end correlation key. Events are tracked through a state machine (`pending → replayed → resolved` on success; `poisoned` after `max_retries` failed replays).
+
+Replay is operator- or service-initiated via `POST /v1/events/{id}/replay`: dlqueue re-POSTs the original payload and headers to the source EventSource URL stored on the DLQ record, re-entering the full CQRS pipeline. All write services are idempotent (see `pkg/idempotency`) so replays are safe. For the full domain model, API surface, and metric definitions, see [docs/superpowers/specs/2026-04-13-dlqueue-service-design.md](docs/superpowers/specs/2026-04-13-dlqueue-service-design.md).
 
 ---
 
@@ -524,10 +613,20 @@ event-driven-bookinfo/
 │   │           └── outbound/   # memory/ and postgres/
 │   ├── reviews/                # User reviews (hex arch, calls ratings)
 │   ├── ratings/                # Star ratings (hex arch)
-│   └── notification/           # Event consumer + audit log (hex arch)
+│   ├── notification/           # Event consumer + audit log (hex arch)
+│   └── dlqueue/                # Dead letter queue (hex arch) — NEW
+│       ├── cmd/main.go
+│       ├── migrations/         # dlq_events + processed_events
+│       └── internal/
+│           ├── core/           # domain/, port/, service/
+│           ├── adapter/
+│           │   ├── inbound/http/
+│           │   └── outbound/   # memory/, postgres/, http/ (replay client)
+│           └── metrics/        # dlq_events_* counters
 ├── pkg/
 │   ├── config/                 # Env-based configuration
 │   ├── health/                 # /healthz and /readyz handlers
+│   ├── idempotency/            # Store interface + adapters; natural-key hashing
 │   ├── logging/                # slog + otelslog bridge + HTTP middleware
 │   ├── metrics/                # OTel -> Prometheus + HTTP middleware + runtime
 │   ├── profiling/              # Pyroscope SDK wrapper
@@ -570,7 +669,7 @@ Each service is versioned and released independently. Releases are fully automat
 ### How It Works
 
 1. **PR merged to `main`** → `auto-tag.yml` runs
-2. **Detects changed services** — file paths under `services/<name>/`; changes to `pkg/`, `go.mod`, or `go.sum` trigger all 5 services
+2. **Detects changed services** — file paths under `services/<name>/`; changes to `pkg/`, `go.mod`, or `go.sum` trigger all 6 services
 3. **Determines version bump** — PR labels (`major`/`minor`) take priority, then conventional commit prefixes (`feat` → minor, `fix` → patch, `BREAKING CHANGE` → major), default is `patch`
 4. **Creates tag** — e.g., `details-v0.2.0`
 5. **Dispatches release** — `release.yml` builds binaries, Docker images (multi-arch), and creates a GitHub release

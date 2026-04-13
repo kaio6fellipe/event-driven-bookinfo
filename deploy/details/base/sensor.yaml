@@ -21,9 +21,75 @@ spec:
                 dependencyName: book-added-dep
                 dataKey: body
               dest: ""
+      atLeastOnce: true
       retryStrategy:
         steps: 3
         duration: 2s
+        factor: 2.0
+        jitter: 1
+      dlqTrigger:
+        template:
+          name: dlq-create-detail
+          http:
+            url: http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/dlq-event-received
+            method: POST
+            headers:
+              Content-Type: application/json
+            payload:
+              - src:
+                  dependencyName: book-added-dep
+                  dataKey: body
+                dest: original_payload
+              - src:
+                  dependencyName: book-added-dep
+                  contextKey: id
+                dest: event_id
+              - src:
+                  dependencyName: book-added-dep
+                  contextKey: type
+                dest: event_type
+              - src:
+                  dependencyName: book-added-dep
+                  contextKey: source
+                dest: event_source
+              - src:
+                  dependencyName: book-added-dep
+                  contextKey: subject
+                dest: event_subject
+              - src:
+                  dependencyName: book-added-dep
+                  contextKey: time
+                dest: event_timestamp
+              - src:
+                  dependencyName: book-added-dep
+                  contextKey: datacontenttype
+                dest: datacontenttype
+              - src:
+                  dependencyName: book-added-dep
+                  dataKey: header
+                dest: original_headers
+              - src:
+                  dependencyName: book-added-dep
+                  value: "book-added-sensor"
+                dest: sensor_name
+              - src:
+                  dependencyName: book-added-dep
+                  value: "create-detail"
+                dest: failed_trigger
+              - src:
+                  dependencyName: book-added-dep
+                  value: "http://book-added-eventsource-svc.bookinfo.svc.cluster.local:12000/book-added"
+                dest: eventsource_url
+              - src:
+                  dependencyName: book-added-dep
+                  value: "bookinfo"
+                dest: namespace
+        atLeastOnce: true
+        retryStrategy:
+          steps: 5
+          duration: 2s
+          factor: 2.0
+          jitter: 1
     - template:
         name: notify-book-added
         http:
@@ -48,6 +114,72 @@ spec:
                 dependencyName: book-added-dep
                 value: "email"
               dest: channel
+      atLeastOnce: true
       retryStrategy:
         steps: 3
         duration: 2s
+        factor: 2.0
+        jitter: 1
+      dlqTrigger:
+        template:
+          name: dlq-notify-book-added
+          http:
+            url: http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/dlq-event-received
+            method: POST
+            headers:
+              Content-Type: application/json
+            payload:
+              - src:
+                  dependencyName: book-added-dep
+                  dataKey: body
+                dest: original_payload
+              - src:
+                  dependencyName: book-added-dep
+                  contextKey: id
+                dest: event_id
+              - src:
+                  dependencyName: book-added-dep
+                  contextKey: type
+                dest: event_type
+              - src:
+                  dependencyName: book-added-dep
+                  contextKey: source
+                dest: event_source
+              - src:
+                  dependencyName: book-added-dep
+                  contextKey: subject
+                dest: event_subject
+              - src:
+                  dependencyName: book-added-dep
+                  contextKey: time
+                dest: event_timestamp
+              - src:
+                  dependencyName: book-added-dep
+                  contextKey: datacontenttype
+                dest: datacontenttype
+              - src:
+                  dependencyName: book-added-dep
+                  dataKey: header
+                dest: original_headers
+              - src:
+                  dependencyName: book-added-dep
+                  value: "book-added-sensor"
+                dest: sensor_name
+              - src:
+                  dependencyName: book-added-dep
+                  value: "notify-book-added"
+                dest: failed_trigger
+              - src:
+                  dependencyName: book-added-dep
+                  value: "http://book-added-eventsource-svc.bookinfo.svc.cluster.local:12000/book-added"
+                dest: eventsource_url
+              - src:
+                  dependencyName: book-added-dep
+                  value: "bookinfo"
+                dest: namespace
+        atLeastOnce: true
+        retryStrategy:
+          steps: 5
+          duration: 2s
+          factor: 2.0
+          jitter: 1

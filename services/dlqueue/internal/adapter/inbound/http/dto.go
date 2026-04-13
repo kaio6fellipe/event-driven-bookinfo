@@ -8,18 +8,18 @@ import (
 
 // IngestEventRequest is the body of POST /v1/events.
 type IngestEventRequest struct {
-	EventID         string              `json:"event_id"`
-	EventType       string              `json:"event_type"`
-	EventSource     string              `json:"event_source"`
-	EventSubject    string              `json:"event_subject"`
-	SensorName      string              `json:"sensor_name"`
-	FailedTrigger   string              `json:"failed_trigger"`
-	EventSourceURL  string              `json:"eventsource_url"`
-	Namespace       string              `json:"namespace"`
-	OriginalPayload any                 `json:"original_payload"` // JSON object, JSON-encoded string, or []byte
-	OriginalHeaders any                 `json:"original_headers"` // map[string][]string or JSON-encoded string
-	DataContentType string              `json:"datacontenttype"`
-	EventTimestamp  string              `json:"event_timestamp"` // ISO-8601
+	EventID         string `json:"event_id"`
+	EventType       string `json:"event_type"`
+	EventSource     string `json:"event_source"`
+	EventSubject    string `json:"event_subject"`
+	SensorName      string `json:"sensor_name"`
+	FailedTrigger   string `json:"failed_trigger"`
+	EventSourceURL  string `json:"eventsource_url"`
+	Namespace       string `json:"namespace"`
+	OriginalPayload any    `json:"original_payload"` // JSON object, JSON-encoded string, or []byte
+	OriginalHeaders any    `json:"original_headers"` // map[string][]string or JSON-encoded string
+	DataContentType string `json:"datacontenttype"`
+	EventTimestamp  string `json:"event_timestamp"` // ISO-8601
 }
 
 // DLQEventResponse is the REST representation of a DLQEvent.

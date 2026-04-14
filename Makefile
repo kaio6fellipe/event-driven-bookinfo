@@ -378,15 +378,17 @@ k8s-deploy: ##@Kubernetes Build images, import to k3d, deploy apps + HTTPRoutes
 		--values deploy/redis/local/redis-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Redis ready.$(NC)\n"
-	@printf "$(BOLD)[5/6] Deploying services...$(NC)\n"
+	@printf "$(BOLD)[5/6] Deploying services via Helm...$(NC)\n"
 	@for svc in $(SERVICES); do \
-		printf "  Applying $$svc local overlay...\n"; \
-		$(KUBECTL) apply -k deploy/$$svc/overlays/local/ || exit 1; \
+		printf "  Installing $$svc...\n"; \
+		$(HELM) upgrade --install $$svc charts/bookinfo-service \
+			--namespace $(K8S_NS_BOOKINFO) \
+			-f deploy/$$svc/values-local.yaml || exit 1; \
 	done
 	@printf "$(BOLD)[6/6] Applying HTTPRoutes...$(NC)\n"
 	@$(KUBECTL) apply -k deploy/gateway/overlays/local/
 	@printf "\n$(BOLD)Waiting for deployments...$(NC)\n"
-	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification; do \
+	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write; do \
 		$(KUBECTL) wait deployment/$$dep -n $(K8S_NS_BOOKINFO) \
 			--for=condition=Available --timeout=120s || true; \
 	done
@@ -430,15 +432,15 @@ k8s-rebuild: ##@Kubernetes Fast iteration: rebuild images, reimport, rollout res
 		k3d image import event-driven-bookinfo/$$svc:local -c $(K8S_CLUSTER) || exit 1; \
 	done
 	@for svc in $(SERVICES); do \
-		$(KUBECTL) apply -k deploy/$$svc/overlays/local/ || exit 1; \
+		$(HELM) upgrade --install $$svc charts/bookinfo-service \
+			--namespace $(K8S_NS_BOOKINFO) \
+			-f deploy/$$svc/values-local.yaml || exit 1; \
 	done
-	@printf "  Applying HTTPRoutes...\n"
-	@$(KUBECTL) apply -k deploy/gateway/overlays/local/
-	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification; do \
+	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write; do \
 		$(KUBECTL) rollout restart deployment/$$dep -n $(K8S_NS_BOOKINFO) 2>/dev/null || true; \
 	done
 	@printf "\n$(BOLD)Waiting for rollouts...$(NC)\n"
-	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification; do \
+	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write; do \
 		$(KUBECTL) rollout status deployment/$$dep -n $(K8S_NS_BOOKINFO) --timeout=120s 2>/dev/null || true; \
 	done
 	@printf "\n$(GREEN)$(BOLD)Rebuild complete.$(NC)\n\n"
@@ -500,6 +502,28 @@ k8s-load-stop: ##@Kubernetes Remove k6 CronJob from the cluster
 	@printf "$(BOLD)Removing k6 load generator CronJob...$(NC)\n"
 	@$(KUBECTL) kustomize --load-restrictor LoadRestrictionsNone deploy/k6/overlays/local/ | $(KUBECTL) delete --ignore-not-found -f -
 	@printf "$(GREEN)k6 CronJob removed.$(NC)\n"
+
+# ─── Helm ──────────────────────────────────────────────────────────────────
+
+.PHONY: helm-lint
+helm-lint: ##@Helm Lint the bookinfo-service chart
+	helm lint charts/bookinfo-service
+	@for svc in $(SERVICES); do \
+		if [ -f deploy/$$svc/values-local.yaml ]; then \
+			printf "  Linting with $$svc values...\n"; \
+			helm lint charts/bookinfo-service -f deploy/$$svc/values-local.yaml || exit 1; \
+		fi; \
+	done
+	@printf "$(GREEN)All lints passed.$(NC)\n"
+
+.PHONY: helm-template
+helm-template: ##@Helm Dry-run render for a service: make helm-template SERVICE=<name>
+ifndef SERVICE
+	$(error SERVICE is not set. Usage: make helm-template SERVICE=<name>)
+endif
+	helm template $(SERVICE) charts/bookinfo-service \
+		-f deploy/$(SERVICE)/values-local.yaml \
+		--namespace $(K8S_NS_BOOKINFO)
 
 # ─── Help ───────────────────────────────────────────────────────────────────
 

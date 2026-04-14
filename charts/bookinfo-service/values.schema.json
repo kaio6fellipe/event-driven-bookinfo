@@ -65,6 +65,27 @@
         "maxReplicas": { "type": "integer" },
         "targetCPUUtilization": { "type": "integer" }
       }
+    },
+    "gateway": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "namespace": { "type": "string" },
+        "sectionName": { "type": "string" }
+      }
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "path": { "type": "string" },
+          "pathType": { "type": "string", "enum": ["PathPrefix", "Exact"] },
+          "method": { "type": "string" }
+        },
+        "required": ["name", "path", "pathType", "method"]
+      }
     }
   }
 }

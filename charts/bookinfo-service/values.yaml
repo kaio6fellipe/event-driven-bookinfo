@@ -83,3 +83,16 @@ autoscaling:
   minReplicas: 3
   maxReplicas: 10
   targetCPUUtilization: 70
+
+# -- Gateway parentRef for HTTPRoutes
+gateway:
+  name: default-gw
+  namespace: platform
+  sectionName: web
+
+# -- Custom HTTPRoutes (for non-CQRS services like productpage)
+routes: []
+  # - name: productpage        # HTTPRoute metadata.name
+  #   path: /                  # match path
+  #   pathType: PathPrefix     # PathPrefix or Exact
+  #   method: GET              # HTTP method

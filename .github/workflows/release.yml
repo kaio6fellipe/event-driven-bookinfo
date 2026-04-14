@@ -19,14 +19,15 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: write
-  packages: write
+permissions: {}
 
 jobs:
   release:
     name: Release ${{ inputs.service }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     steps:
       - name: Validate tag format
         run: |

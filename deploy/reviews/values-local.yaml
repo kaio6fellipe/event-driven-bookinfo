@@ -1,0 +1,100 @@
+# deploy/reviews/values-local.yaml
+serviceName: reviews
+fullnameOverride: reviews
+image:
+  repository: event-driven-bookinfo/reviews
+  tag: local
+
+config:
+  LOG_LEVEL: "debug"
+  STORAGE_BACKEND: "postgres"
+  DATABASE_URL: "postgres://bookinfo:bookinfo@postgres.bookinfo.svc.cluster.local:5432/bookinfo_reviews?sslmode=disable"
+  RUN_MIGRATIONS: "true"
+  RATINGS_SERVICE_URL: "http://ratings.bookinfo.svc.cluster.local"
+
+observability:
+  otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+  pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"
+
+cqrs:
+  enabled: true
+  read:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  write:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  endpoints:
+    review-submitted:
+      port: 12001
+      method: POST
+      endpoint: /v1/reviews
+      triggers:
+        - name: create-review
+          url: self
+          payload:
+            - passthrough
+        - name: notify-review-submitted
+          url: "http://notification.bookinfo.svc.cluster.local/v1/notifications"
+          method: POST
+          payload:
+            - src:
+                dependencyName: review-submitted-dep
+                dataKey: body.product_id
+              dest: subject
+            - src:
+                value: "New review submitted"
+              dest: body
+            - src:
+                value: "system@bookinfo"
+              dest: recipient
+            - src:
+                value: "email"
+              dest: channel
+    review-deleted:
+      port: 12003
+      method: POST
+      endpoint: /v1/reviews/delete
+      triggers:
+        - name: delete-review-write
+          url: self
+          payload:
+            - src:
+                dependencyName: review-deleted-dep
+                dataKey: body.review_id
+              dest: review_id
+        - name: delete-review-read
+          url: "http://reviews.bookinfo.svc.cluster.local/v1/reviews/delete"
+          method: POST
+          payload:
+            - src:
+                dependencyName: review-deleted-dep
+                dataKey: body.review_id
+              dest: review_id
+        - name: notify-review-deleted
+          url: "http://notification.bookinfo.svc.cluster.local/v1/notifications"
+          method: POST
+          payload:
+            - src:
+                dependencyName: review-deleted-dep
+                dataKey: body.product_id
+              dest: subject
+            - src:
+                value: "Review deleted"
+              dest: body
+            - src:
+                value: "system@bookinfo"
+              dest: recipient
+            - src:
+                value: "email"
+              dest: channel
+
+sensor:
+  dlq:
+    url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/dlq-event-received"

@@ -1,0 +1,62 @@
+# deploy/ratings/values-local.yaml
+serviceName: ratings
+fullnameOverride: ratings
+image:
+  repository: event-driven-bookinfo/ratings
+  tag: local
+
+config:
+  LOG_LEVEL: "debug"
+  STORAGE_BACKEND: "postgres"
+  DATABASE_URL: "postgres://bookinfo:bookinfo@postgres.bookinfo.svc.cluster.local:5432/bookinfo_ratings?sslmode=disable"
+  RUN_MIGRATIONS: "true"
+
+observability:
+  otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+  pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"
+
+cqrs:
+  enabled: true
+  read:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  write:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  endpoints:
+    rating-submitted:
+      port: 12002
+      method: POST
+      endpoint: /v1/ratings
+      triggers:
+        - name: create-rating
+          url: self
+          payload:
+            - passthrough
+        - name: notify-rating-submitted
+          url: "http://notification.bookinfo.svc.cluster.local/v1/notifications"
+          method: POST
+          payload:
+            - src:
+                dependencyName: rating-submitted-dep
+                dataKey: body.product_id
+              dest: subject
+            - src:
+                value: "New rating submitted"
+              dest: body
+            - src:
+                value: "system@bookinfo"
+              dest: recipient
+            - src:
+                value: "email"
+              dest: channel
+
+sensor:
+  dlq:
+    url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/dlq-event-received"

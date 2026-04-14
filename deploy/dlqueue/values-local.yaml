@@ -1,0 +1,45 @@
+# deploy/dlqueue/values-local.yaml
+serviceName: dlqueue
+fullnameOverride: dlqueue
+image:
+  repository: event-driven-bookinfo/dlqueue
+  tag: local
+
+config:
+  LOG_LEVEL: "debug"
+  STORAGE_BACKEND: "postgres"
+  DATABASE_URL: "postgres://bookinfo:bookinfo@postgres.bookinfo.svc.cluster.local:5432/bookinfo_dlqueue?sslmode=disable"
+  RUN_MIGRATIONS: "true"
+
+observability:
+  otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+  pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"
+
+sensor:
+  dlq:
+    enabled: false
+
+cqrs:
+  enabled: true
+  read:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  write:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  endpoints:
+    dlq-event-received:
+      port: 12004
+      method: POST
+      endpoint: /dlq-event-received
+      triggers:
+        - name: ingest-dlq-event
+          url: self
+          payload:
+            - passthrough

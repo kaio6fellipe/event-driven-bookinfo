@@ -1,0 +1,18 @@
+# deploy/productpage/values-local.yaml
+serviceName: productpage
+fullnameOverride: productpage
+image:
+  repository: event-driven-bookinfo/productpage
+  tag: local
+
+config:
+  LOG_LEVEL: "debug"
+  STORAGE_BACKEND: "memory"
+  DETAILS_SERVICE_URL: "http://details.bookinfo.svc.cluster.local"
+  REVIEWS_SERVICE_URL: "http://reviews.bookinfo.svc.cluster.local"
+  REDIS_URL: "redis://redis-master.bookinfo.svc.cluster.local:6379"
+  TEMPLATE_DIR: "/app/templates"
+
+observability:
+  otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+  pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"

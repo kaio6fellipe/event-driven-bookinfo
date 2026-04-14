@@ -1,0 +1,24 @@
+# charts/bookinfo-service/ci/values-ratings-cqrs.yaml
+# ct install test: CQRS + EventSource + Sensor + DLQ
+serviceName: ratings
+fullnameOverride: ratings
+image:
+  repository: event-driven-bookinfo/ratings
+  tag: latest
+
+cqrs:
+  enabled: true
+  endpoints:
+    rating-submitted:
+      port: 12002
+      method: POST
+      endpoint: /v1/ratings
+      triggers:
+        - name: create-rating
+          url: self
+          payload:
+            - passthrough
+
+sensor:
+  dlq:
+    url: "http://dlq-eventsource-svc:12004/dlq-event-received"

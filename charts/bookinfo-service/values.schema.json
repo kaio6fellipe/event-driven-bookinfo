@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "serviceName": { "type": "string" },
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": { "type": "string" },
+        "tag": { "type": "string" },
+        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+      },
+      "required": ["repository", "tag"]
+    },
+    "replicaCount": { "type": "integer", "minimum": 0 },
+    "resources": { "type": "object" },
+    "ports": {
+      "type": "object",
+      "properties": {
+        "http": { "type": "integer" },
+        "admin": { "type": "integer" }
+      }
+    },
+    "probes": { "type": "object" },
+    "config": { "type": "object", "additionalProperties": { "type": "string" } },
+    "cqrs": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "read": { "type": "object" },
+        "write": { "type": "object" },
+        "eventBusName": { "type": "string" },
+        "endpoints": { "type": "object" }
+      }
+    },
+    "sensor": {
+      "type": "object",
+      "properties": {
+        "retryStrategy": { "type": "object" },
+        "atLeastOnce": { "type": "boolean" },
+        "dlq": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "url": { "type": "string" },
+            "retryStrategy": { "type": "object" }
+          }
+        }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "properties": {
+        "otelEndpoint": { "type": "string" },
+        "pyroscopeAddress": { "type": "string" }
+      }
+    },
+    "autoscaling": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minReplicas": { "type": "integer" },
+        "maxReplicas": { "type": "integer" },
+        "targetCPUUtilization": { "type": "integer" }
+      }
+    }
+  }
+}

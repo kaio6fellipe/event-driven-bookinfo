@@ -1,0 +1,24 @@
+# charts/bookinfo-service/ci/values-dlqueue-no-dlq.yaml
+# ct install test: CQRS + events, DLQ triggers disabled
+serviceName: dlqueue
+fullnameOverride: dlqueue
+image:
+  repository: event-driven-bookinfo/dlqueue
+  tag: latest
+
+sensor:
+  dlq:
+    enabled: false
+
+cqrs:
+  enabled: true
+  endpoints:
+    dlq-event-received:
+      port: 12004
+      method: POST
+      endpoint: /v1/events
+      triggers:
+        - name: ingest-dlq-event
+          url: self
+          payload:
+            - passthrough

@@ -378,15 +378,15 @@ k8s-deploy: ##@Kubernetes Build images, import to k3d, deploy apps + HTTPRoutes
 		--values deploy/redis/local/redis-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Redis ready.$(NC)\n"
-	@printf "$(BOLD)[5/6] Deploying services...$(NC)\n"
+	@printf "$(BOLD)[5/5] Deploying services via Helm...$(NC)\n"
 	@for svc in $(SERVICES); do \
-		printf "  Applying $$svc local overlay...\n"; \
-		$(KUBECTL) apply -k deploy/$$svc/overlays/local/ || exit 1; \
+		printf "  Installing $$svc...\n"; \
+		$(HELM) upgrade --install $$svc charts/bookinfo-service \
+			--namespace $(K8S_NS_BOOKINFO) \
+			-f deploy/$$svc/values-local.yaml || exit 1; \
 	done
-	@printf "$(BOLD)[6/6] Applying HTTPRoutes...$(NC)\n"
-	@$(KUBECTL) apply -k deploy/gateway/overlays/local/
 	@printf "\n$(BOLD)Waiting for deployments...$(NC)\n"
-	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification; do \
+	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write; do \
 		$(KUBECTL) wait deployment/$$dep -n $(K8S_NS_BOOKINFO) \
 			--for=condition=Available --timeout=120s || true; \
 	done
@@ -430,15 +430,15 @@ k8s-rebuild: ##@Kubernetes Fast iteration: rebuild images, reimport, rollout res
 		k3d image import event-driven-bookinfo/$$svc:local -c $(K8S_CLUSTER) || exit 1; \
 	done
 	@for svc in $(SERVICES); do \
-		$(KUBECTL) apply -k deploy/$$svc/overlays/local/ || exit 1; \
+		$(HELM) upgrade --install $$svc charts/bookinfo-service \
+			--namespace $(K8S_NS_BOOKINFO) \
+			-f deploy/$$svc/values-local.yaml || exit 1; \
 	done
-	@printf "  Applying HTTPRoutes...\n"
-	@$(KUBECTL) apply -k deploy/gateway/overlays/local/
-	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification; do \
+	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write; do \
 		$(KUBECTL) rollout restart deployment/$$dep -n $(K8S_NS_BOOKINFO) 2>/dev/null || true; \
 	done
 	@printf "\n$(BOLD)Waiting for rollouts...$(NC)\n"
-	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification; do \
+	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write; do \
 		$(KUBECTL) rollout status deployment/$$dep -n $(K8S_NS_BOOKINFO) --timeout=120s 2>/dev/null || true; \
 	done
 	@printf "\n$(GREEN)$(BOLD)Rebuild complete.$(NC)\n\n"
@@ -500,6 +500,68 @@ k8s-load-stop: ##@Kubernetes Remove k6 CronJob from the cluster
 	@printf "$(BOLD)Removing k6 load generator CronJob...$(NC)\n"
 	@$(KUBECTL) kustomize --load-restrictor LoadRestrictionsNone deploy/k6/overlays/local/ | $(KUBECTL) delete --ignore-not-found -f -
 	@printf "$(GREEN)k6 CronJob removed.$(NC)\n"
+
+.PHONY: k8s-dlq-test
+k8s-dlq-test: ##@Kubernetes Run DLQ resilience test: inject failures, verify DLQ, replay, verify data
+	$(k8s-guard)
+	@printf "\n$(BOLD)═══ DLQ Resilience Test ═══$(NC)\n\n"
+	@printf "$(BOLD)[1/6] Scaling down ratings-write...$(NC)\n"
+	@$(KUBECTL) scale deployment/ratings-write -n $(K8S_NS_BOOKINFO) --replicas=0
+	@sleep 5
+	@$(KUBECTL) wait pod -l app=ratings,role=write -n $(K8S_NS_BOOKINFO) \
+		--for=delete --timeout=30s 2>/dev/null || true
+	@printf "  $(GREEN)ratings-write scaled to 0.$(NC)\n"
+	@printf "$(BOLD)[2/6] Starting port-forward to DLQ service...$(NC)\n"
+	@$(KUBECTL) port-forward svc/dlqueue -n $(K8S_NS_BOOKINFO) 18085:80 &
+	@sleep 2
+	@printf "  $(GREEN)DLQ accessible at localhost:18085.$(NC)\n"
+	@printf "$(BOLD)[3/6] Inject phase: submitting events + verifying DLQ capture...$(NC)\n"
+	@docker run --rm \
+		-v $(CURDIR)/test/k6:/scripts \
+		-e BASE_URL=http://host.docker.internal:8080 \
+		-e DLQ_URL=http://host.docker.internal:18085 \
+		-e PHASE=inject \
+		grafana/k6 run /scripts/dlq-resilience.js || \
+		($(KUBECTL) scale deployment/ratings-write -n $(K8S_NS_BOOKINFO) --replicas=1; \
+		 kill %% 2>/dev/null; exit 1)
+	@printf "$(BOLD)[4/6] Restoring ratings-write...$(NC)\n"
+	@$(KUBECTL) scale deployment/ratings-write -n $(K8S_NS_BOOKINFO) --replicas=1
+	@$(KUBECTL) wait deployment/ratings-write -n $(K8S_NS_BOOKINFO) \
+		--for=condition=Available --timeout=60s
+	@printf "  $(GREEN)ratings-write restored.$(NC)\n"
+	@printf "$(BOLD)[5/6] Replay phase: replaying events + verifying data...$(NC)\n"
+	@docker run --rm \
+		-v $(CURDIR)/test/k6:/scripts \
+		-e BASE_URL=http://host.docker.internal:8080 \
+		-e DLQ_URL=http://host.docker.internal:18085 \
+		-e PHASE=replay \
+		grafana/k6 run /scripts/dlq-resilience.js || \
+		(kill %% 2>/dev/null; exit 1)
+	@printf "$(BOLD)[6/6] Cleaning up...$(NC)\n"
+	@-kill %% 2>/dev/null
+	@printf "\n$(GREEN)$(BOLD)DLQ resilience test complete.$(NC)\n\n"
+
+# ─── Helm ──────────────────────────────────────────────────────────────────
+
+.PHONY: helm-lint
+helm-lint: ##@Helm Lint the bookinfo-service chart
+	helm lint charts/bookinfo-service
+	@for svc in $(SERVICES); do \
+		if [ -f deploy/$$svc/values-local.yaml ]; then \
+			printf "  Linting with $$svc values...\n"; \
+			helm lint charts/bookinfo-service -f deploy/$$svc/values-local.yaml || exit 1; \
+		fi; \
+	done
+	@printf "$(GREEN)All lints passed.$(NC)\n"
+
+.PHONY: helm-template
+helm-template: ##@Helm Dry-run render for a service: make helm-template SERVICE=<name>
+ifndef SERVICE
+	$(error SERVICE is not set. Usage: make helm-template SERVICE=<name>)
+endif
+	helm template $(SERVICE) charts/bookinfo-service \
+		-f deploy/$(SERVICE)/values-local.yaml \
+		--namespace $(K8S_NS_BOOKINFO)
 
 # ─── Help ───────────────────────────────────────────────────────────────────
 

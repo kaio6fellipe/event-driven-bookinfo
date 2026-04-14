@@ -24,3 +24,23 @@
 - `auto-tag.yml`: triggered on PR merge to main, detects changes, creates tags, dispatches release
 - `release.yml`: triggered by `workflow_dispatch`, builds and releases a single service
 - Manual release: `gh workflow run release.yml -f service=<name> -f tag=<name>-v<X.Y.Z>`
+
+## Chart Release Process
+
+The `bookinfo-service` Helm chart has its own independent version lifecycle.
+
+### Chart Versioning
+- Chart version (`version` in `Chart.yaml`): bumped when templates or helpers change
+- App version (`appVersion`): informational only — each service sets `image.tag` at install time
+- Chart version is independent of service tags (`{service}-vX.Y.Z`)
+
+### Workflows
+- `helm-lint-test.yml`: runs on PRs touching `charts/**` — ct lint + ct install
+- `helm-release.yml`: runs on main push touching `charts/**` — chart-releaser publishes to GitHub Pages
+
+### Using the Chart
+```bash
+helm repo add bookinfo https://kaio6fellipe.github.io/event-driven-bookinfo
+helm repo update
+helm install ratings bookinfo/bookinfo-service -f deploy/ratings/values-local.yaml -n bookinfo
+```

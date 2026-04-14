@@ -1,0 +1,150 @@
+# -- Service identity
+nameOverride: ""
+fullnameOverride: ""
+serviceName: ""
+
+image:
+  repository: event-driven-bookinfo/service
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# -- Service Account
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# -- Image pull secrets
+imagePullSecrets: []
+
+# -- Deployment
+replicaCount: 1
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# -- Pod security
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  runAsGroup: 65534
+  fsGroup: 65534
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# -- Pod scheduling
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
+# -- Pod metadata
+podAnnotations: {}
+podLabels: {}
+
+# -- Extra environment variables
+extraEnv: []
+
+# -- Existing secret to mount as env vars
+existingSecret: ""
+
+# -- Ports
+ports:
+  http: 8080
+  admin: 9090
+
+# -- Probes
+probes:
+  liveness:
+    path: /healthz
+    port: admin
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    failureThreshold: 5
+  readiness:
+    path: /readyz
+    port: admin
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 3
+
+# -- Config (injected as ConfigMap env vars)
+config:
+  LOG_LEVEL: "info"
+  STORAGE_BACKEND: "memory"
+
+# -- CQRS
+cqrs:
+  enabled: false
+  read:
+    replicas: 1
+    resources: {}
+  write:
+    replicas: 1
+    resources: {}
+  eventBusName: kafka
+  endpoints: {}
+
+# -- Sensor defaults
+sensor:
+  retryStrategy:
+    steps: 3
+    duration: 2s
+    factor: "2.0"
+    jitter: "1"
+  atLeastOnce: true
+  dlq:
+    enabled: true
+    url: ""
+    retryStrategy:
+      steps: 5
+      duration: 2s
+      factor: "2.0"
+      jitter: "1"
+
+# -- Observability
+observability:
+  otelEndpoint: ""
+  pyroscopeAddress: ""
+
+# -- Autoscaling
+autoscaling:
+  enabled: false
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilization: 70
+
+# -- Pod Disruption Budget
+pdb:
+  enabled: false
+  minAvailable: 1
+
+# -- Service annotations
+serviceAnnotations: {}
+
+# -- Gateway parentRef for HTTPRoutes
+gateway:
+  name: default-gw
+  namespace: platform
+  sectionName: web
+  hostnames: []
+  timeouts:
+    request: ""
+    backendRequest: ""
+
+# -- Custom HTTPRoutes (for non-CQRS services like productpage)
+routes: []
+  # - name: productpage        # HTTPRoute metadata.name
+  #   path: /                  # match path
+  #   pathType: PathPrefix     # PathPrefix or Exact
+  #   method: GET              # HTTP method

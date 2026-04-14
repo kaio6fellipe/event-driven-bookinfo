@@ -1,0 +1,107 @@
+{{/* charts/bookinfo-service/templates/httproute.yaml */}}
+{{- range $eventName, $endpoint := .Values.cqrs.endpoints }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "bookinfo-service.fullname" $ }}-{{ $eventName }}-write
+  labels:
+    {{- include "bookinfo-service.labels" $ | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ $.Values.gateway.name }}
+      namespace: {{ $.Values.gateway.namespace }}
+      sectionName: {{ $.Values.gateway.sectionName }}
+  {{- with $.Values.gateway.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: {{ $endpoint.endpoint }}
+          method: {{ $endpoint.method }}
+      backendRefs:
+        - name: {{ $eventName }}-eventsource-svc
+          port: {{ $endpoint.port }}
+      {{- if or $.Values.gateway.timeouts.request $.Values.gateway.timeouts.backendRequest }}
+      timeouts:
+        {{- with $.Values.gateway.timeouts.request }}
+        request: {{ . | quote }}
+        {{- end }}
+        {{- with $.Values.gateway.timeouts.backendRequest }}
+        backendRequest: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "bookinfo-service.fullname" $ }}-{{ $eventName }}-read
+  labels:
+    {{- include "bookinfo-service.labels" $ | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ $.Values.gateway.name }}
+      namespace: {{ $.Values.gateway.namespace }}
+      sectionName: {{ $.Values.gateway.sectionName }}
+  {{- with $.Values.gateway.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: {{ $endpoint.endpoint }}
+          method: GET
+      backendRefs:
+        - name: {{ include "bookinfo-service.fullname" $ }}
+          port: 80
+      {{- if or $.Values.gateway.timeouts.request $.Values.gateway.timeouts.backendRequest }}
+      timeouts:
+        {{- with $.Values.gateway.timeouts.request }}
+        request: {{ . | quote }}
+        {{- end }}
+        {{- with $.Values.gateway.timeouts.backendRequest }}
+        backendRequest: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+{{- end }}
+{{- range $route := .Values.routes }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $route.name }}
+  labels:
+    {{- include "bookinfo-service.labels" $ | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ $.Values.gateway.name }}
+      namespace: {{ $.Values.gateway.namespace }}
+      sectionName: {{ $.Values.gateway.sectionName }}
+  {{- with $.Values.gateway.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: {{ $route.pathType }}
+            value: {{ $route.path }}
+          method: {{ $route.method }}
+      backendRefs:
+        - name: {{ include "bookinfo-service.fullname" $ }}
+          port: 80
+      {{- if or $.Values.gateway.timeouts.request $.Values.gateway.timeouts.backendRequest }}
+      timeouts:
+        {{- with $.Values.gateway.timeouts.request }}
+        request: {{ . | quote }}
+        {{- end }}
+        {{- with $.Values.gateway.timeouts.backendRequest }}
+        backendRequest: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+{{- end }}

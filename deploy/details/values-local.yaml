@@ -1,0 +1,67 @@
+# deploy/details/values-local.yaml
+serviceName: details
+fullnameOverride: details
+image:
+  repository: event-driven-bookinfo/details
+  tag: local
+
+config:
+  LOG_LEVEL: "debug"
+  STORAGE_BACKEND: "postgres"
+  DATABASE_URL: "postgres://bookinfo:bookinfo@postgres.bookinfo.svc.cluster.local:5432/bookinfo_details?sslmode=disable"
+  RUN_MIGRATIONS: "true"
+
+observability:
+  otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+  pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"
+
+cqrs:
+  enabled: true
+  read:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  write:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  endpoints:
+    book-added:
+      port: 12000
+      method: POST
+      endpoint: /v1/details
+      triggers:
+        - name: create-detail
+          url: self
+          payload:
+            - passthrough
+        - name: notify-book-added
+          url: "http://notification.bookinfo.svc.cluster.local/v1/notifications"
+          method: POST
+          payload:
+            - src:
+                dependencyName: book-added-dep
+                dataKey: body.title
+              dest: subject
+            - src:
+                value: "New book added"
+              dest: body
+            - src:
+                value: "system@bookinfo"
+              dest: recipient
+            - src:
+                value: "email"
+              dest: channel
+
+sensor:
+  dlq:
+    url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/v1/events"
+
+gateway:
+  name: default-gw
+  namespace: platform
+  sectionName: web

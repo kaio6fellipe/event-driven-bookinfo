@@ -39,7 +39,7 @@ services/{{service}}/
 5. Create the in-memory repository adapter.
 6. Create HTTP handler with DTOs and tests.
 7. Create the composition root (cmd/main.go) wiring everything with pkg/ packages.
-8. Add a Dockerfile and Kustomize base manifests.
+8. Add a Dockerfile and Helm values file (`deploy/{{service}}/values-local.yaml`). Use `deploy/ratings/values-local.yaml` as a template for services with CQRS+events, or `deploy/notification/values-local.yaml` for simple services.
 9. Run `go test ./services/{{service}}/...` to verify.
 
 ## Patterns to Follow

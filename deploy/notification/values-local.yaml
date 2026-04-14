@@ -1,0 +1,16 @@
+# deploy/notification/values-local.yaml
+serviceName: notification
+fullnameOverride: notification
+image:
+  repository: event-driven-bookinfo/notification
+  tag: local
+
+config:
+  LOG_LEVEL: "debug"
+  STORAGE_BACKEND: "postgres"
+  DATABASE_URL: "postgres://bookinfo:bookinfo@postgres.bookinfo.svc.cluster.local:5432/bookinfo_notification?sslmode=disable"
+  RUN_MIGRATIONS: "true"
+
+observability:
+  otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+  pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"

@@ -1,0 +1,160 @@
+{{/* charts/bookinfo-service/templates/sensor.yaml */}}
+{{- $hasEndpoints := false }}
+{{- $endpointCount := 0 }}
+{{- range $_, $ep := .Values.cqrs.endpoints }}
+{{- if $ep.triggers }}
+{{- $hasEndpoints = true }}
+{{- $endpointCount = add $endpointCount 1 }}
+{{- end }}
+{{- end }}
+{{- if $hasEndpoints }}
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: {{ include "bookinfo-service.sensorName" . }}
+  labels:
+    {{- include "bookinfo-service.labels" . | nindent 4 }}
+spec:
+  eventBusName: {{ .Values.cqrs.eventBusName }}
+  {{- with .Values.observability.otelEndpoint }}
+  template:
+    container:
+      env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: {{ . | quote }}
+        - name: OTEL_SERVICE_NAME
+          value: {{ include "bookinfo-service.sensorName" $ | quote }}
+  {{- end }}
+  dependencies:
+    {{- range $eventName, $endpoint := $.Values.cqrs.endpoints }}
+    - name: {{ $eventName }}-dep
+      eventSourceName: {{ $eventName }}
+      eventName: {{ $eventName }}
+    {{- end }}
+  triggers:
+    {{- range $eventName, $endpoint := $.Values.cqrs.endpoints }}
+    {{- range $trigger := $endpoint.triggers }}
+    {{- /* Resolve trigger URL */ -}}
+    {{- $triggerURL := $trigger.url }}
+    {{- if eq $trigger.url "self" }}
+    {{- if $.Values.cqrs.enabled }}
+    {{- $triggerURL = printf "http://%s-write.%s.svc.cluster.local%s" (include "bookinfo-service.fullname" $) $.Release.Namespace $endpoint.endpoint }}
+    {{- else }}
+    {{- $triggerURL = printf "http://%s.%s.svc.cluster.local%s" (include "bookinfo-service.fullname" $) $.Release.Namespace $endpoint.endpoint }}
+    {{- end }}
+    {{- end }}
+    {{- /* Resolve trigger method */ -}}
+    {{- $triggerMethod := default "POST" $trigger.method }}
+    - template:
+        name: {{ $trigger.name }}
+        {{- if $trigger.conditions }}
+        conditions: {{ $trigger.conditions }}
+        {{- else if gt $endpointCount 1 }}
+        conditions: {{ $eventName }}-dep
+        {{- end }}
+        http:
+          url: {{ $triggerURL }}
+          method: {{ $triggerMethod }}
+          headers:
+            Content-Type: application/json
+            {{- with $trigger.headers }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          payload:
+            {{- range $p := $trigger.payload }}
+            {{- if eq (kindOf $p) "string" }}
+            - src:
+                dependencyName: {{ $eventName }}-dep
+                dataKey: body
+              dest: ""
+            {{- else }}
+            - src:
+                dependencyName: {{ default (printf "%s-dep" $eventName) $p.src.dependencyName }}
+                {{- with $p.src.dataKey }}
+                dataKey: {{ . }}
+                {{- end }}
+                {{- with $p.src.value }}
+                value: {{ . | quote }}
+                {{- end }}
+                {{- with $p.src.contextKey }}
+                contextKey: {{ . }}
+                {{- end }}
+              dest: {{ $p.dest }}
+            {{- end }}
+            {{- end }}
+      atLeastOnce: {{ $.Values.sensor.atLeastOnce }}
+      retryStrategy:
+        steps: {{ $.Values.sensor.retryStrategy.steps }}
+        duration: {{ $.Values.sensor.retryStrategy.duration }}
+        factor: {{ $.Values.sensor.retryStrategy.factor }}
+        jitter: {{ $.Values.sensor.retryStrategy.jitter }}
+      {{- /* Auto-generate DLQ trigger */ -}}
+      {{- if $.Values.sensor.dlq.enabled }}
+      {{- $esURL := printf "http://%s-eventsource-svc.%s.svc.cluster.local:%v%s" $eventName $.Release.Namespace $endpoint.port $endpoint.endpoint }}
+      dlqTrigger:
+        template:
+          name: dlq-{{ $trigger.name }}
+          http:
+            url: {{ $.Values.sensor.dlq.url }}
+            method: POST
+            headers:
+              Content-Type: application/json
+            payload:
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  dataKey: body
+                dest: original_payload
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  contextKey: id
+                dest: event_id
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  contextKey: type
+                dest: event_type
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  contextKey: source
+                dest: event_source
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  contextKey: subject
+                dest: event_subject
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  contextKey: time
+                dest: event_timestamp
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  contextKey: datacontenttype
+                dest: datacontenttype
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  dataKey: header
+                dest: original_headers
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  value: {{ include "bookinfo-service.sensorName" $ | quote }}
+                dest: sensor_name
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  value: {{ $trigger.name | quote }}
+                dest: failed_trigger
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  value: {{ $esURL | quote }}
+                dest: eventsource_url
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  value: {{ $.Release.Namespace | quote }}
+                dest: namespace
+        atLeastOnce: true
+        retryStrategy:
+          steps: {{ $.Values.sensor.dlq.retryStrategy.steps }}
+          duration: {{ $.Values.sensor.dlq.retryStrategy.duration }}
+          factor: {{ $.Values.sensor.dlq.retryStrategy.factor }}
+          jitter: {{ $.Values.sensor.dlq.retryStrategy.jitter }}
+      {{- end }}
+    {{- end }}
+    {{- end }}
+{{- end }}

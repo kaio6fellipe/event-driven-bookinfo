@@ -1,0 +1,12 @@
+# charts/bookinfo-service/ci/values-productpage-simple.yaml
+# ct install test: single deployment, no CQRS, no events
+serviceName: productpage
+fullnameOverride: productpage
+image:
+  repository: event-driven-bookinfo/productpage
+  tag: latest
+
+config:
+  DETAILS_SERVICE_URL: "http://details"
+  REVIEWS_SERVICE_URL: "http://reviews"
+  TEMPLATE_DIR: "/templates"

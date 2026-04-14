@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "serviceName": { "type": "string" },
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": { "type": "string" },
+        "tag": { "type": "string" },
+        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+      },
+      "required": ["repository", "tag"]
+    },
+    "replicaCount": { "type": "integer", "minimum": 0 },
+    "resources": { "type": "object" },
+    "ports": {
+      "type": "object",
+      "properties": {
+        "http": { "type": "integer" },
+        "admin": { "type": "integer" }
+      }
+    },
+    "probes": { "type": "object" },
+    "config": { "type": "object", "additionalProperties": { "type": "string" } },
+    "cqrs": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "read": { "type": "object" },
+        "write": { "type": "object" },
+        "eventBusName": { "type": "string" },
+        "endpoints": { "type": "object" }
+      }
+    },
+    "sensor": {
+      "type": "object",
+      "properties": {
+        "retryStrategy": { "type": "object" },
+        "atLeastOnce": { "type": "boolean" },
+        "dlq": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "url": { "type": "string" },
+            "retryStrategy": { "type": "object" }
+          }
+        }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "properties": {
+        "otelEndpoint": { "type": "string" },
+        "pyroscopeAddress": { "type": "string" }
+      }
+    },
+    "autoscaling": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minReplicas": { "type": "integer" },
+        "maxReplicas": { "type": "integer" },
+        "targetCPUUtilization": { "type": "integer" }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "namespace": { "type": "string" },
+        "sectionName": { "type": "string" },
+        "hostnames": { "type": "array" },
+        "timeouts": { "type": "object" }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": { "type": "boolean" },
+        "name": { "type": "string" },
+        "annotations": { "type": "object" }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" }
+        }
+      }
+    },
+    "podSecurityContext": { "type": "object" },
+    "securityContext": { "type": "object" },
+    "nodeSelector": { "type": "object" },
+    "tolerations": { "type": "array" },
+    "affinity": { "type": "object" },
+    "topologySpreadConstraints": { "type": "array" },
+    "podAnnotations": { "type": "object" },
+    "podLabels": { "type": "object" },
+    "extraEnv": { "type": "array" },
+    "existingSecret": { "type": "string" },
+    "pdb": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minAvailable": {}
+      }
+    },
+    "serviceAnnotations": { "type": "object" },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "path": { "type": "string" },
+          "pathType": { "type": "string", "enum": ["PathPrefix", "Exact"] },
+          "method": { "type": "string" }
+        },
+        "required": ["name", "path", "pathType", "method"]
+      }
+    }
+  }
+}

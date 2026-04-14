@@ -1,0 +1,34 @@
+# deploy/productpage/values-local.yaml
+serviceName: productpage
+fullnameOverride: productpage
+image:
+  repository: event-driven-bookinfo/productpage
+  tag: local
+
+config:
+  LOG_LEVEL: "debug"
+  STORAGE_BACKEND: "memory"
+  DETAILS_SERVICE_URL: "http://gateway.envoy-gateway-system.svc.cluster.local"
+  REVIEWS_SERVICE_URL: "http://gateway.envoy-gateway-system.svc.cluster.local"
+  RATINGS_SERVICE_URL: "http://gateway.envoy-gateway-system.svc.cluster.local"
+  REDIS_URL: "redis://redis-master.bookinfo.svc.cluster.local:6379"
+  TEMPLATE_DIR: "/templates"
+
+observability:
+  otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+  pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"
+
+gateway:
+  name: default-gw
+  namespace: platform
+  sectionName: web
+
+routes:
+  - name: productpage
+    path: /
+    pathType: PathPrefix
+    method: GET
+  - name: productpage-partials
+    path: /partials
+    pathType: PathPrefix
+    method: POST

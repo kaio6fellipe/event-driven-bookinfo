@@ -1,0 +1,16 @@
+{{/* charts/bookinfo-service/templates/eventsource-service.yaml */}}
+{{- range $eventName, $endpoint := .Values.cqrs.endpoints }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $eventName }}-eventsource-svc
+  labels:
+    {{- include "bookinfo-service.labels" $ | nindent 4 }}
+spec:
+  selector:
+    eventsource-name: {{ $eventName }}
+  ports:
+    - port: {{ $endpoint.port }}
+      targetPort: {{ $endpoint.port }}
+{{- end }}

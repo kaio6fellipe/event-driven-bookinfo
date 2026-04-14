@@ -90,8 +90,8 @@ All share the same `gateway` parentRef from values.
 ### DLQueue (auto-generated, no external read route needed)
 | Route Name | Match | Backend |
 |---|---|---|
-| `dlqueue-dlq-event-received-write` | `POST Exact /dlq-event-received` | `dlq-event-received-eventsource-svc:12004` |
-| `dlqueue-dlq-event-received-read` | `GET PathPrefix /dlq-event-received` | `dlqueue:80` |
+| `dlqueue-dlq-event-received-write` | `POST Exact /v1/events` | `dlq-event-received-eventsource-svc:12004` |
+| `dlqueue-dlq-event-received-read` | `GET PathPrefix /v1/events` | `dlqueue:80` |
 
 Note: DLQueue's read route will produce a 405 (no GET handler), but this is harmless and consistent with the auto-generation pattern. If needed, read route generation can be disabled per-endpoint in the future.
 

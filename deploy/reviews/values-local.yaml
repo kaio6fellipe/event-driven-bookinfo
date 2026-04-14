@@ -98,3 +98,8 @@ cqrs:
 sensor:
   dlq:
     url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/dlq-event-received"
+
+gateway:
+  name: default-gw
+  namespace: platform
+  sectionName: web

@@ -16,3 +16,18 @@ config:
 observability:
   otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
   pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"
+
+gateway:
+  name: default-gw
+  namespace: platform
+  sectionName: web
+
+routes:
+  - name: productpage
+    path: /
+    pathType: PathPrefix
+    method: GET
+  - name: productpage-partials
+    path: /partials
+    pathType: PathPrefix
+    method: POST

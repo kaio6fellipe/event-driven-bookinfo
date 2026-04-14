@@ -1,0 +1,18 @@
+{{/* charts/bookinfo-service/templates/service-write.yaml */}}
+{{- if .Values.cqrs.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bookinfo-service.fullname" . }}-write
+  labels:
+    {{- include "bookinfo-service.labels" . | nindent 4 }}
+    role: write
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "bookinfo-service.writeSelectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: {{ .Values.ports.http }}
+{{- end }}

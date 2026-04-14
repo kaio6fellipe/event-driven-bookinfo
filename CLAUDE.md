@@ -78,7 +78,6 @@ charts/
 deploy/
 ├── <service>/values-local.yaml  # Per-service Helm values for local k8s
 ├── gateway/base/                # Gateway, GatewayClass, ReferenceGrant
-├── gateway/overlays/local/      # HTTPRoutes for bookinfo
 ├── observability/local/         # Helm values: Prometheus, Grafana, Tempo, Loki, Alloy
 ├── platform/local/              # Helm values: Strimzi, Argo Events; Kafka CRDs; EventBus
 ├── redis/local/                 # Helm values: Bitnami Redis

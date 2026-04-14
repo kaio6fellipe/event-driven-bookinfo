@@ -1,0 +1,26 @@
+{{/* charts/bookinfo-service/templates/eventsource.yaml */}}
+{{- range $eventName, $endpoint := .Values.cqrs.endpoints }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: {{ $eventName }}
+  labels:
+    {{- include "bookinfo-service.labels" $ | nindent 4 }}
+spec:
+  eventBusName: {{ $.Values.cqrs.eventBusName }}
+  {{- with $.Values.observability.otelEndpoint }}
+  template:
+    container:
+      env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: {{ . | quote }}
+        - name: OTEL_SERVICE_NAME
+          value: {{ printf "%s-eventsource" $eventName | quote }}
+  {{- end }}
+  webhook:
+    {{ $eventName }}:
+      port: {{ $endpoint.port | quote }}
+      endpoint: {{ $endpoint.endpoint }}
+      method: {{ $endpoint.method }}
+{{- end }}

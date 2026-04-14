@@ -1,0 +1,18 @@
+{{/* charts/bookinfo-service/templates/pdb.yaml */}}
+{{- if .Values.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "bookinfo-service.fullname" . }}
+  labels:
+    {{- include "bookinfo-service.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- if .Values.cqrs.enabled }}
+      {{- include "bookinfo-service.readSelectorLabels" . | nindent 6 }}
+      {{- else }}
+      {{- include "bookinfo-service.selectorLabels" . | nindent 6 }}
+      {{- end }}
+{{- end }}

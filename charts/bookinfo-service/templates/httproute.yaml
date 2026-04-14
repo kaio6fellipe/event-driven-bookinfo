@@ -12,6 +12,10 @@ spec:
     - name: {{ $.Values.gateway.name }}
       namespace: {{ $.Values.gateway.namespace }}
       sectionName: {{ $.Values.gateway.sectionName }}
+  {{- with $.Values.gateway.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   rules:
     - matches:
         - path:
@@ -21,6 +25,15 @@ spec:
       backendRefs:
         - name: {{ $eventName }}-eventsource-svc
           port: {{ $endpoint.port }}
+      {{- if or $.Values.gateway.timeouts.request $.Values.gateway.timeouts.backendRequest }}
+      timeouts:
+        {{- with $.Values.gateway.timeouts.request }}
+        request: {{ . | quote }}
+        {{- end }}
+        {{- with $.Values.gateway.timeouts.backendRequest }}
+        backendRequest: {{ . | quote }}
+        {{- end }}
+      {{- end }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -33,6 +46,10 @@ spec:
     - name: {{ $.Values.gateway.name }}
       namespace: {{ $.Values.gateway.namespace }}
       sectionName: {{ $.Values.gateway.sectionName }}
+  {{- with $.Values.gateway.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   rules:
     - matches:
         - path:
@@ -42,6 +59,15 @@ spec:
       backendRefs:
         - name: {{ include "bookinfo-service.fullname" $ }}
           port: 80
+      {{- if or $.Values.gateway.timeouts.request $.Values.gateway.timeouts.backendRequest }}
+      timeouts:
+        {{- with $.Values.gateway.timeouts.request }}
+        request: {{ . | quote }}
+        {{- end }}
+        {{- with $.Values.gateway.timeouts.backendRequest }}
+        backendRequest: {{ . | quote }}
+        {{- end }}
+      {{- end }}
 {{- end }}
 {{- range $route := .Values.routes }}
 ---
@@ -56,6 +82,10 @@ spec:
     - name: {{ $.Values.gateway.name }}
       namespace: {{ $.Values.gateway.namespace }}
       sectionName: {{ $.Values.gateway.sectionName }}
+  {{- with $.Values.gateway.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   rules:
     - matches:
         - path:
@@ -65,4 +95,13 @@ spec:
       backendRefs:
         - name: {{ include "bookinfo-service.fullname" $ }}
           port: 80
+      {{- if or $.Values.gateway.timeouts.request $.Values.gateway.timeouts.backendRequest }}
+      timeouts:
+        {{- with $.Values.gateway.timeouts.request }}
+        request: {{ . | quote }}
+        {{- end }}
+        {{- with $.Values.gateway.timeouts.backendRequest }}
+        backendRequest: {{ . | quote }}
+        {{- end }}
+      {{- end }}
 {{- end }}

@@ -7,6 +7,10 @@ metadata:
   labels:
     {{- include "bookinfo-service.labels" . | nindent 4 }}
     role: write
+  {{- with .Values.serviceAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   type: ClusterIP
   selector:

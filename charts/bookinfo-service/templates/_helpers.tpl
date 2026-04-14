@@ -95,3 +95,14 @@ Sensor name: derived from release name.
 {{- define "bookinfo-service.sensorName" -}}
 {{ include "bookinfo-service.fullname" . }}-sensor
 {{- end }}
+
+{{/*
+Service account name.
+*/}}
+{{- define "bookinfo-service.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "bookinfo-service.fullname" .) .Values.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end }}

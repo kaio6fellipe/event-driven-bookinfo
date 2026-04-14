@@ -1,0 +1,19 @@
+{{/* charts/bookinfo-service/templates/service.yaml */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bookinfo-service.fullname" . }}
+  labels:
+    {{- include "bookinfo-service.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- if .Values.cqrs.enabled }}
+    {{- include "bookinfo-service.readSelectorLabels" . | nindent 4 }}
+    {{- else }}
+    {{- include "bookinfo-service.selectorLabels" . | nindent 4 }}
+    {{- end }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: {{ .Values.ports.http }}

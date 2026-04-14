@@ -9,4 +9,4 @@ image:
 config:
   DETAILS_SERVICE_URL: "http://details"
   REVIEWS_SERVICE_URL: "http://reviews"
-  TEMPLATE_DIR: "/app/templates"
+  TEMPLATE_DIR: "/templates"

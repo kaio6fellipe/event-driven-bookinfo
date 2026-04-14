@@ -1,0 +1,55 @@
+# .github/workflows/helm-lint-test.yml
+name: Helm Lint & Test
+
+on:
+  pull_request:
+    paths:
+      - "charts/**"
+
+permissions: {}
+
+jobs:
+  lint-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4
+        with:
+          version: v3.17.0
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@e6669bcd63d7cb57cb4380c33043eebe5d111992 # v2
+
+      - name: List changed charts
+        id: list-changed
+        run: |
+          changed=$(ct list-changed --config ct.yaml)
+          if [[ -n "$changed" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Lint charts
+        if: steps.list-changed.outputs.changed == 'true'
+        run: ct lint --config ct.yaml
+
+      - name: Create Kind cluster
+        if: steps.list-changed.outputs.changed == 'true'
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1
+
+      - name: Install Argo Events CRDs
+        if: steps.list-changed.outputs.changed == 'true'
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-events/stable/manifests/install.yaml 2>/dev/null || \
+          kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-events/master/api/jsonschema/schema.json 2>/dev/null || true
+
+      - name: Install charts
+        if: steps.list-changed.outputs.changed == 'true'
+        run: ct install --config ct.yaml

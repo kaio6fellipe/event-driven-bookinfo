@@ -28,6 +28,8 @@ jobs:
     permissions:
       contents: write
       packages: write
+    outputs:
+      hashes: ${{ steps.hash.outputs.hashes }}
     steps:
       - name: Validate tag format
         run: |
@@ -91,3 +93,23 @@ jobs:
             --title "${{ inputs.service }} ${{ steps.version.outputs.version }}" \
             --generate-notes \
             dist/*.tar.gz
+
+      - name: Generate artifact hashes
+        id: hash
+        run: |
+          cd dist
+          sha256sum *.tar.gz > checksums.txt
+          echo "hashes=$(base64 -w0 checksums.txt)" >> "$GITHUB_OUTPUT"
+
+  provenance:
+    name: Generate SLSA provenance
+    needs: [release]
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: ${{ needs.release.outputs.hashes }}
+      upload-assets: true
+      upload-tag-name: ${{ inputs.tag }}

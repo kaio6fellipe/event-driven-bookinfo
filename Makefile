@@ -501,6 +501,45 @@ k8s-load-stop: ##@Kubernetes Remove k6 CronJob from the cluster
 	@$(KUBECTL) kustomize --load-restrictor LoadRestrictionsNone deploy/k6/overlays/local/ | $(KUBECTL) delete --ignore-not-found -f -
 	@printf "$(GREEN)k6 CronJob removed.$(NC)\n"
 
+.PHONY: k8s-dlq-test
+k8s-dlq-test: ##@Kubernetes Run DLQ resilience test: inject failures, verify DLQ, replay, verify data
+	$(k8s-guard)
+	@printf "\n$(BOLD)═══ DLQ Resilience Test ═══$(NC)\n\n"
+	@printf "$(BOLD)[1/6] Scaling down ratings-write...$(NC)\n"
+	@$(KUBECTL) scale deployment/ratings-write -n $(K8S_NS_BOOKINFO) --replicas=0
+	@$(KUBECTL) wait deployment/ratings-write -n $(K8S_NS_BOOKINFO) \
+		--for=jsonpath='{.status.replicas}'=0 --timeout=30s
+	@printf "  $(GREEN)ratings-write scaled to 0.$(NC)\n"
+	@printf "$(BOLD)[2/6] Starting port-forward to DLQ service...$(NC)\n"
+	@$(KUBECTL) port-forward svc/dlqueue -n $(K8S_NS_BOOKINFO) 18085:80 &
+	@sleep 2
+	@printf "  $(GREEN)DLQ accessible at localhost:18085.$(NC)\n"
+	@printf "$(BOLD)[3/6] Inject phase: submitting events + verifying DLQ capture...$(NC)\n"
+	@docker run --rm \
+		-v $(CURDIR)/test/k6:/scripts \
+		-e BASE_URL=http://host.docker.internal:8080 \
+		-e DLQ_URL=http://host.docker.internal:18085 \
+		-e PHASE=inject \
+		grafana/k6 run /scripts/dlq-resilience.js || \
+		($(KUBECTL) scale deployment/ratings-write -n $(K8S_NS_BOOKINFO) --replicas=1; \
+		 kill %% 2>/dev/null; exit 1)
+	@printf "$(BOLD)[4/6] Restoring ratings-write...$(NC)\n"
+	@$(KUBECTL) scale deployment/ratings-write -n $(K8S_NS_BOOKINFO) --replicas=1
+	@$(KUBECTL) wait deployment/ratings-write -n $(K8S_NS_BOOKINFO) \
+		--for=condition=Available --timeout=60s
+	@printf "  $(GREEN)ratings-write restored.$(NC)\n"
+	@printf "$(BOLD)[5/6] Replay phase: replaying events + verifying data...$(NC)\n"
+	@docker run --rm \
+		-v $(CURDIR)/test/k6:/scripts \
+		-e BASE_URL=http://host.docker.internal:8080 \
+		-e DLQ_URL=http://host.docker.internal:18085 \
+		-e PHASE=replay \
+		grafana/k6 run /scripts/dlq-resilience.js || \
+		(kill %% 2>/dev/null; exit 1)
+	@printf "$(BOLD)[6/6] Cleaning up...$(NC)\n"
+	@-kill %% 2>/dev/null
+	@printf "\n$(GREEN)$(BOLD)DLQ resilience test complete.$(NC)\n\n"
+
 # ─── Helm ──────────────────────────────────────────────────────────────────
 
 .PHONY: helm-lint

@@ -4,3 +4,6 @@ description: Reusable Helm chart for event-driven-bookinfo microservices
 type: application
 version: 0.1.0
 appVersion: "0.0.0"
+maintainers:
+  - name: kaio6fellipe
+    url: https://github.com/kaio6fellipe

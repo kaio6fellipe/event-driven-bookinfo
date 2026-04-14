@@ -40,6 +40,14 @@ make e2e                # Docker Compose + shell smoke tests (memory backend)
 make docker-build-all   # Build all 6 Docker images
 ```
 
+## Helm Commands
+
+```bash
+make helm-lint            # Lint chart with all per-service values files
+make helm-template SERVICE=ratings  # Dry-run render for a specific service
+helm upgrade --install ratings charts/bookinfo-service -f deploy/ratings/values-local.yaml -n bookinfo
+```
+
 ## Local Kubernetes
 
 ```bash
@@ -61,9 +69,14 @@ make k8s-logs           # Tail bookinfo namespace logs
 ## Deploy Structure
 
 ```
+charts/
+  bookinfo-service/          # Reusable Helm chart for all 6 services
+    Chart.yaml
+    values.yaml
+    templates/
+    ci/                      # chart-testing test values
 deploy/
-├── <service>/base/              # Deployment, Service, ConfigMap, EventSource, Sensor (details/reviews/ratings)
-├── <service>/overlays/local/    # CQRS read/write split, eventsource-service, local patches
+├── <service>/values-local.yaml  # Per-service Helm values for local k8s
 ├── gateway/base/                # Gateway, GatewayClass, ReferenceGrant
 ├── gateway/overlays/local/      # HTTPRoutes for bookinfo
 ├── observability/local/         # Helm values: Prometheus, Grafana, Tempo, Loki, Alloy

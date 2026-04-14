@@ -37,7 +37,7 @@ cqrs:
     dlq-event-received:
       port: 12004
       method: POST
-      endpoint: /dlq-event-received
+      endpoint: /v1/events
       triggers:
         - name: ingest-dlq-event
           url: self

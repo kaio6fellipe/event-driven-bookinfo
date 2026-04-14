@@ -59,7 +59,7 @@ cqrs:
 
 sensor:
   dlq:
-    url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/dlq-event-received"
+    url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/v1/events"
 
 gateway:
   name: default-gw

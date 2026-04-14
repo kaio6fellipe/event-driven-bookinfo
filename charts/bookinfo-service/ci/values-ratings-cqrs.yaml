@@ -21,4 +21,4 @@ cqrs:
 
 sensor:
   dlq:
-    url: "http://dlq-eventsource-svc:12004/dlq-event-received"
+    url: "http://dlq-eventsource-svc:12004/v1/events"

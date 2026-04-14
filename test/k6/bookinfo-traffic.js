@@ -197,7 +197,7 @@ export function teardown(data) {
     // Step B: Send all delete requests through the CQRS pipeline
     for (const id of k6Ids) {
       http.post(`${BASE_URL}/v1/reviews/delete`,
-        JSON.stringify({ review_id: id }),
+        JSON.stringify({ review_id: id, product_id: productId }),
         { headers: { 'Content-Type': 'application/json' }, tags: { name: 'teardown: DELETE review' } });
     }
     totalDeleted += k6Ids.length;

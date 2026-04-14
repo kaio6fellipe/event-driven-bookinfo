@@ -1877,7 +1877,7 @@ git commit -m "docs: update CLAUDE.md, skills, and release rules for Helm chart"
 
 ## Task 13: Validation — helm template vs Existing Manifests
 
-This task validates that the Helm-rendered output matches the existing Kustomize manifests for the ratings service.
+This task validates that the Helm-rendered output matches the existing Kustomize manifests structurally.
 
 **Files:** None (read-only validation)
 
@@ -1935,9 +1935,207 @@ git commit -m "fix(helm): align template output with existing kustomize manifest
 
 ---
 
-## Task 14: Remove Old Kustomize Manifests
+## Task 14: End-to-End Validation — Full k8s Lifecycle
 
-Only after Task 13 validation passes.
+This is the critical validation task. Deploy the Helm chart to a real k3d cluster, verify all services work, check observability, and run load tests. **Do not proceed to Task 15 (kustomize removal) until this passes.**
+
+**Files:** None (runtime validation)
+
+- [ ] **Step 1: Tear down any existing cluster**
+
+Run: `make stop-k8s`
+Expected: Cluster deleted (or "cluster not found" if none exists)
+
+- [ ] **Step 2: Stand up the full environment with Helm-based deploys**
+
+Run: `make run-k8s`
+
+This will:
+1. Create k3d cluster
+2. Install platform layer (Envoy Gateway, Strimzi Kafka, Argo Events)
+3. Install observability layer (Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy)
+4. Build Docker images, import to k3d
+5. Deploy PostgreSQL + Redis
+6. **Deploy services via `helm upgrade --install`** (the new path)
+7. Apply HTTPRoutes
+8. Seed databases
+
+Expected: All pods reach `Running`/`Ready` state. The command completes without errors.
+
+- [ ] **Step 3: Verify pod status**
+
+Run: `make k8s-status`
+
+Expected: All pods in `bookinfo` namespace are `Running` and `Ready`:
+- `productpage`, `details`, `details-write`, `reviews`, `reviews-write`, `ratings`, `ratings-write`, `notification`, `dlqueue`, `dlqueue-write`, `postgres`, `redis`
+- EventSource pods (created by Argo Events from the EventSource CRDs)
+- Sensor pods (created by Argo Events from the Sensor CRDs)
+
+If any pods are in `CrashLoopBackOff` or `Error`, check logs:
+```bash
+kubectl --context=k3d-bookinfo-local logs -n bookinfo <pod-name>
+```
+
+- [ ] **Step 4: Verify sync reads — GET requests through Gateway**
+
+Run:
+```bash
+# Get all details (should return seeded data)
+curl -s http://localhost:8080/v1/details | jq .
+
+# Get all reviews
+curl -s http://localhost:8080/v1/reviews | jq .
+
+# Get all ratings
+curl -s http://localhost:8080/v1/ratings | jq .
+```
+
+Expected: All three return JSON arrays with seeded data (200 OK).
+
+- [ ] **Step 5: Verify async writes — POST through EventSource webhook**
+
+Run:
+```bash
+# Submit a new book (routed to book-added EventSource → Sensor → details-write)
+curl -s -X POST http://localhost:8080/v1/details \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Helm Chart Testing","author":"Test Author","year":2026,"isbn":"978-0-000-00000-0"}' | jq .
+
+# Wait for async processing
+sleep 5
+
+# Verify the book was created
+curl -s http://localhost:8080/v1/details | jq '.[] | select(.title=="Helm Chart Testing")'
+```
+
+Expected: The POST returns 200 (accepted by EventSource). After ~5s, the GET returns the new book entry.
+
+- [ ] **Step 6: Verify rating submission (end-to-end CQRS flow)**
+
+Run:
+```bash
+# Submit a rating (routed to rating-submitted EventSource → Sensor → ratings-write + notification)
+curl -s -X POST http://localhost:8080/v1/ratings \
+  -H 'Content-Type: application/json' \
+  -d '{"product_id":"test-product","stars":5,"reviewer":"helm-tester"}' | jq .
+
+sleep 5
+
+# Verify rating was created
+curl -s http://localhost:8080/v1/ratings | jq '.[] | select(.reviewer=="helm-tester")'
+```
+
+Expected: Rating appears in GET response. Notification service received an event (check logs):
+```bash
+kubectl --context=k3d-bookinfo-local logs -n bookinfo -l app=notification --tail=20
+```
+
+- [ ] **Step 7: Verify review submission + deletion (multi-endpoint sensor)**
+
+Run:
+```bash
+# Submit a review
+curl -s -X POST http://localhost:8080/v1/reviews \
+  -H 'Content-Type: application/json' \
+  -d '{"product_id":"test-product","reviewer":"helm-tester","text":"Helm works!","stars":5}' | jq .
+
+sleep 5
+
+# Verify review was created
+REVIEW_ID=$(curl -s http://localhost:8080/v1/reviews | jq -r '.[] | select(.reviewer=="helm-tester") | .id')
+echo "Created review: $REVIEW_ID"
+
+# Delete the review
+curl -s -X POST http://localhost:8080/v1/reviews/delete \
+  -H 'Content-Type: application/json' \
+  -d "{\"review_id\":\"$REVIEW_ID\"}" | jq .
+
+sleep 5
+
+# Verify review was deleted
+curl -s http://localhost:8080/v1/reviews | jq '.[] | select(.reviewer=="helm-tester")'
+```
+
+Expected: Review is created, then deleted. Both operations go through EventSource → Sensor → write service.
+
+- [ ] **Step 8: Verify productpage renders (BFF aggregation)**
+
+Run:
+```bash
+curl -s http://localhost:8080/ | head -20
+```
+
+Expected: HTML response from productpage (HTMX-rendered page aggregating details + reviews).
+
+- [ ] **Step 9: Verify distributed tracing in Grafana**
+
+Open Grafana at `http://localhost:3000` (admin/admin).
+
+1. Navigate to **Explore** → select **Tempo** data source
+2. Search for recent traces (last 15 minutes)
+3. Verify traces show the full request flow:
+   - Gateway → EventSource → Sensor → write-service
+   - Gateway → read-service (for GET requests)
+4. Confirm `service.name` labels match the Helm-deployed services (e.g., `ratings`, `details-write`)
+
+If no traces appear, check Alloy is receiving OTLP data:
+```bash
+kubectl --context=k3d-bookinfo-local logs -n observability -l app.kubernetes.io/name=alloy --tail=20
+```
+
+- [ ] **Step 10: Verify metrics in Prometheus**
+
+Open Prometheus at `http://localhost:9090`.
+
+Run query: `http_requests_total{namespace="bookinfo"}`
+
+Expected: Counters from all bookinfo services.
+
+- [ ] **Step 11: Run k6 load test**
+
+Run:
+```bash
+make k8s-load DURATION=30s BASE_RATE=2
+```
+
+Expected: k6 completes with no errors. Check output for:
+- `http_req_failed` rate should be `0.00%` or very low
+- `http_req_duration` p95 should be reasonable (< 500ms)
+
+After the test, check Grafana's k6 dashboard at `http://localhost:3000` for the load test metrics.
+
+- [ ] **Step 12: Verify helm upgrade works (idempotent re-deploy)**
+
+Run:
+```bash
+make k8s-rebuild
+```
+
+Expected: All `helm upgrade --install` commands succeed. Services restart and return to `Ready` state. No data loss (seeded data still accessible).
+
+- [ ] **Step 13: Fix any issues found**
+
+If any step above fails, investigate and fix:
+- Template rendering issues → fix in `charts/bookinfo-service/templates/`
+- Values issues → fix in `deploy/{service}/values-local.yaml`
+- Makefile issues → fix in `Makefile`
+
+Re-run the failing steps until all pass.
+
+- [ ] **Step 14: Commit any fixes**
+
+```bash
+git add -A charts/ deploy/ Makefile
+git commit -m "fix(helm): resolve e2e validation issues"
+```
+
+(Skip if no fixes were needed.)
+
+---
+
+## Task 15: Remove Old Kustomize Manifests
+
+Only after Task 14 e2e validation passes completely.
 
 **Files:**
 - Delete: `deploy/{details,reviews,ratings,notification,productpage,dlqueue}/base/`
@@ -1985,3 +2183,59 @@ git commit -m "chore: remove old kustomize base and overlay manifests
 
 Replaced by bookinfo-service Helm chart + per-service values files."
 ```
+
+---
+
+## Task 16: Post-Removal E2E Re-Validation
+
+Ensure the system still works after kustomize manifests are deleted. This catches any hidden dependencies on the old files.
+
+**Files:** None (runtime validation)
+
+- [ ] **Step 1: Tear down and rebuild from scratch**
+
+Run:
+```bash
+make stop-k8s
+make run-k8s
+```
+
+Expected: Full environment comes up successfully using only Helm-based deploys. No references to old kustomize overlays.
+
+- [ ] **Step 2: Quick smoke test**
+
+Run:
+```bash
+# Verify reads
+curl -sf http://localhost:8080/v1/details | jq length
+curl -sf http://localhost:8080/v1/reviews | jq length
+curl -sf http://localhost:8080/v1/ratings | jq length
+
+# Verify async write
+curl -s -X POST http://localhost:8080/v1/ratings \
+  -H 'Content-Type: application/json' \
+  -d '{"product_id":"post-migration-test","stars":4,"reviewer":"final-check"}'
+
+sleep 5
+
+curl -s http://localhost:8080/v1/ratings | jq '.[] | select(.reviewer=="final-check")'
+```
+
+Expected: All reads return data. Async write completes successfully.
+
+- [ ] **Step 3: Run final k6 load test**
+
+Run: `make k8s-load DURATION=30s BASE_RATE=2`
+Expected: 0% error rate, comparable latency to pre-migration.
+
+- [ ] **Step 4: Commit confirmation (no code changes expected)**
+
+If everything passes, no commit needed. If fixes are needed:
+```bash
+git add -A
+git commit -m "fix(helm): resolve post-migration issues"
+```
+
+- [ ] **Step 5: Tear down cluster**
+
+Run: `make stop-k8s`

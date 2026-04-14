@@ -1,8 +1,10 @@
 {{/* charts/bookinfo-service/templates/sensor.yaml */}}
 {{- $hasEndpoints := false }}
+{{- $endpointCount := 0 }}
 {{- range $_, $ep := .Values.cqrs.endpoints }}
 {{- if $ep.triggers }}
 {{- $hasEndpoints = true }}
+{{- $endpointCount = add $endpointCount 1 }}
 {{- end }}
 {{- end }}
 {{- if $hasEndpoints }}
@@ -47,6 +49,8 @@ spec:
         name: {{ $trigger.name }}
         {{- if $trigger.conditions }}
         conditions: {{ $trigger.conditions }}
+        {{- else if gt $endpointCount 1 }}
+        conditions: {{ $eventName }}-dep
         {{- end }}
         http:
           url: {{ $triggerURL }}

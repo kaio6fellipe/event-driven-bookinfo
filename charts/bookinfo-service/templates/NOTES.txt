@@ -1,0 +1,14 @@
+{{/* charts/bookinfo-service/templates/NOTES.txt */}}
+{{ include "bookinfo-service.serviceName" . }} deployed.
+
+Service: {{ include "bookinfo-service.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:80
+Admin:   port-forward to {{ .Values.ports.admin }} for /healthz, /readyz, /metrics, /debug/pprof/*
+
+{{- if .Values.cqrs.enabled }}
+CQRS mode: read ({{ .Values.cqrs.read.replicas }} replica(s)) + write ({{ .Values.cqrs.write.replicas }} replica(s))
+Write Service: {{ include "bookinfo-service.fullname" . }}-write.{{ .Release.Namespace }}.svc.cluster.local:80
+{{- end }}
+
+{{- range $eventName, $endpoint := .Values.cqrs.endpoints }}
+EventSource: {{ $eventName }} (port {{ $endpoint.port }}, {{ $endpoint.method }} {{ $endpoint.endpoint }})
+{{- end }}

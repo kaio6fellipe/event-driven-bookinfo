@@ -102,7 +102,10 @@ export default function (data) {
       stars: String(stars),
       text: `k6 load test review by ${reviewer}`,
     }, { tags: { name: 'POST /partials/rating' } });
-    check(ratingRes, { 'rating 200': (r) => r.status === 200 });
+    check(ratingRes, {
+      'rating 200': (r) => r.status === 200,
+      'rating success': (r) => r.body.includes('submitted successfully'),
+    });
   }
 
   // Small random sleep to add jitter between requests within an iteration

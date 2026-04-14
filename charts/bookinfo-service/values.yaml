@@ -1,0 +1,85 @@
+# -- Service identity
+nameOverride: ""
+fullnameOverride: ""
+serviceName: ""
+
+image:
+  repository: event-driven-bookinfo/service
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# -- Deployment
+replicaCount: 1
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# -- Ports
+ports:
+  http: 8080
+  admin: 9090
+
+# -- Probes
+probes:
+  liveness:
+    path: /healthz
+    port: admin
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    failureThreshold: 5
+  readiness:
+    path: /readyz
+    port: admin
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 3
+
+# -- Config (injected as ConfigMap env vars)
+config:
+  LOG_LEVEL: "info"
+  STORAGE_BACKEND: "memory"
+
+# -- CQRS
+cqrs:
+  enabled: false
+  read:
+    replicas: 1
+    resources: {}
+  write:
+    replicas: 1
+    resources: {}
+  eventBusName: kafka
+  endpoints: {}
+
+# -- Sensor defaults
+sensor:
+  retryStrategy:
+    steps: 3
+    duration: 2s
+    factor: "2.0"
+    jitter: "1"
+  atLeastOnce: true
+  dlq:
+    enabled: true
+    url: ""
+    retryStrategy:
+      steps: 5
+      duration: 2s
+      factor: "2.0"
+      jitter: "1"
+
+# -- Observability
+observability:
+  otelEndpoint: ""
+  pyroscopeAddress: ""
+
+# -- Autoscaling
+autoscaling:
+  enabled: false
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilization: 70

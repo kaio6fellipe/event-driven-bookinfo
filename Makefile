@@ -378,15 +378,13 @@ k8s-deploy: ##@Kubernetes Build images, import to k3d, deploy apps + HTTPRoutes
 		--values deploy/redis/local/redis-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Redis ready.$(NC)\n"
-	@printf "$(BOLD)[5/6] Deploying services via Helm...$(NC)\n"
+	@printf "$(BOLD)[5/5] Deploying services via Helm...$(NC)\n"
 	@for svc in $(SERVICES); do \
 		printf "  Installing $$svc...\n"; \
 		$(HELM) upgrade --install $$svc charts/bookinfo-service \
 			--namespace $(K8S_NS_BOOKINFO) \
 			-f deploy/$$svc/values-local.yaml || exit 1; \
 	done
-	@printf "$(BOLD)[6/6] Applying HTTPRoutes...$(NC)\n"
-	@$(KUBECTL) apply -k deploy/gateway/overlays/local/
 	@printf "\n$(BOLD)Waiting for deployments...$(NC)\n"
 	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write; do \
 		$(KUBECTL) wait deployment/$$dep -n $(K8S_NS_BOOKINFO) \

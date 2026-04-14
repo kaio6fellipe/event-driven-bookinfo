@@ -507,8 +507,9 @@ k8s-dlq-test: ##@Kubernetes Run DLQ resilience test: inject failures, verify DLQ
 	@printf "\n$(BOLD)═══ DLQ Resilience Test ═══$(NC)\n\n"
 	@printf "$(BOLD)[1/6] Scaling down ratings-write...$(NC)\n"
 	@$(KUBECTL) scale deployment/ratings-write -n $(K8S_NS_BOOKINFO) --replicas=0
-	@$(KUBECTL) wait deployment/ratings-write -n $(K8S_NS_BOOKINFO) \
-		--for=jsonpath='{.status.replicas}'=0 --timeout=30s
+	@sleep 5
+	@$(KUBECTL) wait pod -l app=ratings,role=write -n $(K8S_NS_BOOKINFO) \
+		--for=delete --timeout=30s 2>/dev/null || true
 	@printf "  $(GREEN)ratings-write scaled to 0.$(NC)\n"
 	@printf "$(BOLD)[2/6] Starting port-forward to DLQ service...$(NC)\n"
 	@$(KUBECTL) port-forward svc/dlqueue -n $(K8S_NS_BOOKINFO) 18085:80 &

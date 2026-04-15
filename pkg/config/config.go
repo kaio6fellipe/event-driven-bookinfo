@@ -4,6 +4,9 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // Config holds all runtime configuration for a service.
@@ -18,6 +21,12 @@ type Config struct {
 	OTLPEndpoint           string
 	PyroscopeServerAddress string
 	RedisURL               string
+
+	// Ingestion service configuration
+	GatewayURL         string
+	PollInterval       time.Duration
+	SearchQueries      []string
+	MaxResultsPerQuery int
 }
 
 // Load reads configuration from environment variables and returns a Config.
@@ -34,6 +43,11 @@ func Load() (*Config, error) {
 		OTLPEndpoint:           os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
 		PyroscopeServerAddress: os.Getenv("PYROSCOPE_SERVER_ADDRESS"),
 		RedisURL:               os.Getenv("REDIS_URL"),
+
+		GatewayURL:         envOrDefault("GATEWAY_URL", "http://localhost:8080"),
+		PollInterval:       parseDuration(envOrDefault("POLL_INTERVAL", "5m")),
+		SearchQueries:      parseCSV(envOrDefault("SEARCH_QUERIES", "programming,golang")),
+		MaxResultsPerQuery: parseInt(envOrDefault("MAX_RESULTS_PER_QUERY", "10")),
 	}
 
 	if cfg.ServiceName == "" {
@@ -45,6 +59,37 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func parseDuration(s string) time.Duration {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 5 * time.Minute
+	}
+	return d
+}
+
+func parseCSV(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+func parseInt(s string) int {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 10
+	}
+	return n
 }
 
 func envOrDefault(key, defaultValue string) string {

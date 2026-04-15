@@ -75,7 +75,7 @@ func (p *Publisher) PublishBookAdded(ctx context.Context, book domain.Book) erro
 	if err != nil {
 		return fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status from Gateway: %d", resp.StatusCode)

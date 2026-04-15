@@ -87,8 +87,10 @@ func main() {
 	svc := service.NewIngestionService(fetcher, publisher, cfg.SearchQueries, cfg.MaxResultsPerQuery)
 	h := handler.NewHandler(svc)
 
-	// Start background poll loop
-	go pollLoop(ctx, logger, svc, cfg.PollInterval)
+	// Start background poll loop with cancellable context.
+	// server.Run blocks until shutdown completes, then cancel stops the poll loop.
+	pollCtx, pollCancel := context.WithCancel(context.Background())
+	go pollLoop(pollCtx, logger, svc, cfg.PollInterval)
 
 	registerRoutes := func(mux *http.ServeMux) {
 		h.RegisterRoutes(mux)
@@ -96,8 +98,10 @@ func main() {
 
 	if err := server.Run(ctx, cfg, registerRoutes, metricsHandler); err != nil {
 		logger.Error("server error", "error", err)
+		pollCancel()
 		os.Exit(1)
 	}
+	pollCancel()
 }
 
 func pollLoop(ctx context.Context, logger *slog.Logger, svc *service.IngestionService, interval time.Duration) {

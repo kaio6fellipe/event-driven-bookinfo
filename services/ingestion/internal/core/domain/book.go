@@ -37,15 +37,15 @@ func (b *Book) Validate() error {
 
 // ScrapeResult contains the outcome of a single ingestion cycle.
 type ScrapeResult struct {
-	BooksFound      int           `json:"books_found"`
-	EventsPublished int           `json:"events_published"`
-	Errors          int           `json:"errors"`
-	Duration        time.Duration `json:"duration_ms"`
+	BooksFound      int
+	EventsPublished int
+	Errors          int
+	Duration        time.Duration
 }
 
 // IngestionStatus represents the current state of the ingestion service.
 type IngestionStatus struct {
-	State      string        `json:"state"`
-	LastRunAt  *time.Time    `json:"last_run_at,omitempty"`
-	LastResult *ScrapeResult `json:"last_result,omitempty"`
+	State      string
+	LastRunAt  *time.Time
+	LastResult *ScrapeResult
 }

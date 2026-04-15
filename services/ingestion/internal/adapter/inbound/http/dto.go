@@ -5,8 +5,7 @@ import "time"
 
 // TriggerRequest is the optional JSON body for POST /v1/ingestion/trigger.
 type TriggerRequest struct {
-	Queries    []string `json:"queries,omitempty"`
-	MaxResults int      `json:"max_results,omitempty"`
+	Queries []string `json:"queries,omitempty"`
 }
 
 // ScrapeResultResponse is the JSON response for a completed scrape cycle.

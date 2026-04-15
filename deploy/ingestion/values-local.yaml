@@ -1,0 +1,17 @@
+# deploy/ingestion/values-local.yaml
+serviceName: ingestion
+fullnameOverride: ingestion
+image:
+  repository: event-driven-bookinfo/ingestion
+  tag: local
+
+config:
+  LOG_LEVEL: "debug"
+  GATEWAY_URL: "http://default-gw-envoy.envoy-gateway-system.svc.cluster.local"
+  POLL_INTERVAL: "5m"
+  SEARCH_QUERIES: "programming,golang,kubernetes,python,devops"
+  MAX_RESULTS_PER_QUERY: "10"
+
+observability:
+  otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+  pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"

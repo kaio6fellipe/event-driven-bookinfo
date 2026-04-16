@@ -394,7 +394,7 @@ k8s-seed: ##@Kubernetes Seed databases in k8s PostgreSQL
 	@for svc in details ratings reviews notification; do \
 		seed_file="services/$$svc/seeds/seed.sql"; \
 		if [ -f "$$seed_file" ]; then \
-			$(KUBECTL) exec -n $(K8S_NS_BOOKINFO) statefulset/postgres -- \
+			$(KUBECTL) exec -n $(K8S_NS_BOOKINFO) statefulset/$$svc-postgresql -- \
 				psql -U bookinfo -d bookinfo_$$svc -c "$$(cat $$seed_file)" > /dev/null 2>&1; \
 			printf "  $(GREEN)%-14s$(NC) seeded\n" "$$svc"; \
 		fi; \

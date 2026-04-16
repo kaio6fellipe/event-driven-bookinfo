@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 
 MODULE := github.com/kaio6fellipe/event-driven-bookinfo
-SERVICES := productpage details reviews ratings notification dlqueue
+SERVICES := productpage details reviews ratings notification dlqueue ingestion
 
 # ─── Build ──────────────────────────────────────────────────────────────────
 
@@ -386,7 +386,7 @@ k8s-deploy: ##@Kubernetes Build images, import to k3d, deploy apps + HTTPRoutes
 			-f deploy/$$svc/values-local.yaml || exit 1; \
 	done
 	@printf "\n$(BOLD)Waiting for deployments...$(NC)\n"
-	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write; do \
+	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write ingestion; do \
 		$(KUBECTL) wait deployment/$$dep -n $(K8S_NS_BOOKINFO) \
 			--for=condition=Available --timeout=120s || true; \
 	done
@@ -434,11 +434,11 @@ k8s-rebuild: ##@Kubernetes Fast iteration: rebuild images, reimport, rollout res
 			--namespace $(K8S_NS_BOOKINFO) \
 			-f deploy/$$svc/values-local.yaml || exit 1; \
 	done
-	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write; do \
+	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write ingestion; do \
 		$(KUBECTL) rollout restart deployment/$$dep -n $(K8S_NS_BOOKINFO) 2>/dev/null || true; \
 	done
 	@printf "\n$(BOLD)Waiting for rollouts...$(NC)\n"
-	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write; do \
+	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write ingestion; do \
 		$(KUBECTL) rollout status deployment/$$dep -n $(K8S_NS_BOOKINFO) --timeout=120s 2>/dev/null || true; \
 	done
 	@printf "\n$(GREEN)$(BOLD)Rebuild complete.$(NC)\n\n"

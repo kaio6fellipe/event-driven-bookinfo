@@ -1,0 +1,65 @@
+version: 2
+project_name: ingestion
+
+builds:
+  - id: ingestion
+    binary: ingestion
+    main: ./services/ingestion/cmd/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+archives:
+  - id: ingestion
+    builds:
+      - ingestion
+    name_template: "ingestion_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+
+dockers:
+  - id: ingestion-amd64
+    ids:
+      - ingestion
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/ingestion:{{ .Tag }}-amd64"
+    dockerfile: build/Dockerfile.goreleaser.ingestion
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=ingestion"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+  - id: ingestion-arm64
+    ids:
+      - ingestion
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/ingestion:{{ .Tag }}-arm64"
+    dockerfile: build/Dockerfile.goreleaser.ingestion
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=ingestion"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+docker_manifests:
+  - name_template: "ghcr.io/kaio6fellipe/event-driven-bookinfo/ingestion:{{ .Tag }}"
+    image_templates:
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/ingestion:{{ .Tag }}-amd64"
+      - "ghcr.io/kaio6fellipe/event-driven-bookinfo/ingestion:{{ .Tag }}-arm64"
+
+release:
+  disable: true
+
+changelog:
+  disable: true

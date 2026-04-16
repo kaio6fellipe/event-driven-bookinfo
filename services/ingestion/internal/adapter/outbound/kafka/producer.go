@@ -40,15 +40,15 @@ type bookEvent struct {
 	IdempotencyKey string   `json:"idempotency_key"`
 }
 
-// KafkaClient abstracts the franz-go client for testing.
-type KafkaClient interface {
+// Client abstracts the franz-go client for testing.
+type Client interface {
 	ProduceSync(ctx context.Context, rs ...*kgo.Record) kgo.ProduceResults
 	Close()
 }
 
 // Producer implements port.EventPublisher by producing to Kafka.
 type Producer struct {
-	client KafkaClient
+	client Client
 	topic  string
 }
 
@@ -74,7 +74,7 @@ func NewProducer(ctx context.Context, brokers, topic string) (*Producer, error) 
 }
 
 // NewProducerWithClient creates a Producer with an injected client (for testing).
-func NewProducerWithClient(client KafkaClient, topic string) *Producer {
+func NewProducerWithClient(client Client, topic string) *Producer {
 	return &Producer{client: client, topic: topic}
 }
 

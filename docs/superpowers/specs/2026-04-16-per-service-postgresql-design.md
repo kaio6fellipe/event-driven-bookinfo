@@ -67,7 +67,7 @@ Add to `charts/bookinfo-service/Chart.yaml`:
 ```yaml
 dependencies:
   - name: postgresql
-    version: "~16"
+    version: "~18"
     repository: oci://registry-1.docker.io/bitnamicharts
     condition: postgresql.enabled
 ```

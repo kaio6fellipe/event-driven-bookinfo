@@ -22,6 +22,8 @@ spec:
     {{ $eventName }}:
       url: {{ required "events.kafka.broker must be set when events.exposed is defined" $.Values.events.kafka.broker }}
       topic: {{ required (printf "events.exposed.%s.topic is required" $eventName) $event.topic }}
+      consumerGroup:
+        groupName: {{ include "bookinfo-service.fullname" $ }}-{{ $eventName }}
       jsonBody: true
       {{- with $event.contentType }}
       contentType: {{ . }}

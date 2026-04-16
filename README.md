@@ -63,7 +63,7 @@ flowchart LR
 
 Go hexagonal architecture monorepo adapting Istio's Bookinfo as a book review system, demonstrating real-time event-driven architecture with Argo Events and Kafka.
 
-Services are plain REST APIs — all event-driven complexity (Kafka consumers, retries, dead-letter queues) is abstracted by Argo Events EventSources and Sensors. The write path flows through Kafka via Argo Events, ensuring every mutation is event-sourced, while the read path remains synchronous HTTP. Failure recovery is built into the pipeline — a `dlqTrigger` on every sensor captures events that exhaust retries into the `dlqueue` service, where they can be inspected, replayed, or marked resolved. This demonstrates using Argo Events not only for workflow automation, but as a real-time event-driven architecture platform — a self-hosted alternative to Google Eventarc or AWS EventBridge.
+Services are plain REST APIs — all event-driven complexity (Kafka consumers, retries, dead-letter queues) is abstracted by Argo Events EventSources and Sensors. The write path flows through Kafka via Argo Events, ensuring every mutation is event-sourced, while the read path remains synchronous HTTP. Failure recovery is built into the pipeline — a `dlqTrigger` on every sensor captures events that exhaust retries into the `dlqueue` service, where they can be inspected, replayed, or marked resolved. This demonstrates using Argo Events not only for workflow automation, but as a real-time event-driven architecture platform — a self-hosted alternative to Google Eventarc or AWS EventBridge. A standalone `ingestion` service demonstrates the pipeline as a self-hosted event broker — it polls the Open Library API and publishes synthetic book-added events through the same Gateway → EventSource → Kafka → Sensor path used by the UI.
 
 ## Architecture Overview
 
@@ -101,6 +101,7 @@ graph TD
     PP["productpage (BFF)"]
     GW["Gateway (CQRS routing)"]
     WH["External POST /v1/*"]
+    ING["ingestion<br/>Open Library poller"]
     ES["Argo Events<br/>EventSource (webhook)"]
     K["Kafka EventBus<br/>CloudEvent + traceparent"]
 
@@ -122,6 +123,7 @@ graph TD
     Browser --> PP
     PP -->|"POST /v1/* via gateway"| GW
     WH --> GW
+    ING -->|"POST /v1/details"| GW
     GW -->|"method: POST"| ES
     ES --> K
 
@@ -158,6 +160,7 @@ graph TD
     style DLQES fill:#22c55e,color:#fff,stroke:#16a34a
     style DLQS fill:#1a1d27,color:#e4e4e7,stroke:#a855f7
     style DLQW fill:#1a1d27,color:#e4e4e7,stroke:#a855f7
+    style ING fill:#1a1d27,color:#e4e4e7,stroke:#10b981
 ```
 
 Reads are synchronous HTTP calls between services. Writes are fully async via the Envoy Gateway's method-based CQRS routing — POST requests are routed to Argo Events webhook EventSources, which publish to the Kafka EventBus. Sensors consume events and fire HTTP triggers against the write services. The gateway acts as the CQRS boundary, while services remain plain HTTP servers with no Kafka dependency.
@@ -184,6 +187,7 @@ All service wiring happens in `services/<name>/cmd/main.go`. The shared `pkg/` p
 | **ratings** | [![release](https://img.shields.io/github/v/release/kaio6fellipe/event-driven-bookinfo?filter=ratings-v*&sort=semver&display_name=tag&label=release)](https://github.com/kaio6fellipe/event-driven-bookinfo/releases?q=ratings-v&expanded=true) | [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/kaio6fellipe/event-driven-bookinfo/badges/coverage-ratings.json)](https://github.com/kaio6fellipe/event-driven-bookinfo/actions/workflows/ci.yml?query=branch%3Amain) | Backend | 8083 | 9093 | Star ratings per reviewer. Event-written via `rating-submitted` sensor. |
 | **notification** | [![release](https://img.shields.io/github/v/release/kaio6fellipe/event-driven-bookinfo?filter=notification-v*&sort=semver&display_name=tag&label=release)](https://github.com/kaio6fellipe/event-driven-bookinfo/releases?q=notification-v&expanded=true) | [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/kaio6fellipe/event-driven-bookinfo/badges/coverage-notification.json)](https://github.com/kaio6fellipe/event-driven-bookinfo/actions/workflows/ci.yml?query=branch%3Amain) | Event consumer | 8084 | 9094 | Receives POST from sensors, stores audit log. Exposes GET for review. |
 | **dlqueue** | [![release](https://img.shields.io/github/v/release/kaio6fellipe/event-driven-bookinfo?filter=dlqueue-v*&sort=semver&display_name=tag&label=release)](https://github.com/kaio6fellipe/event-driven-bookinfo/releases?q=dlqueue-v&expanded=true) | [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/kaio6fellipe/event-driven-bookinfo/badges/coverage-dlqueue.json)](https://github.com/kaio6fellipe/event-driven-bookinfo/actions/workflows/ci.yml?query=branch%3Amain) | Backend (hex arch) | 8085 | 9095 | Captures events failing sensor retry exhaustion; stores in PostgreSQL; supports replay via REST API |
+| **ingestion** | [![release](https://img.shields.io/github/v/release/kaio6fellipe/event-driven-bookinfo?filter=ingestion-v*&sort=semver&display_name=tag&label=release)](https://github.com/kaio6fellipe/event-driven-bookinfo/releases?q=ingestion-v&expanded=true) | [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/kaio6fellipe/event-driven-bookinfo/badges/coverage-ingestion.json)](https://github.com/kaio6fellipe/event-driven-bookinfo/actions/workflows/ci.yml?query=branch%3Amain) | Producer (hex arch) | 8086 | 9096 | Polls Open Library for books on a configurable interval and publishes `book-added` events to the Gateway. Stateless; no storage adapters. |
 
 All services expose their business API on the API port and observability endpoints (`/metrics`, `/healthz`, `/readyz`, `/debug/pprof/*`) on the admin port.
 
@@ -247,6 +251,14 @@ SERVICE_NAME=productpage HTTP_PORT=8080 ADMIN_PORT=9090 \
   TEMPLATE_DIR=services/productpage/templates \
   ./bin/productpage
 
+# Optional standalone demo — polls Open Library and publishes to the Gateway
+SERVICE_NAME=ingestion HTTP_PORT=8086 ADMIN_PORT=9096 \
+  GATEWAY_URL=http://localhost:8080 \
+  POLL_INTERVAL=5m \
+  SEARCH_QUERIES=programming,golang \
+  MAX_RESULTS_PER_QUERY=10 \
+  ./bin/ingestion
+
 # Open in browser
 open http://localhost:8080
 ```
@@ -268,7 +280,7 @@ make stop         # Stop and remove containers
 | Target | Description |
 |---|---|
 | `make build SERVICE=<name>` | Build a single service binary to `bin/<name>` |
-| `make build-all` | Build all 6 service binaries |
+| `make build-all` | Build all 7 service binaries |
 | `make test` | Run all tests |
 | `make test-cover` | Run tests with HTML coverage report |
 | `make test-race` | Run tests with the race detector |
@@ -277,7 +289,7 @@ make stop         # Stop and remove containers
 | `make vet` | Run go vet |
 | `make mod-tidy` | Tidy go module dependencies |
 | `make docker-build SERVICE=<name>` | Build Docker image for one service |
-| `make docker-build-all` | Build Docker images for all 6 services |
+| `make docker-build-all` | Build Docker images for all 7 services |
 | `make run` | Start all services via Docker Compose (PostgreSQL backend) |
 | `make stop` | Stop services and remove containers |
 | `make e2e` | Run E2E tests via docker-compose |
@@ -326,6 +338,7 @@ ghcr.io/kaio6fellipe/event-driven-bookinfo/reviews:<tag>
 ghcr.io/kaio6fellipe/event-driven-bookinfo/ratings:<tag>
 ghcr.io/kaio6fellipe/event-driven-bookinfo/notification:<tag>
 ghcr.io/kaio6fellipe/event-driven-bookinfo/dlqueue:<tag>
+ghcr.io/kaio6fellipe/event-driven-bookinfo/ingestion:<tag>
 ```
 
 ---
@@ -394,6 +407,7 @@ graph TD
 
         DLQR["dlqueue"]
         DLQW["dlqueue-write"]
+        ING["ingestion"]
 
         ES["EventSources"]
         EB["EventBus"]
@@ -430,13 +444,14 @@ graph TD
     S -->|"dlqTrigger<br/>(on failure)"| DLQW
 
     DR & DW & RR & RW & RTR & RTW & N & DLQR & DLQW --> PG
+    ING -.->|"outbound HTTPS"| GW
     PP --> Redis
 
     Alloy -.->|scrape :9090/metrics| PP
     Alloy -.->|OTLP traces| Tempo
     Alloy -.->|remote_write| Prom
     Alloy -.->|push logs| Loki
-    PP & DR & DW & RR & RW & RTR & RTW & N & DLQR & DLQW -.->|push profiles| Pyro
+    PP & DR & DW & RR & RW & RTR & RTW & N & DLQR & DLQW & ING -.->|push profiles| Pyro
     Prom & Tempo & Loki & Pyro --> Grafana
 
     style Browser fill:#6366f1,color:#fff,stroke:#818cf8
@@ -453,6 +468,7 @@ graph TD
     style Grafana fill:#e879f9,color:#000,stroke:#c026d3
     style PG fill:#3b82f6,color:#fff,stroke:#2563eb
     style Redis fill:#ef4444,color:#fff,stroke:#dc2626
+    style ING fill:#1a1d27,color:#e4e4e7,stroke:#10b981
 ```
 
 The cluster (`bookinfo-local`) runs four namespaces:
@@ -462,7 +478,7 @@ The cluster (`bookinfo-local`) runs four namespaces:
 | `platform` | Strimzi operator, Kafka (KRaft single-node), Argo Events controller, EventBus, Gateway `default-gw` |
 | `envoy-gateway-system` | Envoy Gateway controller, GatewayClass `eg`, stable `gateway` Service for CQRS routing |
 | `observability` | Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy (DaemonSet for logs + Deployment for metrics/traces) |
-| `bookinfo` | 10 app deployments (CQRS split incl. dlqueue read/write), PostgreSQL, 4 EventSources (incl. `dlq-event-received`), 4 Sensors (incl. DLQ), method-based HTTPRoutes |
+| `bookinfo` | 11 app deployments (CQRS split incl. dlqueue read/write, plus `ingestion` single deployment), PostgreSQL, 4 EventSources (incl. `dlq-event-received`), 4 Sensors (incl. DLQ), method-based HTTPRoutes |
 
 ### CQRS Deployment Split
 
@@ -476,6 +492,8 @@ Each backend service deploys as two separate Deployments sharing the same image 
 | `ratings` / `ratings-write` | Read / Write | reviews (read) / rating-submitted sensor |
 | `notification` | Write-only | All 3 sensors |
 | `dlqueue` / `dlqueue-write` | Read / Write | operator/service API (GET) / `dlq-event-received` sensor (POST) |
+
+> `ingestion` deploys as a single stateless deployment with no CQRS split — it is a pure event producer and is omitted from the table above.
 
 ### Usage
 
@@ -534,6 +552,16 @@ Replay is operator- or service-initiated via `POST /v1/events/{id}/replay`: dlqu
 
 ---
 
+## Data Ingestion
+
+The `ingestion` service is a demo-scale synthetic-data generator that exercises the full event-driven write pipeline end-to-end (Gateway → EventSource → Kafka → Sensor → `details-write`). It runs as a single stateless deployment with no storage adapters, no CQRS split, and no EventSource/Sensor of its own — it is purely outbound.
+
+A background poll loop ticks every `POLL_INTERVAL` (default 5m). For each query in `SEARCH_QUERIES`, the service calls `GET https://openlibrary.org/search.json`, validates each returned book (title, ISBN, authors, and publish year are required), and publishes accepted books via `POST {GATEWAY_URL}/v1/details`. Each publish carries a deterministic idempotency key `ingestion-isbn-<ISBN>` so the downstream `details-write` service deduplicates across cycles via `pkg/idempotency`. On-demand scrapes are also available via `POST /v1/ingestion/trigger` (optional body `{"queries": ["golang", "rust"]}`).
+
+Configuration via `GATEWAY_URL`, `POLL_INTERVAL`, `SEARCH_QUERIES`, and `MAX_RESULTS_PER_QUERY` environment variables. Because idempotency is enforced at the write service, replays and overlapping cycles are safe. For the full design, port contracts, and metric definitions, see [docs/superpowers/specs/2026-04-14-ingestion-service-design.md](docs/superpowers/specs/2026-04-14-ingestion-service-design.md).
+
+---
+
 ## E2E Tests
 
 E2E tests spin up all five services via docker-compose and exercise each service's HTTP API with shell scripts.
@@ -570,6 +598,7 @@ Prometheus-format metrics are available at `/metrics` on the admin port. Each se
   | details | `books_added_total` |
   | reviews | `reviews_submitted_total` |
   | notification | `notifications_dispatched_total`, `notifications_failed_total`, `notifications_by_status` |
+  | ingestion | `ingestion_scrapes_total`, `ingestion_books_published_total`, `ingestion_errors_total` |
 
 ### Tracing
 
@@ -623,15 +652,22 @@ event-driven-bookinfo/
 │   ├── reviews/                # User reviews (hex arch, calls ratings)
 │   ├── ratings/                # Star ratings (hex arch)
 │   ├── notification/           # Event consumer + audit log (hex arch)
-│   └── dlqueue/                # Dead letter queue (hex arch) — NEW
+│   ├── dlqueue/                # Dead letter queue (hex arch) — NEW
+│   │   ├── cmd/main.go
+│   │   ├── migrations/         # dlq_events + processed_events
+│   │   └── internal/
+│   │       ├── core/           # domain/, port/, service/
+│   │       ├── adapter/
+│   │       │   ├── inbound/http/
+│   │       │   └── outbound/   # memory/, postgres/, http/ (replay client)
+│   │       └── metrics/        # dlq_events_* counters
+│   └── ingestion/              # Producer (hex arch) — Open Library scraper, publishes to Gateway
 │       ├── cmd/main.go
-│       ├── migrations/         # dlq_events + processed_events
 │       └── internal/
 │           ├── core/           # domain/, port/, service/
-│           ├── adapter/
-│           │   ├── inbound/http/
-│           │   └── outbound/   # memory/, postgres/, http/ (replay client)
-│           └── metrics/        # dlq_events_* counters
+│           └── adapter/
+│               ├── inbound/http/
+│               └── outbound/   # openlibrary/ (BookFetcher), gateway/ (EventPublisher)
 ├── pkg/
 │   ├── config/                 # Env-based configuration
 │   ├── health/                 # /healthz and /readyz handlers
@@ -678,7 +714,7 @@ Each service is versioned and released independently. Releases are fully automat
 ### How It Works
 
 1. **PR merged to `main`** → `auto-tag.yml` runs
-2. **Detects changed services** — file paths under `services/<name>/`; changes to `pkg/`, `go.mod`, or `go.sum` trigger all 6 services
+2. **Detects changed services** — file paths under `services/<name>/`; changes to `pkg/`, `go.mod`, or `go.sum` trigger all 7 services
 3. **Determines version bump** — PR labels (`major`/`minor`) take priority, then conventional commit prefixes (`feat` → minor, `fix` → patch, `BREAKING CHANGE` → major), default is `patch`
 4. **Creates tag** — e.g., `details-v0.2.0`
 5. **Dispatches release** — `release.yml` builds binaries, Docker images (multi-arch), and creates a GitHub release

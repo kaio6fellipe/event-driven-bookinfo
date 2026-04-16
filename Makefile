@@ -356,29 +356,24 @@ k8s-deploy: ##@Kubernetes Build images, import to k3d, deploy apps + HTTPRoutes
 	$(k8s-guard)
 	@printf "\n$(BOLD)═══ Application Layer ═══$(NC)\n\n"
 	@$(KUBECTL) create namespace $(K8S_NS_BOOKINFO) --dry-run=client -o yaml | $(KUBECTL) apply -f -
-	@printf "$(BOLD)[1/6] Building Docker images...$(NC)\n"
+	@printf "$(BOLD)[1/4] Building Docker images...$(NC)\n"
 	@for svc in $(SERVICES); do \
 		printf "  Building $$svc...\n"; \
 		docker build -f build/Dockerfile.$$svc -t event-driven-bookinfo/$$svc:local . || exit 1; \
 	done
-	@printf "$(BOLD)[2/6] Importing images to k3d...$(NC)\n"
+	@printf "$(BOLD)[2/4] Importing images to k3d...$(NC)\n"
 	@for svc in $(SERVICES); do \
 		k3d image import event-driven-bookinfo/$$svc:local -c $(K8S_CLUSTER) || exit 1; \
 	done
 	@printf "  $(GREEN)Images imported.$(NC)\n"
-	@printf "$(BOLD)[3/6] Deploying PostgreSQL...$(NC)\n"
-	@$(KUBECTL) apply -k deploy/postgres/local/
-	@$(KUBECTL) wait statefulset/postgres -n $(K8S_NS_BOOKINFO) \
-		--for=jsonpath='{.status.readyReplicas}'=1 --timeout=120s
-	@printf "  $(GREEN)PostgreSQL ready.$(NC)\n"
-	@printf "$(BOLD)[4/6] Deploying Redis...$(NC)\n"
+	@printf "$(BOLD)[3/4] Deploying Redis...$(NC)\n"
 	@$(HELM) repo add bitnami https://charts.bitnami.com/bitnami --force-update > /dev/null 2>&1
 	@$(HELM) upgrade --install redis bitnami/redis \
 		--namespace $(K8S_NS_BOOKINFO) \
 		--values deploy/redis/local/redis-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Redis ready.$(NC)\n"
-	@printf "$(BOLD)[5/5] Deploying services via Helm...$(NC)\n"
+	@printf "$(BOLD)[4/4] Deploying services via Helm...$(NC)\n"
 	@for svc in $(SERVICES); do \
 		printf "  Installing $$svc...\n"; \
 		$(HELM) upgrade --install $$svc charts/bookinfo-service \

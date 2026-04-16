@@ -67,3 +67,21 @@ gateway:
   name: default-gw
   namespace: platform
   sectionName: web
+
+events:
+  kafka:
+    broker: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
+  consumed:
+    raw-books-details:
+      eventSourceName: ingestion-raw-books-details
+      eventName: raw-books-details
+      triggers:
+        - name: ingest-book-detail
+          url: self
+          path: /v1/details
+          method: POST
+          payload:
+            - passthrough
+      dlq:
+        enabled: true
+        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/v1/events"

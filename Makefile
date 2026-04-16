@@ -373,6 +373,7 @@ k8s-deploy: ##@Kubernetes Build images, import to k3d, deploy apps + HTTPRoutes
 		--values deploy/redis/local/redis-values.yaml \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Redis ready.$(NC)\n"
+	@helm dependency build charts/bookinfo-service > /dev/null 2>&1
 	@printf "$(BOLD)[4/4] Deploying services via Helm...$(NC)\n"
 	@for svc in $(SERVICES); do \
 		printf "  Installing $$svc...\n"; \
@@ -555,6 +556,7 @@ helm-template: ##@Helm Dry-run render for a service: make helm-template SERVICE=
 ifndef SERVICE
 	$(error SERVICE is not set. Usage: make helm-template SERVICE=<name>)
 endif
+	helm dependency build charts/bookinfo-service
 	helm template $(SERVICE) charts/bookinfo-service \
 		-f deploy/$(SERVICE)/values-local.yaml \
 		--namespace $(K8S_NS_BOOKINFO)

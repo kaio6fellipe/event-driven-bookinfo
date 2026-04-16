@@ -148,6 +148,31 @@ routes: []
   #   pathType: PathPrefix     # PathPrefix or Exact
   #   method: GET              # HTTP method
 
+# -- Kafka event pipeline (independent of CQRS)
+events:
+  kafka:
+    broker: ""
+  exposed: {}
+    # event-name:
+    #   topic: kafka_topic_name
+    #   eventBusName: kafka
+    #   contentType: application/json
+  consumed: {}
+    # event-name:
+    #   eventSourceName: producer-event-name
+    #   eventName: event-name
+    #   triggers:
+    #     - name: trigger-name
+    #       url: self
+    #       path: /v1/endpoint        # required when url is "self"
+    #       method: POST
+    #       payload:
+    #         - passthrough
+    #   retryStrategy: {}
+    #   dlq:
+    #     enabled: true
+    #     url: ""
+
 # -- PostgreSQL (Bitnami subchart)
 postgresql:
   enabled: false

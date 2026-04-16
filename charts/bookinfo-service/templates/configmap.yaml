@@ -23,3 +23,6 @@ data:
   {{- with .Values.observability.pyroscopeAddress }}
   PYROSCOPE_SERVER_ADDRESS: {{ . | quote }}
   {{- end }}
+  {{- with .Values.events.kafka.broker }}
+  KAFKA_BROKERS: {{ . | quote }}
+  {{- end }}

@@ -1,0 +1,162 @@
+{{/* charts/bookinfo-service/templates/consumer-sensor.yaml */}}
+{{- $hasConsumed := false }}
+{{- range $_, $event := .Values.events.consumed }}
+{{- if $event.triggers }}
+{{- $hasConsumed = true }}
+{{- end }}
+{{- end }}
+{{- if $hasConsumed }}
+{{- $consumedCount := 0 }}
+{{- range $_, $event := .Values.events.consumed }}
+{{- $consumedCount = add $consumedCount 1 }}
+{{- end }}
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: {{ include "bookinfo-service.consumerSensorName" . }}
+  labels:
+    {{- include "bookinfo-service.labels" . | nindent 4 }}
+spec:
+  eventBusName: {{ .Values.cqrs.eventBusName }}
+  {{- with .Values.observability.otelEndpoint }}
+  template:
+    container:
+      env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: {{ . | quote }}
+        - name: OTEL_SERVICE_NAME
+          value: {{ include "bookinfo-service.consumerSensorName" $ | quote }}
+  {{- end }}
+  dependencies:
+    {{- range $eventName, $event := $.Values.events.consumed }}
+    - name: {{ $eventName }}-dep
+      eventSourceName: {{ $event.eventSourceName }}
+      eventName: {{ $event.eventName }}
+    {{- end }}
+  triggers:
+    {{- range $eventName, $event := $.Values.events.consumed }}
+    {{- $retryStrategy := default $.Values.sensor.retryStrategy $event.retryStrategy }}
+    {{- range $trigger := $event.triggers }}
+    {{- /* Resolve trigger URL */ -}}
+    {{- $triggerURL := $trigger.url }}
+    {{- if eq $trigger.url "self" }}
+    {{- if $.Values.cqrs.enabled }}
+    {{- $triggerURL = printf "http://%s-write.%s.svc.cluster.local%s" (include "bookinfo-service.fullname" $) $.Release.Namespace (required (printf "events.consumed.%s.triggers[].path is required when url is 'self'" $eventName) $trigger.path) }}
+    {{- else }}
+    {{- $triggerURL = printf "http://%s.%s.svc.cluster.local%s" (include "bookinfo-service.fullname" $) $.Release.Namespace (required (printf "events.consumed.%s.triggers[].path is required when url is 'self'" $eventName) $trigger.path) }}
+    {{- end }}
+    {{- end }}
+    {{- /* Resolve trigger method */ -}}
+    {{- $triggerMethod := default "POST" $trigger.method }}
+    - template:
+        name: {{ $trigger.name }}
+        {{- if gt $consumedCount 1 }}
+        conditions: {{ $eventName }}-dep
+        {{- end }}
+        http:
+          url: {{ $triggerURL }}
+          method: {{ $triggerMethod }}
+          headers:
+            Content-Type: application/json
+            {{- with $trigger.headers }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          payload:
+            {{- range $p := $trigger.payload }}
+            {{- if eq (kindOf $p) "string" }}
+            - src:
+                dependencyName: {{ $eventName }}-dep
+                dataKey: body
+              dest: ""
+            {{- else }}
+            - src:
+                dependencyName: {{ default (printf "%s-dep" $eventName) $p.src.dependencyName }}
+                {{- with $p.src.dataKey }}
+                dataKey: {{ . }}
+                {{- end }}
+                {{- with $p.src.value }}
+                value: {{ . | quote }}
+                {{- end }}
+                {{- with $p.src.contextKey }}
+                contextKey: {{ . }}
+                {{- end }}
+              dest: {{ $p.dest }}
+            {{- end }}
+            {{- end }}
+      atLeastOnce: {{ $.Values.sensor.atLeastOnce }}
+      retryStrategy:
+        steps: {{ $retryStrategy.steps }}
+        duration: {{ $retryStrategy.duration }}
+        factor: {{ $retryStrategy.factor }}
+        jitter: {{ $retryStrategy.jitter }}
+      {{- /* DLQ trigger */ -}}
+      {{- $dlq := default $.Values.sensor.dlq $event.dlq }}
+      {{- if $dlq.enabled }}
+      {{- $dlqRetry := default $.Values.sensor.dlq.retryStrategy $dlq.retryStrategy }}
+      dlqTrigger:
+        template:
+          name: dlq-{{ $trigger.name }}
+          http:
+            url: {{ $dlq.url }}
+            method: POST
+            headers:
+              Content-Type: application/json
+            payload:
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  dataKey: body
+                dest: original_payload
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  contextKey: id
+                dest: event_id
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  contextKey: type
+                dest: event_type
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  contextKey: source
+                dest: event_source
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  contextKey: subject
+                dest: event_subject
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  contextKey: time
+                dest: event_timestamp
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  contextKey: datacontenttype
+                dest: datacontenttype
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  dataKey: header
+                dest: original_headers
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  value: {{ include "bookinfo-service.consumerSensorName" $ | quote }}
+                dest: sensor_name
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  value: {{ $trigger.name | quote }}
+                dest: failed_trigger
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  value: {{ $event.eventSourceName | quote }}
+                dest: eventsource_name
+              - src:
+                  dependencyName: {{ $eventName }}-dep
+                  value: {{ $.Release.Namespace | quote }}
+                dest: namespace
+        atLeastOnce: true
+        retryStrategy:
+          steps: {{ $dlqRetry.steps }}
+          duration: {{ $dlqRetry.duration }}
+          factor: {{ $dlqRetry.factor }}
+          jitter: {{ $dlqRetry.jitter }}
+      {{- end }}
+    {{- end }}
+    {{- end }}
+{{- end }}

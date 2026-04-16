@@ -150,6 +150,64 @@
           }
         }
       }
+    },
+    "events": {
+      "type": "object",
+      "properties": {
+        "kafka": {
+          "type": "object",
+          "properties": {
+            "broker": { "type": "string" }
+          }
+        },
+        "exposed": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "topic": { "type": "string" },
+              "eventBusName": { "type": "string" },
+              "contentType": { "type": "string" }
+            },
+            "required": ["topic"]
+          }
+        },
+        "consumed": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "eventSourceName": { "type": "string" },
+              "eventName": { "type": "string" },
+              "triggers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string" },
+                    "url": { "type": "string" },
+                    "path": { "type": "string" },
+                    "method": { "type": "string" },
+                    "headers": { "type": "object" },
+                    "payload": { "type": "array" }
+                  },
+                  "required": ["name", "url", "payload"]
+                }
+              },
+              "retryStrategy": { "type": "object" },
+              "dlq": {
+                "type": "object",
+                "properties": {
+                  "enabled": { "type": "boolean" },
+                  "url": { "type": "string" },
+                  "retryStrategy": { "type": "object" }
+                }
+              }
+            },
+            "required": ["eventSourceName", "eventName", "triggers"]
+          }
+        }
+      }
     }
   }
 }

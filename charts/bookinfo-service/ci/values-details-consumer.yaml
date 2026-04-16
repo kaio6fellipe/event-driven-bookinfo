@@ -1,0 +1,42 @@
+# charts/bookinfo-service/ci/values-details-consumer.yaml
+# ct install test: CQRS + consumed events + DLQ
+serviceName: details
+fullnameOverride: details
+image:
+  repository: event-driven-bookinfo/details
+  tag: latest
+
+cqrs:
+  enabled: true
+  endpoints:
+    book-added:
+      port: 12000
+      method: POST
+      endpoint: /v1/details
+      triggers:
+        - name: create-detail
+          url: self
+          payload:
+            - passthrough
+
+sensor:
+  dlq:
+    url: "http://dlq-eventsource-svc:12004/v1/events"
+
+events:
+  kafka:
+    broker: "kafka-bootstrap:9092"
+  consumed:
+    raw-books-details:
+      eventSourceName: ingestion-raw-books-details
+      eventName: raw-books-details
+      triggers:
+        - name: ingest-book-detail
+          url: self
+          path: /v1/details
+          method: POST
+          payload:
+            - passthrough
+      dlq:
+        enabled: true
+        url: "http://dlq-eventsource-svc:12004/v1/events"

@@ -80,7 +80,7 @@ func (c *Client) SearchBooks(ctx context.Context, query string, limit int) ([]do
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) //nolint:gosec // URL is built from trusted baseURL constant, not user input
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}

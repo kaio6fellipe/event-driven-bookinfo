@@ -27,6 +27,10 @@ type Config struct {
 	PollInterval       time.Duration
 	SearchQueries      []string
 	MaxResultsPerQuery int
+
+	// Kafka producer configuration (used by ingestion service)
+	KafkaBrokers string
+	KafkaTopic   string
 }
 
 // Load reads configuration from environment variables and returns a Config.
@@ -48,6 +52,9 @@ func Load() (*Config, error) {
 		PollInterval:       parseDuration(envOrDefault("POLL_INTERVAL", "5m")),
 		SearchQueries:      parseCSV(envOrDefault("SEARCH_QUERIES", "programming,golang")),
 		MaxResultsPerQuery: parseInt(envOrDefault("MAX_RESULTS_PER_QUERY", "10")),
+
+		KafkaBrokers: os.Getenv("KAFKA_BROKERS"),
+		KafkaTopic:   envOrDefault("KAFKA_TOPIC", "raw_books_details"),
 	}
 
 	if cfg.ServiceName == "" {

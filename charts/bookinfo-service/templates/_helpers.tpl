@@ -106,3 +106,10 @@ Service account name.
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Consumer sensor name: derived from release name (separate from CQRS sensor).
+*/}}
+{{- define "bookinfo-service.consumerSensorName" -}}
+{{ include "bookinfo-service.fullname" . }}-consumer-sensor
+{{- end }}

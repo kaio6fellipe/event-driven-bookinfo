@@ -16,7 +16,7 @@ Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review 
 | **ratings** | Backend (hex arch) | :8080 / :9090 admin | Star ratings |
 | **notification** | Backend (hex arch) | :8080 / :9090 admin | Event consumer audit log |
 | **dlqueue** | Backend (hex arch) | :8080 / :9090 admin | Dead letter queue for failed sensor deliveries; REST API for inspection, replay, and resolution |
-| **ingestion** | Producer (hex arch) | :8080 / :9090 admin | Open Library scraper; polls on interval, publishes book-added events to the Gateway |
+| **ingestion** | Producer (hex arch) | :8080 / :9090 admin | Open Library scraper; polls on interval, publishes CloudEvents to Kafka (`raw_books_details` topic) |
 
 ## Architecture
 
@@ -31,7 +31,8 @@ Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review 
 - **Local k8s** (`make run-k8s`): k3d cluster with Envoy Gateway API, Strimzi Kafka (KRaft), full observability stack (Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy)
 - **DLQ**: sensor `dlqTrigger` → `dlq-event-received` EventSource → `dlqueue-write` → PostgreSQL. Dedup by natural key (`sensor_name + failed_trigger + SHA-256(payload)`). State machine: `pending → replayed → resolved / poisoned`. REST API at `/v1/events` supports list/get/replay/resolve/reset plus batch operations.
 - **Idempotency**: all write services (reviews, ratings, details, notification, dlqueue) dedupe on client-supplied `idempotency_key` or derived natural key (SHA-256 of business fields). Prerequisite for safe DLQ replay — CloudEvents `id` cannot be used because Argo Events regenerates it per EventSource pass.
-- **Ingestion**: `ingestion` service polls Open Library on `POLL_INTERVAL` → for each query in `SEARCH_QUERIES` → `POST {GATEWAY_URL}/v1/details` with `idempotency_key=ingestion-isbn-<ISBN>`. Stateless, single deployment, no CQRS split, no EventSource/Sensor of its own. Exercises the full write pipeline end-to-end.
+- **Ingestion**: `ingestion` service polls Open Library on `POLL_INTERVAL` → produces CloudEvents to Kafka topic `raw_books_details` via franz-go. Stateless, single deployment, no CQRS split. Creates a Kafka EventSource (`ingestion-raw-books-details`) for downstream consumers.
+- **Event consumption**: services declare `events.consumed` in Helm values to create a Consumer Sensor with triggers and DLQ, independent of the CQRS Sensor. The `details` service consumes `raw_books_details` events via the `details-consumer-sensor`.
 
 ## Build Commands
 
@@ -51,6 +52,16 @@ make helm-lint            # Lint chart with all per-service values files
 make helm-template SERVICE=ratings  # Dry-run render for a specific service
 helm upgrade --install ratings charts/bookinfo-service -f deploy/ratings/values-local.yaml -n bookinfo
 ```
+
+## Helm Events Configuration
+
+Services can declare Kafka event pipelines independent of CQRS:
+
+- **`events.exposed`**: creates a Kafka-type EventSource (used by producer services like ingestion)
+- **`events.consumed`**: creates a Consumer Sensor with triggers and DLQ (used by consuming services like details)
+- **`events.kafka.broker`**: injects `KAFKA_BROKERS` env var into ConfigMap
+
+These coexist with the existing CQRS pattern (`cqrs.endpoints`) without modification.
 
 ## Local Kubernetes
 
@@ -114,10 +125,11 @@ SERVICE_NAME=notification HTTP_PORT=8084 ADMIN_PORT=9094 go run ./services/notif
 SERVICE_NAME=dlqueue HTTP_PORT=8085 ADMIN_PORT=9095 go run ./services/dlqueue/cmd/
 ```
 
-**ingestion** (publishes to Gateway; requires Gateway/productpage reachable):
+**ingestion** (publishes to Kafka; requires Kafka broker reachable):
 ```bash
 SERVICE_NAME=ingestion HTTP_PORT=8086 ADMIN_PORT=9096 \
-  GATEWAY_URL=http://localhost:8080 \
+  KAFKA_BROKERS=localhost:9092 \
+  KAFKA_TOPIC=raw_books_details \
   POLL_INTERVAL=5m \
   SEARCH_QUERIES=programming,golang \
   MAX_RESULTS_PER_QUERY=10 \
@@ -132,7 +144,7 @@ SERVICE_NAME=productpage HTTP_PORT=8080 ADMIN_PORT=9090 \
   go run ./services/productpage/cmd/
 ```
 
-Optional env vars (all services): `LOG_LEVEL` (debug/info/warn/error, default info), `OTEL_EXPORTER_OTLP_ENDPOINT`, `PYROSCOPE_SERVER_ADDRESS`, `STORAGE_BACKEND` (memory/postgres), `DATABASE_URL`. Productpage-specific: `REDIS_URL` (enables pending review cache; disabled when unset). Ingestion-specific: `GATEWAY_URL`, `POLL_INTERVAL`, `SEARCH_QUERIES`, `MAX_RESULTS_PER_QUERY`.
+Optional env vars (all services): `LOG_LEVEL` (debug/info/warn/error, default info), `OTEL_EXPORTER_OTLP_ENDPOINT`, `PYROSCOPE_SERVER_ADDRESS`, `STORAGE_BACKEND` (memory/postgres), `DATABASE_URL`. Productpage-specific: `REDIS_URL` (enables pending review cache; disabled when unset). Ingestion-specific: `KAFKA_BROKERS`, `KAFKA_TOPIC` (default `raw_books_details`), `POLL_INTERVAL`, `SEARCH_QUERIES`, `MAX_RESULTS_PER_QUERY`.
 
 ## Shared Packages (`pkg/`)
 

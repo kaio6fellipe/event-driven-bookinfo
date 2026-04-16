@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 
@@ -19,7 +18,7 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/server"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/adapter/inbound/http"
-	"github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/adapter/outbound/gateway"
+	kafkaadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/adapter/outbound/kafka"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/adapter/outbound/openlibrary"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/core/service"
 )
@@ -65,7 +64,7 @@ func main() {
 	)
 	booksPublished, _ := meter.Int64Counter(
 		"ingestion_books_published_total",
-		metric.WithDescription("Total number of events accepted by EventSource webhook"),
+		metric.WithDescription("Total number of events published to Kafka"),
 	)
 	errorsTotal, _ := meter.Int64Counter(
 		"ingestion_errors_total",
@@ -74,16 +73,17 @@ func main() {
 	_, _ = scrapesTotal, booksPublished // Will be used in future metric decorator
 	_ = errorsTotal
 
-	// Outbound HTTP client with OTel transport for tracing
-	outboundTransport := otelhttp.NewTransport(http.DefaultTransport)
-	outboundClient := &http.Client{
-		Transport: outboundTransport,
-		Timeout:   30 * time.Second,
-	}
-
-	// Wire hex arch
+	// Wire hex arch: fetcher + Kafka producer
+	outboundClient := &http.Client{Timeout: 30 * time.Second}
 	fetcher := openlibrary.NewClient(outboundClient)
-	publisher := gateway.NewPublisher(outboundClient, cfg.GatewayURL)
+
+	publisher, err := kafkaadapter.NewProducer(ctx, cfg.KafkaBrokers, cfg.KafkaTopic)
+	if err != nil {
+		logger.Error("failed to create Kafka producer", "error", err)
+		os.Exit(1)
+	}
+	defer publisher.Close()
+
 	svc := service.NewIngestionService(fetcher, publisher, cfg.SearchQueries, cfg.MaxResultsPerQuery)
 	h := handler.NewHandler(svc)
 

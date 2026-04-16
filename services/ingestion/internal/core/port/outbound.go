@@ -12,10 +12,10 @@ type BookFetcher interface {
 	SearchBooks(ctx context.Context, query string, limit int) ([]domain.Book, error)
 }
 
-// EventPublisher sends events to the internal event pipeline.
-// Returns nil when the EventSource webhook accepts the event (HTTP 200).
-// Returns error on non-200 responses or connection failures.
+// EventPublisher sends events to Kafka.
+// Returns nil when the event is successfully produced to the topic.
+// Returns error on produce failures.
 type EventPublisher interface {
-	// PublishBookAdded sends a book-added event to the Gateway.
+	// PublishBookAdded sends a book-added event to Kafka.
 	PublishBookAdded(ctx context.Context, book domain.Book) error
 }

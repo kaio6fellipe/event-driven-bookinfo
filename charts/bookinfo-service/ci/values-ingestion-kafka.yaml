@@ -1,0 +1,22 @@
+# charts/bookinfo-service/ci/values-ingestion-kafka.yaml
+# ct install test: Kafka producer + EventSource (no CQRS)
+serviceName: ingestion
+fullnameOverride: ingestion
+image:
+  repository: event-driven-bookinfo/ingestion
+  tag: latest
+
+config:
+  LOG_LEVEL: "debug"
+  POLL_INTERVAL: "5m"
+  SEARCH_QUERIES: "programming"
+  MAX_RESULTS_PER_QUERY: "5"
+
+events:
+  kafka:
+    broker: "kafka-bootstrap:9092"
+  exposed:
+    raw-books-details:
+      topic: raw_books_details
+      eventBusName: kafka
+      contentType: application/json

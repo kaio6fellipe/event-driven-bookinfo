@@ -226,7 +226,7 @@ Standard `pkg/metrics` HTTP middleware on both ports, plus custom metrics:
 - `cqrs.enabled: false`
 - No EventSource, no Sensor, no write Deployment, no HTTPRoutes
 - Config values: `GATEWAY_URL`, `POLL_INTERVAL`, `SEARCH_QUERIES`, `MAX_RESULTS_PER_QUERY`
-- `GATEWAY_URL` in k8s: `http://default-gw-envoy.envoy-gateway-system.svc.cluster.local`
+- `GATEWAY_URL` in k8s: `http://gateway.envoy-gateway-system.svc.cluster.local` (stable alias service defined in `deploy/gateway/base/gateway-service.yaml` that selects the Envoy Gateway data-plane pods)
 
 ### Makefile
 - Add `ingestion` to `SERVICES` list

@@ -2161,7 +2161,7 @@ image:
 
 config:
   LOG_LEVEL: "debug"
-  GATEWAY_URL: "http://default-gw-envoy.envoy-gateway-system.svc.cluster.local"
+  GATEWAY_URL: "http://gateway.envoy-gateway-system.svc.cluster.local"
   POLL_INTERVAL: "5m"
   SEARCH_QUERIES: "programming,golang,kubernetes,python,devops"
   MAX_RESULTS_PER_QUERY: "10"

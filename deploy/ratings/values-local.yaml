@@ -5,11 +5,13 @@ image:
   repository: event-driven-bookinfo/ratings
   tag: local
 
+postgresql:
+  enabled: true
+  auth:
+    database: "bookinfo_ratings"
+
 config:
   LOG_LEVEL: "debug"
-  STORAGE_BACKEND: "postgres"
-  DATABASE_URL: "postgres://bookinfo:bookinfo@postgres.bookinfo.svc.cluster.local:5432/bookinfo_ratings?sslmode=disable"
-  RUN_MIGRATIONS: "true"
 
 observability:
   otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"

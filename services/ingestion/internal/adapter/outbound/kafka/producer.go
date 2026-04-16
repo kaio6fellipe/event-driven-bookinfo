@@ -25,19 +25,19 @@ const (
 	defaultReplicationFactor = 1
 )
 
-// bookEvent is the CloudEvents data payload published to Kafka.
+// bookEvent matches the details service AddDetailRequest DTO.
+// The sensor uses passthrough payload, so this must match what details-write expects.
 type bookEvent struct {
-	Title          string   `json:"title"`
-	Authors        []string `json:"authors"`
-	ISBN           string   `json:"isbn"`
-	PublishYear    int      `json:"publish_year"`
-	Subjects       []string `json:"subjects,omitempty"`
-	Pages          int      `json:"pages,omitempty"`
-	Publisher      string   `json:"publisher,omitempty"`
-	Language       string   `json:"language,omitempty"`
-	ISBN10         string   `json:"isbn_10,omitempty"`
-	ISBN13         string   `json:"isbn_13,omitempty"`
-	IdempotencyKey string   `json:"idempotency_key"`
+	Title          string `json:"title"`
+	Author         string `json:"author"`
+	Year           int    `json:"year"`
+	Type           string `json:"type"`
+	Pages          int    `json:"pages,omitempty"`
+	Publisher      string `json:"publisher,omitempty"`
+	Language       string `json:"language,omitempty"`
+	ISBN10         string `json:"isbn_10,omitempty"`
+	ISBN13         string `json:"isbn_13,omitempty"`
+	IdempotencyKey string `json:"idempotency_key"`
 }
 
 // Client abstracts the franz-go client for testing.
@@ -86,10 +86,9 @@ func (p *Producer) PublishBookAdded(ctx context.Context, book domain.Book) error
 
 	evt := bookEvent{
 		Title:          book.Title,
-		Authors:        book.Authors,
-		ISBN:           book.ISBN,
-		PublishYear:    book.PublishYear,
-		Subjects:       book.Subjects,
+		Author:         strings.Join(book.Authors, ", "),
+		Year:           book.PublishYear,
+		Type:           "paperback",
 		Pages:          book.Pages,
 		Publisher:      book.Publisher,
 		Language:       book.Language,

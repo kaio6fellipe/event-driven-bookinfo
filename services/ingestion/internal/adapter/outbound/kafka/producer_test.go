@@ -134,8 +134,15 @@ func TestPublishBookAdded(t *testing.T) {
 			if body["title"] != tt.book.Title {
 				t.Errorf("body title = %q, want %q", body["title"], tt.book.Title)
 			}
-			if body["isbn"] != tt.book.ISBN {
-				t.Errorf("body isbn = %q, want %q", body["isbn"], tt.book.ISBN)
+			// Verify author is a joined string (matches details service DTO)
+			if body["author"] == nil || body["author"] == "" {
+				t.Error("body missing author field")
+			}
+			if body["year"] == nil {
+				t.Error("body missing year field")
+			}
+			if body["type"] != "paperback" {
+				t.Errorf("body type = %q, want %q", body["type"], "paperback")
 			}
 			if body["idempotency_key"] == nil {
 				t.Error("body missing idempotency_key")

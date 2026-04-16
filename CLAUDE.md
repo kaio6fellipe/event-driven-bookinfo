@@ -24,6 +24,7 @@ Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review 
 - **Event-driven writes**: Envoy Gateway CQRS routing (POST -> EventSources) -> Kafka EventBus -> Sensors -> HTTP triggers to write services
 - **Sync reads**: productpage fans out GET calls to details and reviews; reviews fans out to ratings
 - **Storage**: swappable via `STORAGE_BACKEND` env var — `memory` (default, single replica) or `postgres` (horizontally scalable)
+- **Per-service PostgreSQL**: each postgres-backed service deploys its own Bitnami PostgreSQL instance via the Helm chart subchart (`postgresql.enabled: true`). DATABASE_URL is auto-wired from subchart auth values.
 - **Admin port** (:9090): `/metrics`, `/debug/pprof/*`, `/healthz`, `/readyz` — isolated from business API
 - **CQRS deployments** (local k8s): each backend service has separate read and write Deployments; read serves GET via gateway, write receives POST from Argo Events sensors. The Envoy Gateway acts as the CQRS routing boundary (GET -> read services, POST -> EventSource webhooks)
 - **Pending review cache**: productpage stores submitted reviews in Redis immediately after async POST; merges into read responses with "Processing" badge; HTMX auto-polls to reconcile when confirmed. Disabled when `REDIS_URL` is unset.
@@ -45,6 +46,7 @@ make docker-build-all   # Build all 7 Docker images
 ## Helm Commands
 
 ```bash
+helm dependency build charts/bookinfo-service  # Fetch subchart dependencies (run once after clone)
 make helm-lint            # Lint chart with all per-service values files
 make helm-template SERVICE=ratings  # Dry-run render for a specific service
 helm upgrade --install ratings charts/bookinfo-service -f deploy/ratings/values-local.yaml -n bookinfo
@@ -82,8 +84,7 @@ deploy/
 ├── gateway/base/                # Gateway, GatewayClass, ReferenceGrant
 ├── observability/local/         # Helm values: Prometheus, Grafana, Tempo, Loki, Alloy
 ├── platform/local/              # Helm values: Strimzi, Argo Events; Kafka CRDs; EventBus
-├── redis/local/                 # Helm values: Bitnami Redis
-└── postgres/local/              # StatefulSet, Service, init ConfigMap
+└── redis/local/                 # Helm values: Bitnami Redis
 ```
 
 ## Run Locally

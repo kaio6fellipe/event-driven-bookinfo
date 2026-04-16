@@ -1,0 +1,12 @@
+# charts/bookinfo-service/ci/values-details-postgres.yaml
+# ct lint test: PostgreSQL subchart enabled with auto-wired DATABASE_URL
+serviceName: details
+fullnameOverride: details
+image:
+  repository: event-driven-bookinfo/details
+  tag: latest
+
+postgresql:
+  enabled: true
+  auth:
+    database: "bookinfo_details"

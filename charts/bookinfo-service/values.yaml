@@ -81,7 +81,6 @@ probes:
 # -- Config (injected as ConfigMap env vars)
 config:
   LOG_LEVEL: "info"
-  STORAGE_BACKEND: "memory"
 
 # -- CQRS
 cqrs:
@@ -148,3 +147,22 @@ routes: []
   #   path: /                  # match path
   #   pathType: PathPrefix     # PathPrefix or Exact
   #   method: GET              # HTTP method
+
+# -- PostgreSQL (Bitnami subchart)
+postgresql:
+  enabled: false
+  auth:
+    username: "bookinfo"
+    password: "bookinfo"
+    database: ""
+  primary:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+    persistence:
+      enabled: true
+      size: 256Mi

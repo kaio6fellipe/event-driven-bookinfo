@@ -9,6 +9,11 @@ data:
   SERVICE_NAME: {{ include "bookinfo-service.serviceName" . | quote }}
   HTTP_PORT: {{ .Values.ports.http | quote }}
   ADMIN_PORT: {{ .Values.ports.admin | quote }}
+  {{- if .Values.postgresql.enabled }}
+  STORAGE_BACKEND: "postgres"
+  RUN_MIGRATIONS: "true"
+  DATABASE_URL: {{ printf "postgres://%s:%s@%s-postgresql:5432/%s?sslmode=disable" .Values.postgresql.auth.username .Values.postgresql.auth.password .Release.Name (required "postgresql.auth.database must be set when postgresql.enabled=true" .Values.postgresql.auth.database) | quote }}
+  {{- end }}
   {{- range $key, $value := .Values.config }}
   {{ $key }}: {{ $value | quote }}
   {{- end }}

@@ -63,7 +63,7 @@ flowchart LR
 
 Go hexagonal architecture monorepo adapting Istio's Bookinfo as a book review system, demonstrating real-time event-driven architecture with Argo Events and Kafka.
 
-Services are plain REST APIs — all event-driven complexity (Kafka consumers, retries, dead-letter queues) is abstracted by Argo Events EventSources and Sensors. The write path flows through Kafka via Argo Events, ensuring every mutation is event-sourced, while the read path remains synchronous HTTP. Failure recovery is built into the pipeline — a `dlqTrigger` on every sensor captures events that exhaust retries into the `dlqueue` service, where they can be inspected, replayed, or marked resolved. This demonstrates using Argo Events not only for workflow automation, but as a real-time event-driven architecture platform — a self-hosted alternative to Google Eventarc or AWS EventBridge. A standalone `ingestion` service demonstrates the pipeline as a self-hosted event broker — it polls the Open Library API and publishes synthetic book-added events through the same Gateway → EventSource → Kafka → Sensor path used by the UI.
+Services are plain REST APIs — all event-driven complexity (Kafka consumers, retries, dead-letter queues) is abstracted by Argo Events EventSources and Sensors. The write path flows through Kafka via Argo Events, ensuring every mutation is event-sourced, while the read path remains synchronous HTTP. Failure recovery is built into the pipeline — a `dlqTrigger` on every sensor captures events that exhaust retries into the `dlqueue` service, where they can be inspected, replayed, or marked resolved. This demonstrates using Argo Events not only for workflow automation, but as a real-time event-driven architecture platform — a self-hosted alternative to Google Eventarc or AWS EventBridge. A standalone `ingestion` service publishes CloudEvents directly to a dedicated Kafka topic (`raw_books_details`). Downstream services consume these events by declaring an Argo Events Kafka EventSource and Sensor, independent of the CQRS webhook pipeline used by the UI.
 
 ## Architecture Overview
 
@@ -187,7 +187,7 @@ All service wiring happens in `services/<name>/cmd/main.go`. The shared `pkg/` p
 | **ratings** | [![release](https://img.shields.io/github/v/release/kaio6fellipe/event-driven-bookinfo?filter=ratings-v*&sort=semver&display_name=tag&label=release)](https://github.com/kaio6fellipe/event-driven-bookinfo/releases?q=ratings-v&expanded=true) | [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/kaio6fellipe/event-driven-bookinfo/badges/coverage-ratings.json)](https://github.com/kaio6fellipe/event-driven-bookinfo/actions/workflows/ci.yml?query=branch%3Amain) | Backend | 8083 | 9093 | Star ratings per reviewer. Event-written via `rating-submitted` sensor. |
 | **notification** | [![release](https://img.shields.io/github/v/release/kaio6fellipe/event-driven-bookinfo?filter=notification-v*&sort=semver&display_name=tag&label=release)](https://github.com/kaio6fellipe/event-driven-bookinfo/releases?q=notification-v&expanded=true) | [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/kaio6fellipe/event-driven-bookinfo/badges/coverage-notification.json)](https://github.com/kaio6fellipe/event-driven-bookinfo/actions/workflows/ci.yml?query=branch%3Amain) | Event consumer | 8084 | 9094 | Receives POST from sensors, stores audit log. Exposes GET for review. |
 | **dlqueue** | [![release](https://img.shields.io/github/v/release/kaio6fellipe/event-driven-bookinfo?filter=dlqueue-v*&sort=semver&display_name=tag&label=release)](https://github.com/kaio6fellipe/event-driven-bookinfo/releases?q=dlqueue-v&expanded=true) | [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/kaio6fellipe/event-driven-bookinfo/badges/coverage-dlqueue.json)](https://github.com/kaio6fellipe/event-driven-bookinfo/actions/workflows/ci.yml?query=branch%3Amain) | Backend (hex arch) | 8085 | 9095 | Captures events failing sensor retry exhaustion; stores in PostgreSQL; supports replay via REST API |
-| **ingestion** | [![release](https://img.shields.io/github/v/release/kaio6fellipe/event-driven-bookinfo?filter=ingestion-v*&sort=semver&display_name=tag&label=release)](https://github.com/kaio6fellipe/event-driven-bookinfo/releases?q=ingestion-v&expanded=true) | [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/kaio6fellipe/event-driven-bookinfo/badges/coverage-ingestion.json)](https://github.com/kaio6fellipe/event-driven-bookinfo/actions/workflows/ci.yml?query=branch%3Amain) | Producer (hex arch) | 8086 | 9096 | Polls Open Library for books on a configurable interval and publishes `book-added` events to the Gateway. Stateless; no storage adapters. |
+| **ingestion** | [![release](https://img.shields.io/github/v/release/kaio6fellipe/event-driven-bookinfo?filter=ingestion-v*&sort=semver&display_name=tag&label=release)](https://github.com/kaio6fellipe/event-driven-bookinfo/releases?q=ingestion-v&expanded=true) | [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/kaio6fellipe/event-driven-bookinfo/badges/coverage-ingestion.json)](https://github.com/kaio6fellipe/event-driven-bookinfo/actions/workflows/ci.yml?query=branch%3Amain) | Producer (hex arch) | 8086 | 9096 | Polls Open Library for books on a configurable interval and publishes CloudEvents directly to Kafka (`raw_books_details` topic). Stateless; no storage adapters. |
 
 All services expose their business API on the API port and observability endpoints (`/metrics`, `/healthz`, `/readyz`, `/debug/pprof/*`) on the admin port.
 
@@ -251,9 +251,10 @@ SERVICE_NAME=productpage HTTP_PORT=8080 ADMIN_PORT=9090 \
   TEMPLATE_DIR=services/productpage/templates \
   ./bin/productpage
 
-# Optional standalone demo — polls Open Library and publishes to the Gateway
+# Optional standalone demo — publishes CloudEvents to Kafka
 SERVICE_NAME=ingestion HTTP_PORT=8086 ADMIN_PORT=9096 \
-  GATEWAY_URL=http://localhost:8080 \
+  KAFKA_BROKERS=localhost:9092 \
+  KAFKA_TOPIC=raw_books_details \
   POLL_INTERVAL=5m \
   SEARCH_QUERIES=programming,golang \
   MAX_RESULTS_PER_QUERY=10 \
@@ -554,11 +555,13 @@ Replay is operator- or service-initiated via `POST /v1/events/{id}/replay`: dlqu
 
 ## Data Ingestion
 
-The `ingestion` service is a demo-scale synthetic-data generator that exercises the full event-driven write pipeline end-to-end (Gateway → EventSource → Kafka → Sensor → `details-write`). It runs as a single stateless deployment with no storage adapters, no CQRS split, and no EventSource/Sensor of its own — it is purely outbound.
+The `ingestion` service is a synthetic-data generator that publishes CloudEvents directly to a dedicated Kafka topic (`raw_books_details`) using a native Go Kafka client (franz-go). It runs as a single stateless deployment with no storage adapters and no CQRS split.
 
-A background poll loop ticks every `POLL_INTERVAL` (default 5m). For each query in `SEARCH_QUERIES`, the service calls `GET https://openlibrary.org/search.json`, validates each returned book (title, ISBN, authors, and publish year are required), and publishes accepted books via `POST {GATEWAY_URL}/v1/details`. Each publish carries a deterministic idempotency key `ingestion-isbn-<ISBN>` so the downstream `details-write` service deduplicates across cycles via `pkg/idempotency`. On-demand scrapes are also available via `POST /v1/ingestion/trigger` (optional body `{"queries": ["golang", "rust"]}`).
+A background poll loop ticks every `POLL_INTERVAL` (default 5m). For each query in `SEARCH_QUERIES`, the service calls `GET https://openlibrary.org/search.json`, validates each returned book (title, ISBN, authors, and publish year are required), and publishes accepted books as CloudEvents to Kafka. Each event carries a deterministic idempotency key `ingestion-isbn-<ISBN>` and CloudEvents headers (`ce_type: com.bookinfo.ingestion.book-added`, `ce_source: ingestion`). On-demand scrapes are also available via `POST /v1/ingestion/trigger`.
 
-Configuration via `GATEWAY_URL`, `POLL_INTERVAL`, `SEARCH_QUERIES`, and `MAX_RESULTS_PER_QUERY` environment variables. Because idempotency is enforced at the write service, replays and overlapping cycles are safe. For the full design, port contracts, and metric definitions, see [docs/superpowers/specs/2026-04-14-ingestion-service-design.md](docs/superpowers/specs/2026-04-14-ingestion-service-design.md).
+The Helm chart creates a Kafka EventSource (`ingestion-raw-books-details`) that reads from the topic and makes it available on the EventBus. Downstream services (like `details`) declare `events.consumed` in their Helm values to create a Consumer Sensor with triggers, independently of the CQRS webhook Sensor.
+
+Configuration via `KAFKA_BROKERS`, `KAFKA_TOPIC`, `POLL_INTERVAL`, `SEARCH_QUERIES`, and `MAX_RESULTS_PER_QUERY` environment variables. The topic is auto-created on startup if it doesn't exist. Because idempotency is enforced at the write service, replays and overlapping cycles are safe.
 
 ---
 
@@ -667,7 +670,7 @@ event-driven-bookinfo/
 │           ├── core/           # domain/, port/, service/
 │           └── adapter/
 │               ├── inbound/http/
-│               └── outbound/   # openlibrary/ (BookFetcher), gateway/ (EventPublisher)
+│               └── outbound/   # openlibrary/ (BookFetcher), kafka/ (EventPublisher)
 ├── pkg/
 │   ├── config/                 # Env-based configuration
 │   ├── health/                 # /healthz and /readyz handlers

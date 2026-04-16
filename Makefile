@@ -540,6 +540,7 @@ k8s-dlq-test: ##@Kubernetes Run DLQ resilience test: inject failures, verify DLQ
 
 .PHONY: helm-lint
 helm-lint: ##@Helm Lint the bookinfo-service chart
+	helm dependency build charts/bookinfo-service
 	helm lint charts/bookinfo-service
 	@for svc in $(SERVICES); do \
 		if [ -f deploy/$$svc/values-local.yaml ]; then \

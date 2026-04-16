@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review system with event-driven architecture**. Services are plain REST APIs — all event-driven complexity (Kafka consumers, retries) is abstracted by Argo Events EventSources and Sensors. Failed events that exhaust sensor retries are captured by the `dlqueue` service for inspection and replay. Full observability: structured logging, distributed tracing, metrics, continuous profiling.
+Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review system with event-driven architecture**. Services are plain REST APIs — all event-driven complexity (Kafka consumers, retries) is abstracted by Argo Events EventSources and Sensors. Failed events that exhaust sensor retries are captured by the `dlqueue` service for inspection and replay. A standalone `ingestion` service polls the Open Library API and publishes `book-added` events through the Gateway, demonstrating the system as a self-hosted event broker. Full observability: structured logging, distributed tracing, metrics, continuous profiling.
 
 **Module**: `github.com/kaio6fellipe/event-driven-bookinfo`
 
@@ -16,6 +16,7 @@ Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review 
 | **ratings** | Backend (hex arch) | :8080 / :9090 admin | Star ratings |
 | **notification** | Backend (hex arch) | :8080 / :9090 admin | Event consumer audit log |
 | **dlqueue** | Backend (hex arch) | :8080 / :9090 admin | Dead letter queue for failed sensor deliveries; REST API for inspection, replay, and resolution |
+| **ingestion** | Producer (hex arch) | :8080 / :9090 admin | Open Library scraper; polls on interval, publishes book-added events to the Gateway |
 
 ## Architecture
 
@@ -29,15 +30,16 @@ Go hexagonal architecture monorepo adapting Istio's Bookinfo as a **book review 
 - **Local k8s** (`make run-k8s`): k3d cluster with Envoy Gateway API, Strimzi Kafka (KRaft), full observability stack (Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy)
 - **DLQ**: sensor `dlqTrigger` → `dlq-event-received` EventSource → `dlqueue-write` → PostgreSQL. Dedup by natural key (`sensor_name + failed_trigger + SHA-256(payload)`). State machine: `pending → replayed → resolved / poisoned`. REST API at `/v1/events` supports list/get/replay/resolve/reset plus batch operations.
 - **Idempotency**: all write services (reviews, ratings, details, notification, dlqueue) dedupe on client-supplied `idempotency_key` or derived natural key (SHA-256 of business fields). Prerequisite for safe DLQ replay — CloudEvents `id` cannot be used because Argo Events regenerates it per EventSource pass.
+- **Ingestion**: `ingestion` service polls Open Library on `POLL_INTERVAL` → for each query in `SEARCH_QUERIES` → `POST {GATEWAY_URL}/v1/details` with `idempotency_key=ingestion-isbn-<ISBN>`. Stateless, single deployment, no CQRS split, no EventSource/Sensor of its own. Exercises the full write pipeline end-to-end.
 
 ## Build Commands
 
 ```bash
-make build-all          # Build all 6 service binaries to bin/
+make build-all          # Build all 7 service binaries to bin/
 make test               # go test -race -count=1 ./...
 make lint               # golangci-lint run
 make e2e                # Docker Compose + shell smoke tests (memory backend)
-make docker-build-all   # Build all 6 Docker images
+make docker-build-all   # Build all 7 Docker images
 ```
 
 ## Helm Commands
@@ -70,7 +72,7 @@ make k8s-logs           # Tail bookinfo namespace logs
 
 ```
 charts/
-  bookinfo-service/          # Reusable Helm chart for all 6 services
+  bookinfo-service/          # Reusable Helm chart for all 7 services
     Chart.yaml
     values.yaml
     templates/
@@ -111,6 +113,16 @@ SERVICE_NAME=notification HTTP_PORT=8084 ADMIN_PORT=9094 go run ./services/notif
 SERVICE_NAME=dlqueue HTTP_PORT=8085 ADMIN_PORT=9095 go run ./services/dlqueue/cmd/
 ```
 
+**ingestion** (publishes to Gateway; requires Gateway/productpage reachable):
+```bash
+SERVICE_NAME=ingestion HTTP_PORT=8086 ADMIN_PORT=9096 \
+  GATEWAY_URL=http://localhost:8080 \
+  POLL_INTERVAL=5m \
+  SEARCH_QUERIES=programming,golang \
+  MAX_RESULTS_PER_QUERY=10 \
+  go run ./services/ingestion/cmd/
+```
+
 **productpage** (depends on details + reviews):
 ```bash
 SERVICE_NAME=productpage HTTP_PORT=8080 ADMIN_PORT=9090 \
@@ -119,7 +131,7 @@ SERVICE_NAME=productpage HTTP_PORT=8080 ADMIN_PORT=9090 \
   go run ./services/productpage/cmd/
 ```
 
-Optional env vars (all services): `LOG_LEVEL` (debug/info/warn/error, default info), `OTEL_EXPORTER_OTLP_ENDPOINT`, `PYROSCOPE_SERVER_ADDRESS`, `STORAGE_BACKEND` (memory/postgres), `DATABASE_URL`. Productpage-specific: `REDIS_URL` (enables pending review cache; disabled when unset).
+Optional env vars (all services): `LOG_LEVEL` (debug/info/warn/error, default info), `OTEL_EXPORTER_OTLP_ENDPOINT`, `PYROSCOPE_SERVER_ADDRESS`, `STORAGE_BACKEND` (memory/postgres), `DATABASE_URL`. Productpage-specific: `REDIS_URL` (enables pending review cache; disabled when unset). Ingestion-specific: `GATEWAY_URL`, `POLL_INTERVAL`, `SEARCH_QUERIES`, `MAX_RESULTS_PER_QUERY`.
 
 ## Shared Packages (`pkg/`)
 

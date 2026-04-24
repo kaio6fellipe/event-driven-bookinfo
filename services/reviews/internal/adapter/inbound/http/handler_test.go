@@ -12,6 +12,7 @@ import (
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/inbound/http"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/kafka"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/memory"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/service"
@@ -38,7 +39,7 @@ func setupHandler(t *testing.T) *http.ServeMux {
 			},
 		},
 	}
-	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore(), kafka.NewNoopPublisher())
 	mux := http.NewServeMux()
 	h := handler.NewHandler(svc)
 	h.RegisterRoutes(mux)
@@ -324,6 +325,8 @@ func TestDeleteReview_Success(t *testing.T) {
 	}
 }
 
+// TestDeleteReview_NotFound verifies that deleting a non-existent review is idempotent:
+// the endpoint returns 204 No Content rather than 404, enabling safe sensor retries.
 func TestDeleteReview_NotFound(t *testing.T) {
 	mux := setupHandler(t)
 
@@ -333,7 +336,7 @@ func TestDeleteReview_NotFound(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusNotFound {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNoContent)
 	}
 }

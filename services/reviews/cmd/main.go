@@ -22,6 +22,7 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/inbound/http"
 	ratingshttp "github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/http"
+	reviewskafka "github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/kafka"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/memory"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/postgres"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/port"
@@ -110,7 +111,9 @@ func main() {
 
 	ratingsURL := envOrDefault("RATINGS_SERVICE_URL", "http://localhost:8080")
 	ratingsClient := ratingshttp.NewRatingsClient(ratingsURL)
-	svc := service.NewReviewService(repo, ratingsClient, idemStore)
+	// TODO(T16): replace NoopPublisher with the real franz-go Kafka producer.
+	publisher := reviewskafka.NewNoopPublisher()
+	svc := service.NewReviewService(repo, ratingsClient, idemStore, publisher)
 	h := handler.NewHandler(svc)
 
 	registerRoutes := func(mux *http.ServeMux) {

@@ -3,7 +3,6 @@ package service_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -25,7 +24,7 @@ func (s *stubRatingsClient) GetProductRatings(_ context.Context, _ string) (*dom
 func TestSubmitReview_Success(t *testing.T) {
 	repo := memory.NewReviewRepository()
 	client := &stubRatingsClient{}
-	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore(), &fakeReviewPublisher{})
 
 	review, err := svc.SubmitReview(context.Background(), "product-1", "alice", "Great book!", "")
 	if err != nil {
@@ -42,7 +41,7 @@ func TestSubmitReview_Success(t *testing.T) {
 func TestSubmitReview_ValidationError(t *testing.T) {
 	repo := memory.NewReviewRepository()
 	client := &stubRatingsClient{}
-	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore(), &fakeReviewPublisher{})
 
 	tests := []struct {
 		name      string
@@ -70,7 +69,7 @@ func TestGetProductReviews_Empty(t *testing.T) {
 	client := &stubRatingsClient{
 		data: &domain.RatingData{Average: 0, Count: 0, IndividualRatings: map[string]int{}},
 	}
-	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore(), &fakeReviewPublisher{})
 
 	reviews, total, err := svc.GetProductReviews(context.Background(), "nonexistent", 1, 10)
 	if err != nil {
@@ -92,7 +91,7 @@ func TestGetProductReviews_WithRatings(t *testing.T) {
 			IndividualRatings: map[string]int{"alice": 5, "bob": 2},
 		},
 	}
-	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore(), &fakeReviewPublisher{})
 
 	_, _ = svc.SubmitReview(context.Background(), "product-1", "alice", "Excellent!", "")
 	_, _ = svc.SubmitReview(context.Background(), "product-1", "bob", "Good read", "")
@@ -124,7 +123,7 @@ func TestGetProductReviews_Pagination(t *testing.T) {
 	client := &stubRatingsClient{
 		data: &domain.RatingData{Average: 4.0, Count: 15, IndividualRatings: map[string]int{}},
 	}
-	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore(), &fakeReviewPublisher{})
 
 	for i := 0; i < 15; i++ {
 		_, _ = svc.SubmitReview(context.Background(), "product-1", "reviewer", fmt.Sprintf("review text %d", i), "")
@@ -162,7 +161,8 @@ func TestGetProductReviews_Pagination(t *testing.T) {
 func TestDeleteReview_Success(t *testing.T) {
 	repo := memory.NewReviewRepository()
 	client := &stubRatingsClient{}
-	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
+	pub := &fakeReviewPublisher{}
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore(), pub)
 
 	review, _ := svc.SubmitReview(context.Background(), "product-1", "alice", "Great book!", "")
 	err := svc.DeleteReview(context.Background(), review.ID)
@@ -177,15 +177,54 @@ func TestDeleteReview_Success(t *testing.T) {
 	if len(reviews) != 0 {
 		t.Errorf("expected empty reviews after delete, got %d", len(reviews))
 	}
+
+	pub.mu.Lock()
+	defer pub.mu.Unlock()
+	if len(pub.deleted) != 1 {
+		t.Fatalf("expected 1 deleted publish, got %d", len(pub.deleted))
+	}
+	if pub.deleted[0].ReviewID != review.ID {
+		t.Errorf("ReviewID = %q, want %q", pub.deleted[0].ReviewID, review.ID)
+	}
 }
 
+// TestDeleteReview_NotFound verifies that deleting a non-existent review is a no-op (idempotent)
+// and still publishes the event — required for Option B sensor retry semantics.
 func TestDeleteReview_NotFound(t *testing.T) {
 	repo := memory.NewReviewRepository()
 	client := &stubRatingsClient{}
-	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore())
+	pub := &fakeReviewPublisher{}
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore(), pub)
 
 	err := svc.DeleteReview(context.Background(), "nonexistent-id")
-	if !errors.Is(err, domain.ErrNotFound) {
-		t.Errorf("expected ErrNotFound, got %v", err)
+	if err != nil {
+		t.Fatalf("expected nil (idempotent delete), got: %v", err)
+	}
+
+	pub.mu.Lock()
+	defer pub.mu.Unlock()
+	if len(pub.deleted) != 1 {
+		t.Fatalf("expected 1 deleted publish even for missing review, got %d", len(pub.deleted))
 	}
 }
+
+func TestDeleteReview_PublishesEvent(t *testing.T) {
+	repo := memory.NewReviewRepository()
+	pub := &fakeReviewPublisher{}
+	svc := service.NewReviewService(repo, nil, idempotency.NewMemoryStore(), pub)
+
+	// Deleting a non-existent review succeeds and still publishes.
+	if err := svc.DeleteReview(context.Background(), "rev_missing"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	pub.mu.Lock()
+	defer pub.mu.Unlock()
+	if len(pub.deleted) != 1 {
+		t.Fatalf("expected 1 deleted publish, got %d", len(pub.deleted))
+	}
+	if pub.deleted[0].ReviewID != "rev_missing" {
+		t.Errorf("ReviewID = %q", pub.deleted[0].ReviewID)
+	}
+}
+

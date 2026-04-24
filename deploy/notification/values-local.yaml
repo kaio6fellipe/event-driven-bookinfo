@@ -102,3 +102,30 @@ events:
       dlq:
         enabled: true
         url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/v1/events"
+    rating-submitted:
+      eventSourceName: ratings-events
+      eventName: events
+      filter:
+        ceType: com.bookinfo.ratings.rating-submitted
+      triggers:
+        - name: notify-rating-submitted
+          url: self
+          path: /v1/notifications
+          method: POST
+          payload:
+            - src:
+                dependencyName: rating-submitted-dep
+                dataKey: body.product_id
+              dest: subject
+            - src:
+                value: "New rating submitted"
+              dest: body
+            - src:
+                value: "system@bookinfo"
+              dest: recipient
+            - src:
+                value: "email"
+              dest: channel
+      dlq:
+        enabled: true
+        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/v1/events"

@@ -21,6 +21,7 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/server"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/inbound/http"
+	kafkaadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/kafka"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/memory"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/postgres"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/core/port"
@@ -107,7 +108,26 @@ func main() {
 		idemStore = idempotency.NewMemoryStore()
 	}
 
-	svc := service.NewRatingService(repo, idemStore)
+	var publisher port.EventPublisher
+	if cfg.KafkaBrokers != "" {
+		topic := cfg.KafkaTopic
+		if topic == "" {
+			topic = "bookinfo_ratings_events"
+		}
+		kProd, err := kafkaadapter.NewProducer(ctx, cfg.KafkaBrokers, topic)
+		if err != nil {
+			logger.Error("failed to create Kafka producer", "error", err)
+			os.Exit(1)
+		}
+		defer kProd.Close()
+		publisher = kProd
+		logger.Info("kafka publisher enabled", "topic", topic)
+	} else {
+		publisher = kafkaadapter.NewNoopPublisher()
+		logger.Info("kafka publisher disabled — using no-op")
+	}
+
+	svc := service.NewRatingService(repo, idemStore, publisher)
 	h := handler.NewHandler(svc)
 
 	registerRoutes := func(mux *http.ServeMux) {

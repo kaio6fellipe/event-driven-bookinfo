@@ -3,16 +3,30 @@ package service_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/memory"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/core/domain"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/core/service"
 )
 
+type fakeRatingPublisher struct {
+	mu    sync.Mutex
+	calls []domain.RatingSubmittedEvent
+}
+
+func (f *fakeRatingPublisher) PublishRatingSubmitted(_ context.Context, evt domain.RatingSubmittedEvent) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, evt)
+	return nil
+}
+
 func TestSubmitRating_Success(t *testing.T) {
 	repo := memory.NewRatingRepository()
-	svc := service.NewRatingService(repo, idempotency.NewMemoryStore())
+	svc := service.NewRatingService(repo, idempotency.NewMemoryStore(), &fakeRatingPublisher{})
 
 	rating, err := svc.SubmitRating(context.Background(), "product-1", "alice", 5, "")
 	if err != nil {
@@ -35,7 +49,7 @@ func TestSubmitRating_Success(t *testing.T) {
 
 func TestSubmitRating_ValidationError(t *testing.T) {
 	repo := memory.NewRatingRepository()
-	svc := service.NewRatingService(repo, idempotency.NewMemoryStore())
+	svc := service.NewRatingService(repo, idempotency.NewMemoryStore(), &fakeRatingPublisher{})
 
 	tests := []struct {
 		name      string
@@ -61,7 +75,7 @@ func TestSubmitRating_ValidationError(t *testing.T) {
 
 func TestGetProductRatings_Empty(t *testing.T) {
 	repo := memory.NewRatingRepository()
-	svc := service.NewRatingService(repo, idempotency.NewMemoryStore())
+	svc := service.NewRatingService(repo, idempotency.NewMemoryStore(), &fakeRatingPublisher{})
 
 	pr, err := svc.GetProductRatings(context.Background(), "nonexistent")
 	if err != nil {
@@ -81,7 +95,7 @@ func TestGetProductRatings_Empty(t *testing.T) {
 
 func TestGetProductRatings_WithRatings(t *testing.T) {
 	repo := memory.NewRatingRepository()
-	svc := service.NewRatingService(repo, idempotency.NewMemoryStore())
+	svc := service.NewRatingService(repo, idempotency.NewMemoryStore(), &fakeRatingPublisher{})
 
 	_, err := svc.SubmitRating(context.Background(), "product-1", "alice", 4, "")
 	if err != nil {

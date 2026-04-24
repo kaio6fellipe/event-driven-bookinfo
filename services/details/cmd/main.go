@@ -21,6 +21,7 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/server"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/inbound/http"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/kafka"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/memory"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/postgres"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/core/port"
@@ -107,7 +108,8 @@ func main() {
 		idemStore = idempotency.NewMemoryStore()
 	}
 
-	svc := service.NewDetailService(repo, idemStore)
+	// TODO(T9): replace NoopPublisher with the real Kafka producer wired from config
+	svc := service.NewDetailService(repo, idemStore, kafka.NewNoopPublisher())
 	h := handler.NewHandler(svc)
 
 	registerRoutes := func(mux *http.ServeMux) {

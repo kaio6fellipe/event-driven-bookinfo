@@ -13,7 +13,7 @@ import (
 func TestAddDetail_Idempotent(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDetailRepository()
-	svc := service.NewDetailService(repo, idempotency.NewMemoryStore())
+	svc := service.NewDetailService(repo, idempotency.NewMemoryStore(), &fakePublisher{})
 
 	// Call twice with the same explicit key; expect ErrAlreadyProcessed on second.
 	_, err := svc.AddDetail(ctx,
@@ -35,7 +35,7 @@ func TestAddDetail_Idempotent(t *testing.T) {
 func TestAddDetail_NaturalKey(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewDetailRepository()
-	svc := service.NewDetailService(repo, idempotency.NewMemoryStore())
+	svc := service.NewDetailService(repo, idempotency.NewMemoryStore(), &fakePublisher{})
 
 	_, err := svc.AddDetail(ctx,
 		"Book One", "Jane Doe", 2024, "paperback",

@@ -16,3 +16,35 @@ config:
 observability:
   otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
   pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"
+
+events:
+  kafka:
+    broker: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
+  consumed:
+    book-added:
+      eventSourceName: details-events
+      eventName: events
+      filter:
+        ceType: com.bookinfo.details.book-added
+      triggers:
+        - name: notify-book-added
+          url: self
+          path: /v1/notifications
+          method: POST
+          payload:
+            - src:
+                dependencyName: book-added-dep
+                dataKey: body.title
+              dest: subject
+            - src:
+                value: "New book added"
+              dest: body
+            - src:
+                value: "system@bookinfo"
+              dest: recipient
+            - src:
+                value: "email"
+              dest: channel
+      dlq:
+        enabled: true
+        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/v1/events"

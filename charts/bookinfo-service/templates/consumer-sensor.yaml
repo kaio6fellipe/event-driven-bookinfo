@@ -32,6 +32,13 @@ spec:
     - name: {{ $eventName }}-dep
       eventSourceName: {{ $event.eventSourceName }}
       eventName: {{ $event.eventName }}
+      {{- with $event.filter }}
+      {{- with .ceType }}
+      filters:
+        context:
+          type: {{ . | quote }}
+      {{- end }}
+      {{- end }}
     {{- end }}
   triggers:
     {{- range $eventName, $event := $.Values.events.consumed }}

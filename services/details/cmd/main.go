@@ -21,7 +21,7 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/server"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/inbound/http"
-	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/kafka"
+	kafkaadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/kafka"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/memory"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/postgres"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/core/port"
@@ -108,8 +108,26 @@ func main() {
 		idemStore = idempotency.NewMemoryStore()
 	}
 
-	// TODO(T9): replace NoopPublisher with the real Kafka producer wired from config
-	svc := service.NewDetailService(repo, idemStore, kafka.NewNoopPublisher())
+	var publisher port.EventPublisher
+	if cfg.KafkaBrokers != "" {
+		kafkaTopic := cfg.KafkaTopic
+		if kafkaTopic == "" {
+			kafkaTopic = "bookinfo_details_events"
+		}
+		kProd, err := kafkaadapter.NewProducer(ctx, cfg.KafkaBrokers, kafkaTopic)
+		if err != nil {
+			logger.Error("failed to create Kafka producer", "error", err)
+			os.Exit(1)
+		}
+		defer kProd.Close()
+		publisher = kProd
+		logger.Info("kafka publisher enabled", "topic", kafkaTopic)
+	} else {
+		publisher = kafkaadapter.NewNoopPublisher()
+		logger.Info("kafka publisher disabled — using no-op")
+	}
+
+	svc := service.NewDetailService(repo, idemStore, publisher)
 	h := handler.NewHandler(svc)
 
 	registerRoutes := func(mux *http.ServeMux) {

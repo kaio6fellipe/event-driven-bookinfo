@@ -111,8 +111,26 @@ func main() {
 
 	ratingsURL := envOrDefault("RATINGS_SERVICE_URL", "http://localhost:8080")
 	ratingsClient := ratingshttp.NewRatingsClient(ratingsURL)
-	// TODO(T16): replace NoopPublisher with the real franz-go Kafka producer.
-	publisher := reviewskafka.NewNoopPublisher()
+
+	var publisher port.EventPublisher
+	if cfg.KafkaBrokers != "" {
+		topic := cfg.KafkaTopic
+		if topic == "" {
+			topic = "bookinfo_reviews_events"
+		}
+		kProd, err := reviewskafka.NewProducer(ctx, cfg.KafkaBrokers, topic)
+		if err != nil {
+			logger.Error("failed to create Kafka producer", "error", err)
+			os.Exit(1)
+		}
+		defer kProd.Close()
+		publisher = kProd
+		logger.Info("kafka publisher enabled", "topic", topic)
+	} else {
+		publisher = reviewskafka.NewNoopPublisher()
+		logger.Info("kafka publisher disabled — using no-op")
+	}
+
 	svc := service.NewReviewService(repo, ratingsClient, idemStore, publisher)
 	h := handler.NewHandler(svc)
 

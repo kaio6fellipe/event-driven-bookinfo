@@ -12,10 +12,23 @@ postgresql:
 
 config:
   LOG_LEVEL: "debug"
+  KAFKA_BROKERS: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
+  KAFKA_TOPIC: "bookinfo_ratings_events"
 
 observability:
   otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
   pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"
+
+events:
+  kafka:
+    broker: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
+  exposed:
+    events:
+      topic: bookinfo_ratings_events
+      eventBusName: kafka
+      contentType: application/json
+      eventTypes:
+        - com.bookinfo.ratings.rating-submitted
 
 cqrs:
   enabled: true
@@ -41,23 +54,6 @@ cqrs:
           url: self
           payload:
             - passthrough
-        - name: notify-rating-submitted
-          url: "http://notification.bookinfo.svc.cluster.local/v1/notifications"
-          method: POST
-          payload:
-            - src:
-                dependencyName: rating-submitted-dep
-                dataKey: body.product_id
-              dest: subject
-            - src:
-                value: "New rating submitted"
-              dest: body
-            - src:
-                value: "system@bookinfo"
-              dest: recipient
-            - src:
-                value: "email"
-              dest: channel
 
 sensor:
   dlq:

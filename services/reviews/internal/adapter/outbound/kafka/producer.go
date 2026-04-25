@@ -13,6 +13,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
 )
 
@@ -122,6 +123,7 @@ func (p *Producer) produce(ctx context.Context, ceType, key, partitionHint strin
 		},
 	}
 
+	telemetry.InjectTraceContext(ctx, record)
 	results := p.client.ProduceSync(ctx, record)
 	if err := results.FirstErr(); err != nil {
 		return fmt.Errorf("producing to Kafka: %w", err)

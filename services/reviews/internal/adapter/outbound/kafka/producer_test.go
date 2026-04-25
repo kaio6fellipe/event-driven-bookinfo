@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	"github.com/twmb/franz-go/pkg/kgo"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	kafkaadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/kafka"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
@@ -97,5 +100,37 @@ func TestPublishReviewDeleted(t *testing.T) {
 	_ = json.Unmarshal(r.Value, &body)
 	if body["review_id"] != "rev_99" {
 		t.Errorf("body review_id = %v", body["review_id"])
+	}
+}
+
+func TestPublishReviewSubmitted_InjectsTraceparent(t *testing.T) {
+	t.Parallel()
+
+	otel.SetTracerProvider(sdktrace.NewTracerProvider())
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	ctx, span := otel.Tracer("test").Start(context.Background(), "parent")
+	defer span.End()
+
+	fc := &fakeClient{}
+	p := kafkaadapter.NewProducerWithClient(fc, "bookinfo_reviews_events")
+
+	if err := p.PublishReviewSubmitted(ctx, domain.ReviewSubmittedEvent{
+		ID: "r1", ProductID: "p", Reviewer: "u", Text: "ok", IdempotencyKey: "k1",
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	fc.mu.Lock()
+	defer fc.mu.Unlock()
+	headers := map[string]string{}
+	for _, h := range fc.records[0].Headers {
+		headers[h.Key] = string(h.Value)
+	}
+	if headers["traceparent"] == "" {
+		t.Fatal("expected traceparent header, got none")
+	}
+	want := span.SpanContext().TraceID().String()
+	if got := headers["traceparent"]; len(got) < 35 || got[3:35] != want {
+		t.Errorf("traceparent = %q, want embedded trace_id %q", got, want)
 	}
 }

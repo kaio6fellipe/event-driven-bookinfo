@@ -60,7 +60,7 @@ flowchart LR
 ## Decisions
 
 | # | Decision | Rationale |
-|---|---|---|
+| --- | --- | --- |
 | 1 | Two-repo change | Producer-only fix is invisible (header on wire but no extractor); fork-only fix has nothing to extract. Both required to close the loop. |
 | 2 | Cherry-pick fork branch propagation | Land commit on `feat/cloudevents-compliance-otel-tracing` (PR 3961), cherry-pick onto `feat/combined-prs-3961-3983` (consumed branch). No force-push, no history rewrite. |
 | 3 | Mirror webhook source pattern in Kafka source | Existing established pattern in the same fork at `pkg/eventsources/sources/webhook/start.go:108`. Minimum surface area, maximum review velocity. |
@@ -190,7 +190,7 @@ If `WithContext` is not already an option for the `dispatch` callback, add one. 
 
 ### Image release flow
 
-```
+```text
 1. Add commit to feat/cloudevents-compliance-otel-tracing (signed off, no Claude trailer)
 2. git push origin feat/cloudevents-compliance-otel-tracing  (fast-forward; updates PR 3961)
 3. git checkout feat/combined-prs-3961-3983
@@ -220,6 +220,8 @@ git log -1 --format=%B                                                          
 
 ## Data flow (target state)
 
+`bookinfo_reviews_events` and `argo-events` are both topics on the same Strimzi Kafka cluster, which serves as the Argo Events bus. The diagram shows Kafka as a single participant with topic names called out per arrow.
+
 ```mermaid
 sequenceDiagram
   participant Caller
@@ -227,30 +229,30 @@ sequenceDiagram
   participant CQRSes as CQRS EventSource
   participant CQRSse as CQRS Sensor
   participant RW as reviews-write
-  participant Kafka as bookinfo_reviews_events
+  participant Kafka as Strimzi Kafka (argo-events bus)
   participant ESrc as reviews-events EventSource (fork)
-  participant Bus as argo-events bus
   participant NSe as notification consumer sensor
   participant Notif as notification
 
   Caller->>Gateway: POST /v1/reviews [traceparent: T1]
   Gateway->>CQRSes: webhook [traceparent: T1]
-  CQRSes->>Bus: publish (PRODUCER, parent=T1)
-  Bus->>CQRSse: deliver
-  CQRSse->>RW: HTTP POST [traceparent: T1.x]
+  CQRSes->>Kafka: publish to argo-events topic<br/>(PRODUCER span, parent=T1)
+  Kafka->>CQRSse: deliver from argo-events topic<br/>(CONSUMER span)
+  CQRSse->>RW: HTTP POST [traceparent: T1.x]<br/>(trigger CLIENT span)
   Note over RW: otelhttp server span (parent=T1.x)<br/>service + producer share ctx
-  RW->>Kafka: produce + InjectTraceContext(ctx, record)<br/>headers: ce_*, traceparent=T1.x.y
-  ESrc->>ESrc: processOne extracts traceparent<br/>StartServerSpan eventsource.receive (parent=T1.x.y)
-  ESrc->>Bus: dispatch(ctx, eventBody) → publish PRODUCER span chains under receive
-  Bus->>NSe: deliver (CONSUMER span)
-  NSe->>Notif: HTTP POST [traceparent: T1.x.y.z] → trigger CLIENT span
+  RW->>Kafka: produce to bookinfo_reviews_events topic<br/>InjectTraceContext(ctx, record)<br/>headers: ce_*, traceparent=T1.x.y
+  Kafka->>ESrc: deliver from bookinfo_reviews_events topic
+  Note over ESrc: processOne extracts traceparent from msg.Headers<br/>StartServerSpan eventsource.receive (parent=T1.x.y)
+  ESrc->>Kafka: dispatch eventBody to argo-events topic<br/>(eventsource.publish PRODUCER span chains under receive)
+  Kafka->>NSe: deliver from argo-events topic<br/>(CONSUMER span)
+  NSe->>Notif: HTTP POST [traceparent: T1.x.y.z]<br/>(trigger CLIENT span)
   Note over Notif: otelhttp server span chains under T1
 ```
 
 ## Error handling
 
 | Failure | Behavior |
-|---|---|
+| --- | --- |
 | No active span at producer call | `InjectTraceContext` is a no-op; record sent without traceparent. Existing flow continues; no new error. |
 | `traceparent` header malformed at consumer | `propagation.MapCarrier.Extract` returns the original ctx unchanged; SERVER span starts as a fresh root (current behavior). |
 | `tracing.StartServerSpan` panics | Existing argo-events panic-recovery in source listeners catches and logs. Event still dispatches. |
@@ -261,6 +263,7 @@ sequenceDiagram
 ### Producer side — unit tests
 
 `pkg/telemetry/kafka_test.go`:
+
 - Carrier `Get`/`Set`/`Keys` round-trip a known `traceparent` value.
 - `InjectTraceContext` with active ctx writes both `traceparent` and `tracestate` headers.
 - `InjectTraceContext` with empty ctx writes nothing.
@@ -292,6 +295,7 @@ func TestPublishX_InjectsTraceparent(t *testing.T) {
 ### Argo-events fork — unit test
 
 `pkg/eventsources/sources/kafka/start_test.go` (new test):
+
 - Build a sarama `ConsumerMessage` with `traceparent` in `Headers` (e.g. `00-<hex32>-<hex16>-01`).
 - Capture ctx passed to a fake `dispatch` shim.
 - Assert the ctx carries a valid `SpanContext` with the expected `TraceID`.

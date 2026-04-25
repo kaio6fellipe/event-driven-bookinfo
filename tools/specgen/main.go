@@ -14,6 +14,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -69,8 +70,8 @@ func runAll(args []string) error {
 		return err
 	}
 	_ = repoRoot
-	return fmt.Errorf("not implemented")
+	return errors.New("not implemented")
 }
 
-func runLint(args []string) error { return fmt.Errorf("not implemented") }
-func runDiff(args []string) error { return fmt.Errorf("not implemented") }
+func runLint(args []string) error { return errors.New("not implemented") }
+func runDiff(args []string) error { return errors.New("not implemented") }

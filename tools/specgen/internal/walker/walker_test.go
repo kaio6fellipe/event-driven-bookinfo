@@ -47,3 +47,29 @@ func TestLoadEndpoints_Fixture(t *testing.T) {
 		t.Errorf("endpoints[1].RequestType = %v, want CreateThingRequest", post.RequestType)
 	}
 }
+
+func TestLoadExposed_Fixture(t *testing.T) {
+	fixtureDir, err := filepath.Abs("../../testdata/fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	exposed, err := walker.LoadExposed(fixtureDir, "fixture/events")
+	if err != nil {
+		t.Fatalf("LoadExposed: %v", err)
+	}
+	if len(exposed) != 1 {
+		t.Fatalf("len(exposed) = %d, want 1", len(exposed))
+	}
+
+	d := exposed[0]
+	if d.Name != "thing-created" || d.ExposureKey != "events" {
+		t.Errorf("Name=%q ExposureKey=%q, want thing-created/events", d.Name, d.ExposureKey)
+	}
+	if d.CEType != "com.fixture.thing-created" {
+		t.Errorf("CEType = %q", d.CEType)
+	}
+	if d.PayloadType == nil || d.PayloadType.Obj().Name() != "ThingCreatedPayload" {
+		t.Errorf("PayloadType = %v, want ThingCreatedPayload", d.PayloadType)
+	}
+}

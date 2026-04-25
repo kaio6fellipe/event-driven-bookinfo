@@ -15,11 +15,14 @@ import (
 
 // Input holds everything Build needs to produce a catalog-info.yaml.
 type Input struct {
-	ServiceName   string
-	Owner         string
-	RepoTreeURL   string
-	HasOpenAPI    bool
-	HasAsyncAPI   bool
+	ServiceName string
+	Owner       string
+	RepoTreeURL string
+	HasOpenAPI  bool
+	HasAsyncAPI bool
+	// ExposedSubset is reserved for richer per-event metadata in future
+	// catalog-info.yaml versions. Currently unused — only ExposedNames is
+	// read for the bookinfo.io/exposed-event-names annotation.
 	ExposedSubset []walker.DescriptorInfo
 	ExposedNames  []string
 }
@@ -42,7 +45,10 @@ func Build(in Input) ([]byte, error) {
 	enc.SetIndent(2)
 
 	// Component document
-	componentNode := buildComponent(in)
+	componentNode, err := buildComponent(in)
+	if err != nil {
+		return nil, fmt.Errorf("building Component: %w", err)
+	}
 	if err := enc.Encode(componentNode); err != nil {
 		return nil, fmt.Errorf("encoding Component: %w", err)
 	}
@@ -67,7 +73,7 @@ func Build(in Input) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func buildComponent(in Input) *yaml.Node {
+func buildComponent(in Input) (*yaml.Node, error) {
 	node := yamlutil.Mapping()
 	yamlutil.AddScalar(node, "apiVersion", "backstage.io/v1alpha1")
 	yamlutil.AddScalar(node, "kind", "Component")
@@ -91,14 +97,20 @@ func buildComponent(in Input) *yaml.Node {
 	if in.HasAsyncAPI {
 		providesApis = append(providesApis, in.ServiceName+"-events")
 	}
-	providesNode, _ := yamlutil.AnyToNode(providesApis)
+	providesNode, err := yamlutil.AnyToNode(providesApis)
+	if err != nil {
+		return nil, fmt.Errorf("converting providesApis: %w", err)
+	}
 	yamlutil.AddMapping(spec, "providesApis", providesNode)
 
-	consumesNode, _ := yamlutil.AnyToNode([]string{})
+	consumesNode, err := yamlutil.AnyToNode([]string{})
+	if err != nil {
+		return nil, fmt.Errorf("converting consumesApis: %w", err)
+	}
 	yamlutil.AddMapping(spec, "consumesApis", consumesNode)
 
 	yamlutil.AddMapping(node, "spec", spec)
-	return node
+	return node, nil
 }
 
 func buildOpenAPIEntity(in Input) *yaml.Node {

@@ -274,6 +274,17 @@ make run-logs     # Tail logs
 make stop         # Stop and remove containers
 ```
 
+> **Lite mode.** Docker Compose runs the synchronous service mesh
+> only: postgres + redis + 5 backend services + productpage. Kafka,
+> the ingestion service, Argo Events, and the observability stack
+> are NOT included. Producers detect missing `KAFKA_BROKERS` and
+> fall back to a no-op publisher; events are dropped silently.
+>
+> The full event-driven path (ingestion polling Open Library →
+> Kafka → Argo Events EventSource → Sensor → notification HTTP
+> trigger) is exercised only via `make run-k8s` (k3d-based local
+> cluster).
+
 ---
 
 ## Makefile Targets
@@ -580,6 +591,12 @@ bash test/e2e/run-tests.sh
 ```
 
 Individual test scripts under `test/e2e/` cover health endpoints, CRUD operations, and cross-service integration (e.g., reviews fetching ratings).
+
+> **Scope.** `make e2e` covers HTTP-level acceptance tests
+> (idempotency, validation, CRUD round-trips) under the lite-mode
+> compose stack. The event chain (Kafka publish, Argo Events sensor,
+> notification HTTP trigger) is verified end-to-end via Tempo trace
+> inspection after `make run-k8s`.
 
 ---
 

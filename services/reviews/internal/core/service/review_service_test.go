@@ -227,4 +227,3 @@ func TestDeleteReview_PublishesEvent(t *testing.T) {
 		t.Errorf("ReviewID = %q", pub.deleted[0].ReviewID)
 	}
 }
-

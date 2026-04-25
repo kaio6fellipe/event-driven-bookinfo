@@ -13,15 +13,16 @@ metadata:
   {{- end }}
 spec:
   eventBusName: {{ default "kafka" $event.eventBusName }}
-  {{- with $.Values.observability.otelEndpoint }}
   template:
+    serviceAccountName: {{ include "bookinfo-service.serviceAccountName" $ }}
+    {{- with $.Values.observability.otelEndpoint }}
     container:
       env:
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
           value: {{ . | quote }}
         - name: OTEL_SERVICE_NAME
           value: {{ printf "%s-%s-eventsource" (include "bookinfo-service.fullname" $) $eventName | quote }}
-  {{- end }}
+    {{- end }}
   kafka:
     {{ $eventName }}:
       url: {{ required "events.kafka.broker must be set when events.exposed is defined" $.Values.events.kafka.broker }}

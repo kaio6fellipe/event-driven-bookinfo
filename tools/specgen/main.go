@@ -18,6 +18,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"github.com/kaio6fellipe/event-driven-bookinfo/tools/specgen/internal/runner"
 )
 
 const usage = `specgen — generate API specs from service source
@@ -69,8 +71,7 @@ func runAll(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	_ = repoRoot
-	return errors.New("not implemented")
+	return runner.RunAll(*repoRoot)
 }
 
 func runLint(args []string) error { return errors.New("not implemented") }

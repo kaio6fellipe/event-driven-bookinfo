@@ -3,6 +3,24 @@ entries:
   bookinfo-service:
   - apiVersion: v2
     appVersion: 0.0.0
+    created: "2026-04-25T17:13:16.979126566Z"
+    dependencies:
+    - condition: postgresql.enabled
+      name: postgresql
+      repository: oci://registry-1.docker.io/bitnamicharts
+      version: ~18
+    description: Reusable Helm chart for event-driven-bookinfo microservices
+    digest: 2c3812d8eecf8639a3a4983332c8ad431a5a139eba745ffeedd851f3669591b0
+    maintainers:
+    - name: kaio6fellipe
+      url: https://github.com/kaio6fellipe
+    name: bookinfo-service
+    type: application
+    urls:
+    - https://github.com/kaio6fellipe/event-driven-bookinfo/releases/download/bookinfo-service-0.4.0/bookinfo-service-0.4.0.tgz
+    version: 0.4.0
+  - apiVersion: v2
+    appVersion: 0.0.0
     created: "2026-04-16T15:42:47.208940868Z"
     dependencies:
     - condition: postgresql.enabled
@@ -50,4 +68,4 @@ entries:
     urls:
     - https://github.com/kaio6fellipe/event-driven-bookinfo/releases/download/bookinfo-service-0.1.0/bookinfo-service-0.1.0.tgz
     version: 0.1.0
-generated: "2026-04-16T15:42:47.208956949Z"
+generated: "2026-04-25T17:13:16.979142005Z"

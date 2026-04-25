@@ -13,7 +13,7 @@ import (
 func TestSubmitReview_Idempotent(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewReviewRepository()
-	svc := service.NewReviewService(repo, nil, idempotency.NewMemoryStore())
+	svc := service.NewReviewService(repo, nil, idempotency.NewMemoryStore(), &fakeReviewPublisher{})
 
 	_, err := svc.SubmitReview(ctx, "p1", "alice", "great book", "key-1")
 	if err != nil {
@@ -29,7 +29,7 @@ func TestSubmitReview_Idempotent(t *testing.T) {
 func TestSubmitReview_NaturalKey(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewReviewRepository()
-	svc := service.NewReviewService(repo, nil, idempotency.NewMemoryStore())
+	svc := service.NewReviewService(repo, nil, idempotency.NewMemoryStore(), &fakeReviewPublisher{})
 
 	_, err := svc.SubmitReview(ctx, "p1", "bob", "good", "")
 	if err != nil {

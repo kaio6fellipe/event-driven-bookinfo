@@ -21,14 +21,16 @@ type ReviewService struct {
 	repo          port.ReviewRepository
 	ratingsClient port.RatingsClient
 	idempotency   idempotency.Store
+	publisher     port.EventPublisher
 }
 
 // NewReviewService creates a new ReviewService.
-func NewReviewService(repo port.ReviewRepository, ratingsClient port.RatingsClient, idem idempotency.Store) *ReviewService {
+func NewReviewService(repo port.ReviewRepository, ratingsClient port.RatingsClient, idem idempotency.Store, publisher port.EventPublisher) *ReviewService {
 	return &ReviewService{
 		repo:          repo,
 		ratingsClient: ratingsClient,
 		idempotency:   idem,
+		publisher:     publisher,
 	}
 }
 
@@ -62,37 +64,60 @@ func (s *ReviewService) GetProductReviews(ctx context.Context, productID string,
 	return reviews, total, nil
 }
 
-// SubmitReview creates and persists a new review. Deduplicates on idempotencyKey
-// (falls back to a natural key derived from productID+reviewer+text).
+// SubmitReview creates and persists a new review, then publishes a ReviewSubmittedEvent.
+// Always publishes (even on idempotency dedup) for retry safety.
 func (s *ReviewService) SubmitReview(ctx context.Context, productID, reviewer, text, idempotencyKey string) (*domain.Review, error) {
 	key := idempotency.Resolve(idempotencyKey, productID, reviewer, text)
-
-	alreadyProcessed, err := s.idempotency.CheckAndRecord(ctx, key)
-	if err != nil {
-		return nil, fmt.Errorf("checking idempotency: %w", err)
-	}
-	if alreadyProcessed {
-		logger := logging.FromContext(ctx)
-		logger.Info("review submit skipped: already processed", slog.String("idempotency_key", key))
-		return nil, ErrAlreadyProcessed
-	}
 
 	review, err := domain.NewReview(productID, reviewer, text)
 	if err != nil {
 		return nil, fmt.Errorf("creating review: %w", err)
 	}
 
-	if err := s.repo.Save(ctx, review); err != nil {
-		return nil, fmt.Errorf("saving review: %w", err)
+	alreadyProcessed, err := s.idempotency.CheckAndRecord(ctx, key)
+	if err != nil {
+		return nil, fmt.Errorf("checking idempotency: %w", err)
 	}
 
+	if !alreadyProcessed {
+		if err := s.repo.Save(ctx, review); err != nil {
+			return nil, fmt.Errorf("saving review: %w", err)
+		}
+	} else {
+		logging.FromContext(ctx).Info("review submit skipped: already processed", slog.String("idempotency_key", key))
+	}
+
+	evt := domain.ReviewSubmittedEvent{
+		ID:             review.ID,
+		ProductID:      review.ProductID,
+		Reviewer:       review.Reviewer,
+		Text:           review.Text,
+		IdempotencyKey: key,
+	}
+	if err := s.publisher.PublishReviewSubmitted(ctx, evt); err != nil {
+		return nil, fmt.Errorf("publishing review-submitted event: %w", err)
+	}
+
+	if alreadyProcessed {
+		return nil, ErrAlreadyProcessed
+	}
 	return review, nil
 }
 
-// DeleteReview removes a review by its ID.
+// DeleteReview removes a review by its ID and publishes a ReviewDeletedEvent.
+// Idempotent: if the review does not exist, returns nil and still publishes.
+// This is required for Option B retry semantics.
 func (s *ReviewService) DeleteReview(ctx context.Context, id string) error {
-	if err := s.repo.DeleteByID(ctx, id); err != nil {
+	if err := s.repo.DeleteByID(ctx, id); err != nil && !errors.Is(err, domain.ErrNotFound) {
 		return fmt.Errorf("deleting review %s: %w", id, err)
+	}
+
+	evt := domain.ReviewDeletedEvent{
+		ReviewID:       id,
+		IdempotencyKey: "review-deleted-" + id,
+	}
+	if err := s.publisher.PublishReviewDeleted(ctx, evt); err != nil {
+		return fmt.Errorf("publishing review-deleted event: %w", err)
 	}
 	return nil
 }

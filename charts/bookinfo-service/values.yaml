@@ -157,14 +157,18 @@ events:
     #   topic: kafka_topic_name
     #   eventBusName: kafka
     #   contentType: application/json
+    #   eventTypes:                        # optional, rendered as bookinfo.io/emitted-ce-types annotation on the EventSource
+    #     - com.bookinfo.<service>.<event>
   consumed: {}
     # event-name:
     #   eventSourceName: producer-event-name
     #   eventName: event-name
+    #   filter:                             # optional
+    #     ceType: com.bookinfo.<service>.<event>   # matches Argo Events filters.context.type
     #   triggers:
     #     - name: trigger-name
     #       url: self
-    #       path: /v1/endpoint        # required when url is "self"
+    #       path: /v1/endpoint             # required when url is "self"
     #       method: POST
     #       payload:
     #         - passthrough

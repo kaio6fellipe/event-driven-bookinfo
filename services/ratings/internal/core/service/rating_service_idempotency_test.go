@@ -13,7 +13,7 @@ import (
 func TestSubmitRating_Idempotent(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewRatingRepository()
-	svc := service.NewRatingService(repo, idempotency.NewMemoryStore())
+	svc := service.NewRatingService(repo, idempotency.NewMemoryStore(), &fakeRatingPublisher{})
 
 	// Call twice with the same explicit key; expect ErrAlreadyProcessed on second.
 	_, err := svc.SubmitRating(ctx, "product-1", "alice", 5, "key-1")
@@ -29,7 +29,7 @@ func TestSubmitRating_Idempotent(t *testing.T) {
 func TestSubmitRating_NaturalKey(t *testing.T) {
 	ctx := context.Background()
 	repo := memory.NewRatingRepository()
-	svc := service.NewRatingService(repo, idempotency.NewMemoryStore())
+	svc := service.NewRatingService(repo, idempotency.NewMemoryStore(), &fakeRatingPublisher{})
 
 	_, err := svc.SubmitRating(ctx, "p1", "bob", 4, "")
 	if err != nil {

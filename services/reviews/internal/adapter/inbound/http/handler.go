@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
-	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/port"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/service"
 )
@@ -129,20 +128,14 @@ func (h *Handler) deleteReview(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "review_id is required"})
 		return
 	}
-	reviewID := req.ReviewID
 
-	err := h.svc.DeleteReview(r.Context(), reviewID)
-	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "review not found"})
-			return
-		}
-		logger.Error("failed to delete review", "error", err, "review_id", reviewID)
+	if err := h.svc.DeleteReview(r.Context(), req.ReviewID); err != nil {
+		logger.Error("failed to delete review", "error", err, "review_id", req.ReviewID)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "internal error"})
 		return
 	}
 
-	logger.Info("review deleted", "review_id", reviewID)
+	logger.Info("review deleted", "review_id", req.ReviewID)
 	w.WriteHeader(http.StatusNoContent)
 }
 

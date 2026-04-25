@@ -15,21 +15,21 @@ import (
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
-	"github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/core/domain"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/core/domain"
 )
 
 const (
-	ceType    = "com.bookinfo.ingestion.book-added"
-	ceSource  = "ingestion"
-	ceVersion = "1.0"
+	ceTypeBookAdded = "com.bookinfo.details.book-added"
+	ceSource        = "details"
+	ceVersion       = "1.0"
 
 	defaultPartitions        = 3
 	defaultReplicationFactor = 1
 )
 
-// bookEvent matches the details service AddDetailRequest DTO.
-// The sensor uses passthrough payload, so this must match what details-write expects.
-type bookEvent struct {
+// bookAddedBody is the marshaled Kafka record value for a BookAddedEvent.
+type bookAddedBody struct {
+	ID             string `json:"id,omitempty"`
 	Title          string `json:"title"`
 	Author         string `json:"author"`
 	Year           int    `json:"year"`
@@ -54,8 +54,8 @@ type Producer struct {
 	topic  string
 }
 
-// NewProducer creates a real Kafka producer that connects to the given brokers.
-// It auto-creates the topic if it does not exist.
+// NewProducer creates a real Kafka producer connecting to the given brokers.
+// Auto-creates the topic if it does not exist.
 func NewProducer(ctx context.Context, brokers, topic string) (*Producer, error) {
 	seeds := strings.Split(brokers, ",")
 
@@ -81,46 +81,45 @@ func NewProducerWithClient(client Client, topic string) *Producer {
 }
 
 // PublishBookAdded sends a book-added CloudEvent to Kafka.
-func (p *Producer) PublishBookAdded(ctx context.Context, book domain.Book) error {
+func (p *Producer) PublishBookAdded(ctx context.Context, evt domain.BookAddedEvent) error {
 	logger := logging.FromContext(ctx)
 
-	isbn10, isbn13 := classifyISBN(book.ISBN)
-
-	evt := bookEvent{
-		Title:          book.Title,
-		Author:         strings.Join(book.Authors, ", "),
-		Year:           book.PublishYear,
-		Type:           "paperback",
-		Pages:          book.Pages,
-		Publisher:      book.Publisher,
-		Language:       book.Language,
-		ISBN10:         isbn10,
-		ISBN13:         isbn13,
-		IdempotencyKey: fmt.Sprintf("ingestion-isbn-%s", book.ISBN),
+	body := bookAddedBody{
+		ID:             evt.ID,
+		Title:          evt.Title,
+		Author:         evt.Author,
+		Year:           evt.Year,
+		Type:           evt.Type,
+		Pages:          evt.Pages,
+		Publisher:      evt.Publisher,
+		Language:       evt.Language,
+		ISBN10:         evt.ISBN10,
+		ISBN13:         evt.ISBN13,
+		IdempotencyKey: evt.IdempotencyKey,
 	}
 
-	value, err := json.Marshal(evt)
+	value, err := json.Marshal(body)
 	if err != nil {
-		return fmt.Errorf("marshaling book event: %w", err)
+		return fmt.Errorf("marshaling book-added event: %w", err)
 	}
 
 	now := time.Now().UTC()
 	record := &kgo.Record{
 		Topic: p.topic,
-		Key:   []byte(book.ISBN),
+		Key:   []byte(evt.IdempotencyKey),
 		Value: value,
 		Headers: []kgo.RecordHeader{
 			{Key: "ce_specversion", Value: []byte(ceVersion)},
-			{Key: "ce_type", Value: []byte(ceType)},
+			{Key: "ce_type", Value: []byte(ceTypeBookAdded)},
 			{Key: "ce_source", Value: []byte(ceSource)},
 			{Key: "ce_id", Value: []byte(uuid.New().String())},
 			{Key: "ce_time", Value: []byte(now.Format(time.RFC3339))},
-			{Key: "ce_subject", Value: []byte(book.ISBN)},
+			{Key: "ce_subject", Value: []byte(evt.IdempotencyKey)},
 			{Key: "content-type", Value: []byte("application/json")},
 		},
 	}
 
-	ctx, span := telemetry.StartProducerSpan(ctx, p.topic, book.ISBN)
+	ctx, span := telemetry.StartProducerSpan(ctx, p.topic, evt.IdempotencyKey)
 	defer span.End()
 
 	telemetry.InjectTraceContext(ctx, record)
@@ -132,7 +131,7 @@ func (p *Producer) PublishBookAdded(ctx context.Context, book domain.Book) error
 		return fmt.Errorf("producing to Kafka: %w", err)
 	}
 
-	logger.Debug("published book-added event to Kafka", "topic", p.topic, "isbn", book.ISBN)
+	logger.Debug("published book-added event to Kafka", "topic", p.topic, "idempotency_key", evt.IdempotencyKey)
 	return nil
 }
 
@@ -160,11 +159,4 @@ func ensureTopic(ctx context.Context, client *kgo.Client, topic string) error {
 
 func isTopicExistsError(msg string) bool {
 	return strings.Contains(msg, "already exists") || strings.Contains(msg, "TOPIC_ALREADY_EXISTS")
-}
-
-func classifyISBN(isbn string) (isbn10, isbn13 string) {
-	if len(isbn) == 13 {
-		return "", isbn
-	}
-	return isbn, ""
 }

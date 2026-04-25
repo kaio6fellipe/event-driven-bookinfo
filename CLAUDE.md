@@ -44,6 +44,18 @@ make e2e                # Docker Compose + shell smoke tests (memory backend)
 make docker-build-all   # Build all 7 Docker images
 ```
 
+## Compose vs k8s scope
+
+`make run` (docker-compose) is a lite development environment —
+postgres + redis + 5 backend services + productpage. Compose does
+NOT include Kafka, the ingestion service, Argo Events, or the
+observability stack. Producers fall back to a no-op publisher when
+`KAFKA_BROKERS` is unset; events are dropped. The full event-driven
+flow (ingestion + Kafka + Argo Events sensors driving notifications)
+and observability stack are exercised only via `make run-k8s`. Use
+`make e2e` for HTTP-level acceptance tests; the event chain is
+verified via Tempo traces after `make run-k8s`.
+
 ## Helm Commands
 
 ```bash

@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
@@ -119,10 +120,15 @@ func (p *Producer) PublishBookAdded(ctx context.Context, book domain.Book) error
 		},
 	}
 
+	ctx, span := telemetry.StartProducerSpan(ctx, p.topic, book.ISBN)
+	defer span.End()
+
 	telemetry.InjectTraceContext(ctx, record)
 
 	results := p.client.ProduceSync(ctx, record)
 	if err := results.FirstErr(); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("producing to Kafka: %w", err)
 	}
 

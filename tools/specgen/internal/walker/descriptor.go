@@ -28,7 +28,8 @@ func LoadExposed(moduleDir, importPath string) ([]DescriptorInfo, error) {
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax |
 			packages.NeedTypes | packages.NeedTypesInfo | packages.NeedDeps |
 			packages.NeedImports,
-		Dir: moduleDir,
+		Dir:   moduleDir,
+		Tests: false,
 	}
 	pkgs, err := packages.Load(cfg, importPath)
 	if err != nil {
@@ -60,7 +61,11 @@ func LoadExposed(moduleDir, importPath string) ([]DescriptorInfo, error) {
 					if i >= len(vs.Values) {
 						return nil, fmt.Errorf("Exposed has no initializer")
 					}
-					return parseDescriptorSlice(pkg, vs.Values[i])
+					out, err := parseDescriptorSlice(pkg, vs.Values[i])
+					if err != nil {
+						return nil, fmt.Errorf("extracting Exposed: %w", err)
+					}
+					return out, nil
 				}
 			}
 		}

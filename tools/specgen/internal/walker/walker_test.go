@@ -63,11 +63,26 @@ func TestLoadExposed_Fixture(t *testing.T) {
 	}
 
 	d := exposed[0]
-	if d.Name != "thing-created" || d.ExposureKey != "events" {
-		t.Errorf("Name=%q ExposureKey=%q, want thing-created/events", d.Name, d.ExposureKey)
+	if d.Name != "thing-created" {
+		t.Errorf("Name = %q, want thing-created", d.Name)
+	}
+	if d.ExposureKey != "events" {
+		t.Errorf("ExposureKey = %q, want events", d.ExposureKey)
 	}
 	if d.CEType != "com.fixture.thing-created" {
-		t.Errorf("CEType = %q", d.CEType)
+		t.Errorf("CEType = %q, want com.fixture.thing-created", d.CEType)
+	}
+	if d.CESource != "fixture" {
+		t.Errorf("CESource = %q, want fixture", d.CESource)
+	}
+	if d.Version != "1.0" {
+		t.Errorf("Version = %q, want 1.0", d.Version)
+	}
+	if d.ContentType != "application/json" {
+		t.Errorf("ContentType = %q, want application/json", d.ContentType)
+	}
+	if d.Description != "Emitted when a thing is created." {
+		t.Errorf("Description = %q, want %q", d.Description, "Emitted when a thing is created.")
 	}
 	if d.PayloadType == nil || d.PayloadType.Obj().Name() != "ThingCreatedPayload" {
 		t.Errorf("PayloadType = %v, want ThingCreatedPayload", d.PayloadType)

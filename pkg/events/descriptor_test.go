@@ -6,16 +6,33 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
 )
 
-func TestResolveExposureKey_DefaultsToName(t *testing.T) {
-	d := events.Descriptor{Name: "rating-submitted"}
-	if got := d.ResolveExposureKey(); got != "rating-submitted" {
-		t.Errorf("ResolveExposureKey() = %q, want %q", got, "rating-submitted")
+func TestResolveExposureKey(t *testing.T) {
+	tests := []struct {
+		name       string
+		descriptor events.Descriptor
+		want       string
+	}{
+		{
+			name:       "defaults to Name when ExposureKey is empty",
+			descriptor: events.Descriptor{Name: "rating-submitted"},
+			want:       "rating-submitted",
+		},
+		{
+			name:       "uses explicit ExposureKey when set",
+			descriptor: events.Descriptor{Name: "book-added", ExposureKey: "events"},
+			want:       "events",
+		},
+		{
+			name:       "returns empty when both are empty",
+			descriptor: events.Descriptor{},
+			want:       "",
+		},
 	}
-}
-
-func TestResolveExposureKey_UsesExplicitWhenSet(t *testing.T) {
-	d := events.Descriptor{Name: "book-added", ExposureKey: "events"}
-	if got := d.ResolveExposureKey(); got != "events" {
-		t.Errorf("ResolveExposureKey() = %q, want %q", got, "events")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.descriptor.ResolveExposureKey(); got != tt.want {
+				t.Errorf("ResolveExposureKey() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

@@ -31,7 +31,9 @@ type Descriptor struct {
 	// CESource is the CloudEvents `source` attribute, e.g. "details".
 	CESource string
 
-	// Version is the CloudEvents `specversion` attribute payload version.
+	// Version is the CloudEvents `specversion` attribute (CE protocol version,
+	// typically "1.0"). It is wired into the `ce_specversion` binary header
+	// when the producer publishes to Kafka.
 	Version string
 
 	// ContentType is the message contentType, almost always

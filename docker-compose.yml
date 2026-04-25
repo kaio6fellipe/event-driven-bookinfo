@@ -1,4 +1,13 @@
-# Local development compose file.
+# Local development compose file — lite mode.
+#
+# Scope: postgres + redis + 5 backend services + productpage.
+# NOT included: Kafka, ingestion service, Argo Events, observability.
+# Producers detect missing KAFKA_BROKERS and fall back to a no-op
+# publisher; events are dropped silently.
+#
+# The full event-driven path (ingestion → Kafka → Argo Events sensor
+# → notification HTTP trigger) requires `make run-k8s` (k3d cluster).
+#
 # Usage: make run | make run-logs | make stop | make seed
 #   or:  docker compose up --build
 services:

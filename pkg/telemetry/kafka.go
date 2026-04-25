@@ -5,7 +5,9 @@ import (
 
 	"github.com/twmb/franz-go/pkg/kgo"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // kafkaHeaderCarrier adapts a *kgo.Record's Headers slice to TextMapCarrier
@@ -49,3 +51,19 @@ func InjectTraceContext(ctx context.Context, record *kgo.Record) {
 }
 
 var _ propagation.TextMapCarrier = (*kafkaHeaderCarrier)(nil)
+
+// StartProducerSpan starts a child span for a Kafka publish operation following
+// OTel messaging semantic conventions. The caller must End() the span (use defer).
+// Span name is "<topic> publish"; SpanKind is Producer.
+func StartProducerSpan(ctx context.Context, topic, key string) (context.Context, trace.Span) {
+	return otel.Tracer("kafka-producer").Start(ctx,
+		topic+" publish",
+		trace.WithSpanKind(trace.SpanKindProducer),
+		trace.WithAttributes(
+			attribute.String("messaging.system", "kafka"),
+			attribute.String("messaging.destination.name", topic),
+			attribute.String("messaging.operation.type", "publish"),
+			attribute.String("messaging.kafka.message.key", key),
+		),
+	)
+}

@@ -35,8 +35,11 @@ spec:
       {{- with $event.filter }}
       {{- with .ceType }}
       filters:
-        context:
-          type: {{ . | quote }}
+        data:
+          - path: headers.ce_type
+            type: string
+            value:
+              - {{ . | quote }}
       {{- end }}
       {{- end }}
     {{- end }}

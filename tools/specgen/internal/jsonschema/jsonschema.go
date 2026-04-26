@@ -44,6 +44,12 @@ func schemaFor(t types.Type) (*Schema, error) {
 		}
 		return &Schema{Type: "array", Items: inner}, nil
 	case *types.Named:
+		// Special-case well-known stdlib types whose JSON marshaling is a
+		// string, not their struct shape. time.Time marshals as RFC3339;
+		// emit the schema accordingly.
+		if isTimeTime(tt) {
+			return &Schema{Type: "string", Format: "date-time"}, nil
+		}
 		return schemaFor(tt.Underlying())
 	case *types.Alias:
 		// any / interface{} aliases — treat as schema-less (accepts anything).
@@ -108,6 +114,21 @@ func structSchema(s *types.Struct) (*Schema, error) {
 		}
 	}
 	return out, nil
+}
+
+// isTimeTime returns true when the named type is the standard library's
+// time.Time. *types.Named uniquely identifies a named type by its
+// (package path, name) pair.
+func isTimeTime(t *types.Named) bool {
+	obj := t.Obj()
+	if obj == nil {
+		return false
+	}
+	pkg := obj.Pkg()
+	if pkg == nil {
+		return false // builtin (e.g. error) — not us
+	}
+	return pkg.Path() == "time" && obj.Name() == "Time"
 }
 
 // jsonTagName parses a JSON struct tag and returns (name, omitempty).

@@ -46,6 +46,9 @@ func TestLoadEndpoints_Fixture(t *testing.T) {
 	if post.RequestType == nil || post.RequestType.Obj().Name() != "CreateThingRequest" {
 		t.Errorf("endpoints[1].RequestType = %v, want CreateThingRequest", post.RequestType)
 	}
+	if post.SuccessStatus != 200 {
+		t.Errorf("endpoints[1].SuccessStatus = %d, want 200", post.SuccessStatus)
+	}
 }
 
 func TestLoadExposed_Fixture(t *testing.T) {

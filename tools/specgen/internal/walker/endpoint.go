@@ -118,6 +118,12 @@ func setEndpointField(ep *EndpointInfo, pkg *packages.Package, fieldName string,
 	switch fieldName {
 	case "Method", "Path", "Summary", "EventName":
 		return setEndpointStringField(ep, fieldName, value)
+	case "SuccessStatus":
+		n, err := intLit(value)
+		if err != nil {
+			return fmt.Errorf("SuccessStatus: %w", err)
+		}
+		ep.SuccessStatus = n
 	case "Request":
 		t, err := namedType(pkg, value)
 		if err != nil {
@@ -197,6 +203,19 @@ func stringLit(expr ast.Expr) (string, error) {
 		return "", fmt.Errorf("unquoting: %w", err)
 	}
 	return s, nil
+}
+
+// intLit parses a Go integer literal AST node.
+func intLit(expr ast.Expr) (int, error) {
+	bl, ok := expr.(*ast.BasicLit)
+	if !ok {
+		return 0, fmt.Errorf("not a basic literal")
+	}
+	n, err := strconv.Atoi(bl.Value)
+	if err != nil {
+		return 0, fmt.Errorf("parsing int %q: %w", bl.Value, err)
+	}
+	return n, nil
 }
 
 // namedType resolves a composite literal like `Foo{}` to its *types.Named.

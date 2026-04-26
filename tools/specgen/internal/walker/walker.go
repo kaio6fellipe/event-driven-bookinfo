@@ -20,6 +20,7 @@ type EndpointInfo struct {
 	Path            string
 	Summary         string
 	EventName       string
+	SuccessStatus   int          // 0 means "use method default" (201 for POST, 200 otherwise)
 	RequestType     *types.Named // nil when omitted
 	ResponseType    *types.Named // nil when omitted; holds element type when ResponseIsSlice is true
 	ResponseIsSlice bool         // true when the response is []NamedType (array of ResponseType)

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/api"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/dlqueue/internal/core/domain"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/dlqueue/internal/core/port"
@@ -29,16 +30,20 @@ func NewHandler(svc port.DLQService) *Handler {
 	return &Handler{svc: svc}
 }
 
-// RegisterRoutes registers all dlqueue routes on the given mux.
+// RegisterRoutes registers all dlqueue routes on the given mux by looping
+// over the Endpoints slice in endpoints.go — single source of truth for
+// runtime routing and OpenAPI generation.
 func (h *Handler) RegisterRoutes(mux *stdhttp.ServeMux) {
-	mux.HandleFunc("POST /v1/events", h.ingestEvent)
-	mux.HandleFunc("GET /v1/events", h.listEvents)
-	mux.HandleFunc("GET /v1/events/{id}", h.getEvent)
-	mux.HandleFunc("POST /v1/events/{id}/replay", h.replayEvent)
-	mux.HandleFunc("POST /v1/events/{id}/resolve", h.resolveEvent)
-	mux.HandleFunc("POST /v1/events/{id}/reset", h.resetPoisoned)
-	mux.HandleFunc("POST /v1/events/batch/replay", h.batchReplay)
-	mux.HandleFunc("POST /v1/events/batch/resolve", h.batchResolve)
+	api.Register(mux, Endpoints, map[string]stdhttp.HandlerFunc{
+		"POST /v1/events":               h.ingestEvent,
+		"GET /v1/events":                h.listEvents,
+		"GET /v1/events/{id}":           h.getEvent,
+		"POST /v1/events/{id}/replay":   h.replayEvent,
+		"POST /v1/events/{id}/resolve":  h.resolveEvent,
+		"POST /v1/events/{id}/reset":    h.resetPoisoned,
+		"POST /v1/events/batch/replay":  h.batchReplay,
+		"POST /v1/events/batch/resolve": h.batchResolve,
+	})
 }
 
 func (h *Handler) ingestEvent(w stdhttp.ResponseWriter, r *stdhttp.Request) {

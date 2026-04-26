@@ -27,7 +27,10 @@ const (
 	defaultReplicationFactor = 1
 )
 
-type submittedBody struct {
+// RatingSubmittedPayload is the marshaled Kafka record value for a
+// rating-submitted CloudEvent. Exported because the events.Descriptor in
+// exposed.go references it as a JSONSchema source for tools/specgen.
+type RatingSubmittedPayload struct {
 	ID             string `json:"id,omitempty"`
 	ProductID      string `json:"product_id"`
 	Reviewer       string `json:"reviewer"`
@@ -70,7 +73,7 @@ func NewProducerWithClient(client Client, topic string) *Producer {
 func (p *Producer) PublishRatingSubmitted(ctx context.Context, evt domain.RatingSubmittedEvent) error {
 	logger := logging.FromContext(ctx)
 
-	body := submittedBody{
+	body := RatingSubmittedPayload{
 		ID:             evt.ID,
 		ProductID:      evt.ProductID,
 		Reviewer:       evt.Reviewer,

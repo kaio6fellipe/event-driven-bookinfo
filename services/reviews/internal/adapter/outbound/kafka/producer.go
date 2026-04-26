@@ -13,22 +13,20 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 	"go.opentelemetry.io/otel/codes"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
 )
 
 const (
-	ceTypeReviewSubmitted = "com.bookinfo.reviews.review-submitted"
-	ceTypeReviewDeleted   = "com.bookinfo.reviews.review-deleted"
-	ceSource              = "reviews"
-	ceVersion             = "1.0"
-
 	defaultPartitions        = 3
 	defaultReplicationFactor = 1
 )
 
-type submittedBody struct {
+// ReviewSubmittedPayload is the marshaled Kafka record value for a
+// review-submitted CloudEvent.
+type ReviewSubmittedPayload struct {
 	ID             string `json:"id,omitempty"`
 	ProductID      string `json:"product_id"`
 	Reviewer       string `json:"reviewer"`
@@ -36,7 +34,9 @@ type submittedBody struct {
 	IdempotencyKey string `json:"idempotency_key"`
 }
 
-type deletedBody struct {
+// ReviewDeletedPayload is the marshaled Kafka record value for a
+// review-deleted CloudEvent.
+type ReviewDeletedPayload struct {
 	ReviewID       string `json:"review_id"`
 	ProductID      string `json:"product_id,omitempty"`
 	IdempotencyKey string `json:"idempotency_key"`
@@ -73,58 +73,40 @@ func NewProducerWithClient(client Client, topic string) *Producer {
 	return &Producer{client: client, topic: topic}
 }
 
-// PublishReviewSubmitted sends a review-submitted CloudEvent to Kafka.
-func (p *Producer) PublishReviewSubmitted(ctx context.Context, evt domain.ReviewSubmittedEvent) error {
-	body := submittedBody{
-		ID:             evt.ID,
-		ProductID:      evt.ProductID,
-		Reviewer:       evt.Reviewer,
-		Text:           evt.Text,
-		IdempotencyKey: evt.IdempotencyKey,
-	}
-	return p.produce(ctx, ceTypeReviewSubmitted, evt.IdempotencyKey, evt.ProductID, body)
-}
-
-// PublishReviewDeleted sends a review-deleted CloudEvent to Kafka.
-func (p *Producer) PublishReviewDeleted(ctx context.Context, evt domain.ReviewDeletedEvent) error {
-	body := deletedBody{
-		ReviewID:       evt.ReviewID,
-		ProductID:      evt.ProductID,
-		IdempotencyKey: evt.IdempotencyKey,
-	}
-	return p.produce(ctx, ceTypeReviewDeleted, evt.IdempotencyKey, evt.ProductID, body)
-}
-
-func (p *Producer) produce(ctx context.Context, ceType, key, partitionHint string, body any) error {
+// Publish sends a CloudEvent to Kafka using the given descriptor, payload,
+// record key, and idempotency key. The recordKey is used as the Kafka
+// partition key and ce_subject header; when empty, idempotencyKey is used
+// instead.
+func (p *Producer) Publish(ctx context.Context, d events.Descriptor, payload any, recordKey, idempotencyKey string) error {
 	logger := logging.FromContext(ctx)
 
-	value, err := json.Marshal(body)
+	value, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("marshaling event: %w", err)
+		return fmt.Errorf("marshaling %s event: %w", d.Name, err)
 	}
 
-	recordKey := []byte(partitionHint)
-	if len(recordKey) == 0 {
-		recordKey = []byte(key)
+	keyBytes := []byte(recordKey)
+	if len(keyBytes) == 0 {
+		keyBytes = []byte(idempotencyKey)
 	}
 
 	now := time.Now().UTC()
 	record := &kgo.Record{
 		Topic: p.topic,
-		Key:   recordKey,
+		Key:   keyBytes,
 		Value: value,
 		Headers: []kgo.RecordHeader{
-			{Key: "ce_specversion", Value: []byte(ceVersion)},
-			{Key: "ce_type", Value: []byte(ceType)},
-			{Key: "ce_source", Value: []byte(ceSource)},
+			{Key: "ce_specversion", Value: []byte(d.Version)},
+			{Key: "ce_type", Value: []byte(d.CEType)},
+			{Key: "ce_source", Value: []byte(d.CESource)},
 			{Key: "ce_id", Value: []byte(uuid.New().String())},
 			{Key: "ce_time", Value: []byte(now.Format(time.RFC3339))},
-			{Key: "ce_subject", Value: []byte(key)},
-			{Key: "content-type", Value: []byte("application/json")},
+			{Key: "ce_subject", Value: []byte(recordKey)},
+			{Key: "content-type", Value: []byte(d.ContentType)},
 		},
 	}
 
-	ctx, span := telemetry.StartProducerSpan(ctx, p.topic, key)
+	ctx, span := telemetry.StartProducerSpan(ctx, p.topic, idempotencyKey)
 	defer span.End()
 
 	telemetry.InjectTraceContext(ctx, record)
@@ -136,8 +118,46 @@ func (p *Producer) produce(ctx context.Context, ceType, key, partitionHint strin
 		return fmt.Errorf("producing to Kafka: %w", err)
 	}
 
-	logger.Debug("published reviews event", "topic", p.topic, "ce_type", ceType, "idempotency_key", key)
+	logger.Debug("published event",
+		"topic", p.topic,
+		"ce_type", d.CEType,
+		"idempotency_key", idempotencyKey,
+	)
 	return nil
+}
+
+// descriptorFor returns the descriptor whose Name matches; panics if
+// Exposed is missing the named descriptor (drift between exposed.go
+// and the producer surfaces immediately).
+func descriptorFor(name string) events.Descriptor {
+	for _, d := range Exposed {
+		if d.Name == name {
+			return d
+		}
+	}
+	panic(fmt.Sprintf("kafka: no descriptor for event %q", name))
+}
+
+// PublishReviewSubmitted sends a review-submitted CloudEvent to Kafka.
+func (p *Producer) PublishReviewSubmitted(ctx context.Context, evt domain.ReviewSubmittedEvent) error {
+	body := ReviewSubmittedPayload{
+		ID:             evt.ID,
+		ProductID:      evt.ProductID,
+		Reviewer:       evt.Reviewer,
+		Text:           evt.Text,
+		IdempotencyKey: evt.IdempotencyKey,
+	}
+	return p.Publish(ctx, descriptorFor("review-submitted"), body, evt.ProductID, evt.IdempotencyKey)
+}
+
+// PublishReviewDeleted sends a review-deleted CloudEvent to Kafka.
+func (p *Producer) PublishReviewDeleted(ctx context.Context, evt domain.ReviewDeletedEvent) error {
+	body := ReviewDeletedPayload{
+		ReviewID:       evt.ReviewID,
+		ProductID:      evt.ProductID,
+		IdempotencyKey: evt.IdempotencyKey,
+	}
+	return p.Publish(ctx, descriptorFor("review-deleted"), body, evt.ProductID, evt.IdempotencyKey)
 }
 
 // Close flushes and closes the underlying client.

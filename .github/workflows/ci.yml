@@ -352,7 +352,7 @@ jobs:
           go-version: "1.26.2"
 
       - name: Set up Node
-        uses: actions/setup-node@v4 # TODO(specgen): pin to commit SHA in a follow-up
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
 
@@ -378,7 +378,7 @@ jobs:
           go-version: "1.26.2"
 
       - name: Install oasdiff
-        run: go install github.com/oasdiff/oasdiff@latest
+        run: go install github.com/oasdiff/oasdiff@v1.15.0
 
       - name: Run oasdiff
         run: |

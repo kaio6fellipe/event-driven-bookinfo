@@ -28,64 +28,63 @@ type Input struct {
 	Exposed     []walker.DescriptorInfo
 }
 
-// Build returns the YAML bytes of the values-generated.yaml document.
-//
-// cqrs.endpoints is omitted entirely when no Endpoint has an EventName.
-// events.exposed is omitted entirely when Exposed is empty.
-//
-// Multi-descriptor grouping: descriptors sharing an ExposureKey are merged
-// into one entry. ContentType is taken from the first descriptor in the group
-// (sorted by Name); if descriptors in the same group have differing
-// ContentTypes, the first one wins — this situation is unusual in practice.
-func Build(in Input) ([]byte, error) {
-	docNode := yamlutil.Mapping()
+// cqrsEntry holds the fields needed to emit one cqrs.endpoints entry.
+type cqrsEntry struct {
+	eventName string
+	method    string
+	path      string
+}
 
-	// --- cqrs.endpoints block ---
-	// Include only endpoints that have a non-empty EventName.
-	type cqrsEntry struct {
-		eventName string
-		method    string
-		path      string
-	}
-	var cqrsEntries []cqrsEntry
-	for _, ep := range in.Endpoints {
+// exposedGroup holds the aggregated fields for one events.exposed entry.
+type exposedGroup struct {
+	contentType string   // ContentType of the first descriptor (sorted by Name)
+	ceTypes     []string // Union of all CETypes in the group, sorted alphabetically
+}
+
+// buildCQRSNode constructs the cqrs: YAML mapping node from endpoints that
+// carry an EventName. Returns nil when no such endpoints exist.
+func buildCQRSNode(endpoints []walker.EndpointInfo) *yaml.Node {
+	var entries []cqrsEntry
+	for _, ep := range endpoints {
 		if ep.EventName == "" {
 			continue
 		}
-		cqrsEntries = append(cqrsEntries, cqrsEntry{
+		entries = append(entries, cqrsEntry{
 			eventName: ep.EventName,
 			method:    ep.Method,
 			path:      ep.Path,
 		})
 	}
-	// Sort alphabetically by eventName for determinism.
-	sort.Slice(cqrsEntries, func(i, j int) bool {
-		return cqrsEntries[i].eventName < cqrsEntries[j].eventName
+	if len(entries) == 0 {
+		return nil
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].eventName < entries[j].eventName
 	})
 
-	if len(cqrsEntries) > 0 {
-		endpointsNode := yamlutil.Mapping()
-		for _, e := range cqrsEntries {
-			entryNode := yamlutil.Mapping()
-			yamlutil.AddScalar(entryNode, "method", e.method)
-			yamlutil.AddScalar(entryNode, "endpoint", e.path)
-			yamlutil.AddMapping(endpointsNode, e.eventName, entryNode)
-		}
-		cqrsNode := yamlutil.Mapping()
-		yamlutil.AddMapping(cqrsNode, "endpoints", endpointsNode)
-		yamlutil.AddMapping(docNode, "cqrs", cqrsNode)
+	endpointsNode := yamlutil.Mapping()
+	for _, e := range entries {
+		entryNode := yamlutil.Mapping()
+		yamlutil.AddScalar(entryNode, "method", e.method)
+		yamlutil.AddScalar(entryNode, "endpoint", e.path)
+		yamlutil.AddMapping(endpointsNode, e.eventName, entryNode)
+	}
+	cqrsNode := yamlutil.Mapping()
+	yamlutil.AddMapping(cqrsNode, "endpoints", endpointsNode)
+	return cqrsNode
+}
+
+// buildExposedNode constructs the events: YAML mapping node from Exposed
+// descriptors. Returns nil when the slice is empty.
+func buildExposedNode(exposed []walker.DescriptorInfo) *yaml.Node {
+	if len(exposed) == 0 {
+		return nil
 	}
 
-	// --- events.exposed block ---
 	// Group descriptors by ExposureKey (fall back to Name when ExposureKey is empty).
-	type exposedGroup struct {
-		contentType string   // ContentType of the first descriptor (sorted by Name)
-		ceTypes     []string // Union of all CETypes in the group, sorted alphabetically
-	}
 	groupMap := map[string]*exposedGroup{}
 	groupOrder := []string{}
-
-	for _, d := range in.Exposed {
+	for _, d := range exposed {
 		key := d.ExposureKey
 		if key == "" {
 			key = d.Name
@@ -101,13 +100,9 @@ func Build(in Input) ([]byte, error) {
 
 	// For each group, sort descriptors by Name so ContentType is deterministic
 	// (first by Name order), and sort CETypes alphabetically.
-	//
-	// We derive ContentType from the first descriptor in Name order. Because
-	// we only stored CETypes above, we need a second pass over in.Exposed.
 	for key, g := range groupMap {
-		// Collect all descriptors for this group, sorted by Name.
 		var descs []walker.DescriptorInfo
-		for _, d := range in.Exposed {
+		for _, d := range exposed {
 			dk := d.ExposureKey
 			if dk == "" {
 				dk = d.Name
@@ -123,31 +118,47 @@ func Build(in Input) ([]byte, error) {
 			g.contentType = descs[0].ContentType
 		}
 		sort.Strings(g.ceTypes)
-		_ = g // already in groupMap
 	}
 
-	// Sort group keys alphabetically for determinism.
 	sort.Strings(groupOrder)
 
-	if len(groupOrder) > 0 {
-		exposedNode := yamlutil.Mapping()
-		for _, key := range groupOrder {
-			g := groupMap[key]
+	exposedNode := yamlutil.Mapping()
+	for _, key := range groupOrder {
+		g := groupMap[key]
+		entryNode := yamlutil.Mapping()
+		yamlutil.AddScalar(entryNode, "contentType", g.contentType)
 
-			entryNode := yamlutil.Mapping()
-			yamlutil.AddScalar(entryNode, "contentType", g.contentType)
-
-			seqNode := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
-			for _, ct := range g.ceTypes {
-				seqNode.Content = append(seqNode.Content,
-					&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: ct},
-				)
-			}
-			yamlutil.AddMapping(entryNode, "eventTypes", seqNode)
-			yamlutil.AddMapping(exposedNode, key, entryNode)
+		seqNode := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+		for _, ct := range g.ceTypes {
+			seqNode.Content = append(seqNode.Content,
+				&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: ct},
+			)
 		}
-		eventsNode := yamlutil.Mapping()
-		yamlutil.AddMapping(eventsNode, "exposed", exposedNode)
+		yamlutil.AddMapping(entryNode, "eventTypes", seqNode)
+		yamlutil.AddMapping(exposedNode, key, entryNode)
+	}
+	eventsNode := yamlutil.Mapping()
+	yamlutil.AddMapping(eventsNode, "exposed", exposedNode)
+	return eventsNode
+}
+
+// Build returns the YAML bytes of the values-generated.yaml document.
+//
+// cqrs.endpoints is omitted entirely when no Endpoint has an EventName.
+// events.exposed is omitted entirely when Exposed is empty.
+//
+// Multi-descriptor grouping: descriptors sharing an ExposureKey are merged
+// into one entry. ContentType is taken from the first descriptor in the group
+// (sorted by Name); if descriptors in the same group have differing
+// ContentTypes, the first one wins — this situation is unusual in practice.
+func Build(in Input) ([]byte, error) {
+	docNode := yamlutil.Mapping()
+
+	if cqrsNode := buildCQRSNode(in.Endpoints); cqrsNode != nil {
+		yamlutil.AddMapping(docNode, "cqrs", cqrsNode)
+	}
+
+	if eventsNode := buildExposedNode(in.Exposed); eventsNode != nil {
 		yamlutil.AddMapping(docNode, "events", eventsNode)
 	}
 

@@ -47,8 +47,6 @@ cqrs:
   endpoints:
     rating-submitted:
       port: 12002
-      method: POST
-      endpoint: /v1/ratings
       triggers:
         - name: create-rating
           url: self

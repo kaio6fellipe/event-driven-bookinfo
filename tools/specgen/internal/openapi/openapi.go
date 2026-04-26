@@ -134,6 +134,25 @@ func Build(in Input) ([]byte, error) {
 		entry := pathMap[p]
 		pathItemNode := yamlutil.Mapping()
 
+		// Emit path-level parameters for each {param} in the path template.
+		params := extractPathParams(p)
+		if len(params) > 0 {
+			paramNodes := make([]any, 0, len(params))
+			for _, param := range params {
+				paramNodes = append(paramNodes, map[string]any{
+					"name":     param,
+					"in":       "path",
+					"required": true,
+					"schema":   map[string]any{"type": "string"},
+				})
+			}
+			paramNode, err := yamlutil.AnyToNode(paramNodes)
+			if err != nil {
+				return nil, fmt.Errorf("encoding parameters for %s: %w", p, err)
+			}
+			yamlutil.AddMapping(pathItemNode, "parameters", paramNode)
+		}
+
 		// Sort methods for determinism
 		methods := make([]string, 0, len(entry.methods))
 		for m := range entry.methods {
@@ -185,4 +204,21 @@ func Build(in Input) ([]byte, error) {
 		return nil, fmt.Errorf("closing YAML encoder: %w", err)
 	}
 	return buf.Bytes(), nil
+}
+
+// extractPathParams returns the names of all {param} segments in a path
+// template, preserving left-to-right order and deduplicating.
+func extractPathParams(path string) []string {
+	var params []string
+	seen := map[string]bool{}
+	for _, segment := range strings.Split(path, "/") {
+		if len(segment) >= 3 && segment[0] == '{' && segment[len(segment)-1] == '}' {
+			name := segment[1 : len(segment)-1]
+			if !seen[name] {
+				params = append(params, name)
+				seen[name] = true
+			}
+		}
+	}
+	return params
 }

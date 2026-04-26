@@ -29,6 +29,12 @@ paths:
       summary: Create a thing
       x-bookinfo-event-name: thing-created
   /v1/things/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
     get:
       responses:
         "200":

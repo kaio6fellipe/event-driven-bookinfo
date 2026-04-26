@@ -47,8 +47,8 @@ func DiscoverServices(repoRoot string) ([]Service, error) {
 			svc.HasHTTPPkg = true
 			svc.HTTPPkg = modulePath + "/services/" + e.Name() + "/internal/adapter/inbound/http"
 		}
-		kafkaDir := filepath.Join(root, "internal/adapter/outbound/kafka")
-		if _, err := os.Stat(kafkaDir); err == nil {
+		kafkaExposed := filepath.Join(root, "internal/adapter/outbound/kafka/exposed.go")
+		if _, err := os.Stat(kafkaExposed); err == nil {
 			svc.HasKafkaPkg = true
 			svc.KafkaPkg = modulePath + "/services/" + e.Name() + "/internal/adapter/outbound/kafka"
 		}

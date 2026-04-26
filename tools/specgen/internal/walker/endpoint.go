@@ -125,7 +125,7 @@ func setEndpointField(ep *EndpointInfo, pkg *packages.Package, fieldName string,
 	case "Tags":
 		tags, err := stringSliceLit(value)
 		if err != nil {
-			return fmt.Errorf("Tags: %w", err)
+			return fmt.Errorf("tags: %w", err)
 		}
 		ep.Tags = tags
 	case "SuccessStatus":

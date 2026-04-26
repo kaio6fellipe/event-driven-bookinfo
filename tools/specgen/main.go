@@ -61,6 +61,7 @@ func main() {
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 	default:
+		// #nosec G705 -- os.Args[1] echo is intentional in usage error message
 		fmt.Fprintf(os.Stderr, "unknown subcommand %q\n\n%s", os.Args[1], usage)
 		os.Exit(2)
 	}

@@ -23,155 +23,131 @@ type Input struct {
 	Endpoints   []walker.EndpointInfo
 }
 
-// Build returns the YAML bytes of the OpenAPI 3.1 document.
-func Build(in Input) ([]byte, error) {
-	// Collect schemas keyed by type name so we can sort them later.
-	schemas := map[string]*jsonschema.Schema{}
+// pathEntry holds all methods collected for one URL path.
+type pathEntry struct {
+	path    string
+	methods map[string]map[string]any // method -> operation fields
+}
 
-	// Use a slice to collect paths in declaration order; sort before encoding.
-	type pathEntry struct {
-		path    string
-		methods map[string]map[string]any // method -> operation fields
+// buildOperation constructs the operation object for one endpoint and
+// accumulates any referenced schemas into the provided map.
+func buildOperation(ep walker.EndpointInfo, schemas map[string]*jsonschema.Schema) (map[string]any, error) {
+	op := map[string]any{
+		"summary":   ep.Summary,
+		"responses": map[string]any{},
 	}
-	pathMap := map[string]*pathEntry{}
-	pathOrder := []string{}
+	if ep.EventName != "" {
+		op["x-bookinfo-event-name"] = ep.EventName
+	}
 
-	for _, ep := range in.Endpoints {
-		op := map[string]any{
-			"summary":   ep.Summary,
-			"responses": map[string]any{},
+	if ep.RequestType != nil {
+		s, err := jsonschema.SchemaFromType(ep.RequestType)
+		if err != nil {
+			return nil, fmt.Errorf("request schema for %s %s: %w", ep.Method, ep.Path, err)
 		}
-		if ep.EventName != "" {
-			op["x-bookinfo-event-name"] = ep.EventName
+		schemas[ep.RequestType.Obj().Name()] = s
+		op["requestBody"] = map[string]any{
+			"required": true,
+			"content": map[string]any{
+				"application/json": map[string]any{
+					"schema": map[string]any{
+						"$ref": "#/components/schemas/" + ep.RequestType.Obj().Name(),
+					},
+				},
+			},
 		}
+	}
 
-		if ep.RequestType != nil {
-			s, err := jsonschema.SchemaFromType(ep.RequestType)
+	responses := op["responses"].(map[string]any)
+	successStatus := strconv.Itoa(http.StatusOK)
+	if ep.Method == http.MethodPost {
+		successStatus = strconv.Itoa(http.StatusCreated)
+	}
+	if ep.ResponseType != nil {
+		s, err := jsonschema.SchemaFromType(ep.ResponseType)
+		if err != nil {
+			return nil, fmt.Errorf("response schema for %s %s: %w", ep.Method, ep.Path, err)
+		}
+		schemas[ep.ResponseType.Obj().Name()] = s
+		responses[successStatus] = map[string]any{
+			"description": "success",
+			"content": map[string]any{
+				"application/json": map[string]any{
+					"schema": map[string]any{
+						"$ref": "#/components/schemas/" + ep.ResponseType.Obj().Name(),
+					},
+				},
+			},
+		}
+	} else {
+		responses[successStatus] = map[string]any{"description": "success"}
+	}
+
+	for _, errInfo := range ep.Errors {
+		if errInfo.Type != nil {
+			s, err := jsonschema.SchemaFromType(errInfo.Type)
 			if err != nil {
-				return nil, fmt.Errorf("request schema for %s %s: %w", ep.Method, ep.Path, err)
+				return nil, fmt.Errorf("error schema for status %d: %w", errInfo.Status, err)
 			}
-			schemas[ep.RequestType.Obj().Name()] = s
-			op["requestBody"] = map[string]any{
+			schemas[errInfo.Type.Obj().Name()] = s
+			responses[strconv.Itoa(errInfo.Status)] = map[string]any{
+				"description": http.StatusText(errInfo.Status),
+				"content": map[string]any{
+					"application/json": map[string]any{
+						"schema": map[string]any{
+							"$ref": "#/components/schemas/" + errInfo.Type.Obj().Name(),
+						},
+					},
+				},
+			}
+		}
+	}
+	return op, nil
+}
+
+// buildPathItemNode encodes one URL path entry (parameters + methods) into a
+// YAML mapping node.
+func buildPathItemNode(p string, entry *pathEntry) (*yaml.Node, error) {
+	pathItemNode := yamlutil.Mapping()
+
+	// Emit path-level parameters for each {param} in the path template.
+	params := extractPathParams(p)
+	if len(params) > 0 {
+		paramNodes := make([]any, 0, len(params))
+		for _, param := range params {
+			paramNodes = append(paramNodes, map[string]any{
+				"name":     param,
+				"in":       "path",
 				"required": true,
-				"content": map[string]any{
-					"application/json": map[string]any{
-						"schema": map[string]any{
-							"$ref": "#/components/schemas/" + ep.RequestType.Obj().Name(),
-						},
-					},
-				},
-			}
+				"schema":   map[string]any{"type": "string"},
+			})
 		}
-
-		responses := op["responses"].(map[string]any)
-		successStatus := strconv.Itoa(http.StatusOK)
-		if ep.Method == http.MethodPost {
-			successStatus = strconv.Itoa(http.StatusCreated)
+		paramNode, err := yamlutil.AnyToNode(paramNodes)
+		if err != nil {
+			return nil, fmt.Errorf("encoding parameters for %s: %w", p, err)
 		}
-		if ep.ResponseType != nil {
-			s, err := jsonschema.SchemaFromType(ep.ResponseType)
-			if err != nil {
-				return nil, fmt.Errorf("response schema for %s %s: %w", ep.Method, ep.Path, err)
-			}
-			schemas[ep.ResponseType.Obj().Name()] = s
-			responses[successStatus] = map[string]any{
-				"description": "success",
-				"content": map[string]any{
-					"application/json": map[string]any{
-						"schema": map[string]any{
-							"$ref": "#/components/schemas/" + ep.ResponseType.Obj().Name(),
-						},
-					},
-				},
-			}
-		} else {
-			responses[successStatus] = map[string]any{"description": "success"}
-		}
-
-		for _, errInfo := range ep.Errors {
-			if errInfo.Type != nil {
-				s, err := jsonschema.SchemaFromType(errInfo.Type)
-				if err != nil {
-					return nil, fmt.Errorf("error schema for status %d: %w", errInfo.Status, err)
-				}
-				schemas[errInfo.Type.Obj().Name()] = s
-				responses[strconv.Itoa(errInfo.Status)] = map[string]any{
-					"description": http.StatusText(errInfo.Status),
-					"content": map[string]any{
-						"application/json": map[string]any{
-							"schema": map[string]any{
-								"$ref": "#/components/schemas/" + errInfo.Type.Obj().Name(),
-							},
-						},
-					},
-				}
-			}
-		}
-
-		if _, exists := pathMap[ep.Path]; !exists {
-			pathMap[ep.Path] = &pathEntry{path: ep.Path, methods: map[string]map[string]any{}}
-			pathOrder = append(pathOrder, ep.Path)
-		}
-		pathMap[ep.Path].methods[strings.ToLower(ep.Method)] = op
+		yamlutil.AddMapping(pathItemNode, "parameters", paramNode)
 	}
 
-	// Build the YAML document using *yaml.Node for deterministic key ordering.
-	docNode := yamlutil.Mapping()
-
-	// openapi field
-	yamlutil.AddScalar(docNode, "openapi", "3.1.0")
-
-	// info
-	infoNode := yamlutil.Mapping()
-	yamlutil.AddScalar(infoNode, "title", in.ServiceName)
-	yamlutil.AddScalar(infoNode, "version", in.Version)
-	yamlutil.AddMapping(docNode, "info", infoNode)
-
-	// paths — sorted alphabetically
-	sort.Strings(pathOrder)
-	pathsNode := yamlutil.Mapping()
-	for _, p := range pathOrder {
-		entry := pathMap[p]
-		pathItemNode := yamlutil.Mapping()
-
-		// Emit path-level parameters for each {param} in the path template.
-		params := extractPathParams(p)
-		if len(params) > 0 {
-			paramNodes := make([]any, 0, len(params))
-			for _, param := range params {
-				paramNodes = append(paramNodes, map[string]any{
-					"name":     param,
-					"in":       "path",
-					"required": true,
-					"schema":   map[string]any{"type": "string"},
-				})
-			}
-			paramNode, err := yamlutil.AnyToNode(paramNodes)
-			if err != nil {
-				return nil, fmt.Errorf("encoding parameters for %s: %w", p, err)
-			}
-			yamlutil.AddMapping(pathItemNode, "parameters", paramNode)
-		}
-
-		// Sort methods for determinism
-		methods := make([]string, 0, len(entry.methods))
-		for m := range entry.methods {
-			methods = append(methods, m)
-		}
-		sort.Strings(methods)
-
-		for _, method := range methods {
-			opNode, err := yamlutil.AnyToNode(entry.methods[method])
-			if err != nil {
-				return nil, fmt.Errorf("encoding operation %s %s: %w", method, p, err)
-			}
-			yamlutil.AddMapping(pathItemNode, method, opNode)
-		}
-		yamlutil.AddMapping(pathsNode, p, pathItemNode)
+	// Sort methods for determinism.
+	methods := make([]string, 0, len(entry.methods))
+	for m := range entry.methods {
+		methods = append(methods, m)
 	}
-	yamlutil.AddMapping(docNode, "paths", pathsNode)
+	sort.Strings(methods)
 
-	// components.schemas — sorted alphabetically
+	for _, method := range methods {
+		opNode, err := yamlutil.AnyToNode(entry.methods[method])
+		if err != nil {
+			return nil, fmt.Errorf("encoding operation %s %s: %w", method, p, err)
+		}
+		yamlutil.AddMapping(pathItemNode, method, opNode)
+	}
+	return pathItemNode, nil
+}
+
+// buildSchemasNode encodes the components.schemas mapping sorted alphabetically.
+func buildSchemasNode(schemas map[string]*jsonschema.Schema) (*yaml.Node, error) {
 	schemaKeys := make([]string, 0, len(schemas))
 	for k := range schemas {
 		schemaKeys = append(schemaKeys, k)
@@ -185,6 +161,54 @@ func Build(in Input) ([]byte, error) {
 			return nil, fmt.Errorf("encoding schema %s: %w", k, err)
 		}
 		yamlutil.AddMapping(schemasNode, k, sn)
+	}
+	return schemasNode, nil
+}
+
+// Build returns the YAML bytes of the OpenAPI 3.1 document.
+func Build(in Input) ([]byte, error) {
+	// Collect schemas keyed by type name so we can sort them later.
+	schemas := map[string]*jsonschema.Schema{}
+
+	pathMap := map[string]*pathEntry{}
+	pathOrder := []string{}
+
+	for _, ep := range in.Endpoints {
+		op, err := buildOperation(ep, schemas)
+		if err != nil {
+			return nil, err
+		}
+		if _, exists := pathMap[ep.Path]; !exists {
+			pathMap[ep.Path] = &pathEntry{path: ep.Path, methods: map[string]map[string]any{}}
+			pathOrder = append(pathOrder, ep.Path)
+		}
+		pathMap[ep.Path].methods[strings.ToLower(ep.Method)] = op
+	}
+
+	// Build the YAML document using *yaml.Node for deterministic key ordering.
+	docNode := yamlutil.Mapping()
+	yamlutil.AddScalar(docNode, "openapi", "3.1.0")
+
+	infoNode := yamlutil.Mapping()
+	yamlutil.AddScalar(infoNode, "title", in.ServiceName)
+	yamlutil.AddScalar(infoNode, "version", in.Version)
+	yamlutil.AddMapping(docNode, "info", infoNode)
+
+	// paths — sorted alphabetically
+	sort.Strings(pathOrder)
+	pathsNode := yamlutil.Mapping()
+	for _, p := range pathOrder {
+		pathItemNode, err := buildPathItemNode(p, pathMap[p])
+		if err != nil {
+			return nil, err
+		}
+		yamlutil.AddMapping(pathsNode, p, pathItemNode)
+	}
+	yamlutil.AddMapping(docNode, "paths", pathsNode)
+
+	schemasNode, err := buildSchemasNode(schemas)
+	if err != nil {
+		return nil, err
 	}
 	componentsNode := yamlutil.Mapping()
 	yamlutil.AddMapping(componentsNode, "schemas", schemasNode)

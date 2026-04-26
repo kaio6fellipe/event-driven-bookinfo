@@ -32,10 +32,10 @@ type Input struct {
 // AsyncAPI API entity. Documents are omitted when HasOpenAPI or HasAsyncAPI is false.
 func Build(in Input) ([]byte, error) {
 	if in.Owner == "" {
-		return nil, fmt.Errorf("Owner is required")
+		return nil, fmt.Errorf("owner is required")
 	}
 	if in.RepoTreeURL == "" {
-		return nil, fmt.Errorf("RepoTreeURL is required")
+		return nil, fmt.Errorf("repoTreeURL is required")
 	}
 
 	var buf bytes.Buffer

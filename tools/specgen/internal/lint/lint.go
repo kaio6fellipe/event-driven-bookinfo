@@ -36,6 +36,7 @@ func Run(repoRoot string) error {
 	}
 
 	args := append([]string{"--yes", "@stoplight/spectral-cli", "lint", "--ruleset", filepath.Join(repoRoot, ".spectral.yaml")}, specs...)
+	// #nosec G204 -- args derived from trusted filesystem walk under repoRoot
 	cmd := exec.Command("npx", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

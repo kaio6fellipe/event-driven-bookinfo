@@ -32,6 +32,7 @@ func Run(repoRoot string) error {
 
 		baseRef := "origin/main:" + filepath.ToSlash(filepath.Join("services", e.Name(), "api", "openapi.yaml"))
 		var stdout, stderr bytes.Buffer
+		// #nosec G204 -- args derived from trusted filesystem walk under repoRoot
 		cmd := exec.Command("oasdiff", "breaking", baseRef, spec, "--fail-on", "ERR")
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr

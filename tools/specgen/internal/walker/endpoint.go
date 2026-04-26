@@ -28,7 +28,7 @@ func extractAPIVersion(pkg *packages.Package) (string, error) {
 func extractEndpoints(pkg *packages.Package) ([]EndpointInfo, error) {
 	obj := pkg.Types.Scope().Lookup("Endpoints")
 	if obj == nil {
-		return nil, fmt.Errorf("Endpoints var not found in %s", pkg.PkgPath)
+		return nil, fmt.Errorf("endpoints var not found in %s", pkg.PkgPath)
 	}
 
 	// Find the AST node for the Endpoints declaration.
@@ -48,30 +48,30 @@ func extractEndpoints(pkg *packages.Package) ([]EndpointInfo, error) {
 						continue
 					}
 					if i >= len(vs.Values) {
-						return nil, fmt.Errorf("Endpoints has no initializer")
+						return nil, fmt.Errorf("endpoints has no initializer")
 					}
 					return parseEndpointSlice(pkg, vs.Values[i])
 				}
 			}
 		}
 	}
-	return nil, fmt.Errorf("Endpoints AST node not found")
+	return nil, fmt.Errorf("endpoints AST node not found")
 }
 
 func parseEndpointSlice(pkg *packages.Package, expr ast.Expr) ([]EndpointInfo, error) {
 	cl, ok := expr.(*ast.CompositeLit)
 	if !ok {
-		return nil, fmt.Errorf("Endpoints initializer is not a composite literal")
+		return nil, fmt.Errorf("endpoints initializer is not a composite literal")
 	}
 	out := make([]EndpointInfo, 0, len(cl.Elts))
 	for i, elt := range cl.Elts {
 		ec, ok := elt.(*ast.CompositeLit)
 		if !ok {
-			return nil, fmt.Errorf("Endpoints[%d] is not a composite literal", i)
+			return nil, fmt.Errorf("endpoints[%d] is not a composite literal", i)
 		}
 		ep, err := parseEndpointFields(pkg, ec)
 		if err != nil {
-			return nil, fmt.Errorf("Endpoints[%d]: %w", i, err)
+			return nil, fmt.Errorf("endpoints[%d]: %w", i, err)
 		}
 		out = append(out, ep)
 	}
@@ -83,58 +83,61 @@ func parseEndpointFields(pkg *packages.Package, cl *ast.CompositeLit) (EndpointI
 	for _, elt := range cl.Elts {
 		kv, ok := elt.(*ast.KeyValueExpr)
 		if !ok {
-			return ep, fmt.Errorf("Endpoint field must use Key: Value form")
+			return ep, fmt.Errorf("endpoint field must use Key: Value form")
 		}
 		name, ok := kv.Key.(*ast.Ident)
 		if !ok {
-			return ep, fmt.Errorf("Endpoint field key is not an identifier")
+			return ep, fmt.Errorf("endpoint field key is not an identifier")
 		}
-		switch name.Name {
-		case "Method":
-			s, err := stringLit(kv.Value)
-			if err != nil {
-				return ep, err
-			}
-			ep.Method = s
-		case "Path":
-			s, err := stringLit(kv.Value)
-			if err != nil {
-				return ep, err
-			}
-			ep.Path = s
-		case "Summary":
-			s, err := stringLit(kv.Value)
-			if err != nil {
-				return ep, err
-			}
-			ep.Summary = s
-		case "EventName":
-			s, err := stringLit(kv.Value)
-			if err != nil {
-				return ep, err
-			}
-			ep.EventName = s
-		case "Request":
-			t, err := namedType(pkg, kv.Value)
-			if err != nil {
-				return ep, fmt.Errorf("Request: %w", err)
-			}
-			ep.RequestType = t
-		case "Response":
-			t, err := namedType(pkg, kv.Value)
-			if err != nil {
-				return ep, fmt.Errorf("Response: %w", err)
-			}
-			ep.ResponseType = t
-		case "Errors":
-			errs, err := parseErrorSlice(pkg, kv.Value)
-			if err != nil {
-				return ep, fmt.Errorf("Errors: %w", err)
-			}
-			ep.Errors = errs
+		if err := setEndpointField(&ep, pkg, name.Name, kv.Value); err != nil {
+			return ep, err
 		}
 	}
 	return ep, nil
+}
+
+func setEndpointStringField(ep *EndpointInfo, fieldName string, value ast.Expr) error {
+	s, err := stringLit(value)
+	if err != nil {
+		return err
+	}
+	switch fieldName {
+	case "Method":
+		ep.Method = s
+	case "Path":
+		ep.Path = s
+	case "Summary":
+		ep.Summary = s
+	case "EventName":
+		ep.EventName = s
+	}
+	return nil
+}
+
+func setEndpointField(ep *EndpointInfo, pkg *packages.Package, fieldName string, value ast.Expr) error {
+	switch fieldName {
+	case "Method", "Path", "Summary", "EventName":
+		return setEndpointStringField(ep, fieldName, value)
+	case "Request":
+		t, err := namedType(pkg, value)
+		if err != nil {
+			return fmt.Errorf("request: %w", err)
+		}
+		ep.RequestType = t
+	case "Response":
+		t, err := namedType(pkg, value)
+		if err != nil {
+			return fmt.Errorf("response: %w", err)
+		}
+		ep.ResponseType = t
+	case "Errors":
+		errs, err := parseErrorSlice(pkg, value)
+		if err != nil {
+			return fmt.Errorf("errors: %w", err)
+		}
+		ep.Errors = errs
+	}
+	return nil
 }
 
 func parseErrorSlice(pkg *packages.Package, expr ast.Expr) ([]ErrorInfo, error) {
@@ -152,27 +155,27 @@ func parseErrorSlice(pkg *packages.Package, expr ast.Expr) ([]ErrorInfo, error) 
 		for _, sub := range ec.Elts {
 			kv, ok := sub.(*ast.KeyValueExpr)
 			if !ok {
-				return nil, fmt.Errorf("ErrorResponse field must use Key: Value form")
+				return nil, fmt.Errorf("errorResponse field must use Key: Value form")
 			}
 			name, ok := kv.Key.(*ast.Ident)
 			if !ok {
-				return nil, fmt.Errorf("ErrorResponse field key is not an identifier")
+				return nil, fmt.Errorf("errorResponse field key is not an identifier")
 			}
 			switch name.Name {
 			case "Status":
 				bl, ok := kv.Value.(*ast.BasicLit)
 				if !ok {
-					return nil, fmt.Errorf("Status must be an int literal")
+					return nil, fmt.Errorf("status must be an int literal")
 				}
 				n, err := strconv.Atoi(bl.Value)
 				if err != nil {
-					return nil, fmt.Errorf("Status: %w", err)
+					return nil, fmt.Errorf("status: %w", err)
 				}
 				info.Status = n
 			case "Type":
 				t, err := namedType(pkg, kv.Value)
 				if err != nil {
-					return nil, fmt.Errorf("Type: %w", err)
+					return nil, fmt.Errorf("type: %w", err)
 				}
 				info.Type = t
 			}

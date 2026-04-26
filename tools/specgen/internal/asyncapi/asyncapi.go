@@ -20,6 +20,55 @@ type Input struct {
 	Exposed     []walker.DescriptorInfo
 }
 
+// buildMessage constructs the components.messages node for a single descriptor
+// and accumulates any payload schema into the provided schemas map.
+func buildMessage(d walker.DescriptorInfo, schemas map[string]*jsonschema.Schema) (*yaml.Node, error) {
+	msgNode := yamlutil.Mapping()
+	yamlutil.AddScalar(msgNode, "name", d.Name)
+	yamlutil.AddScalar(msgNode, "title", d.Name)
+	if d.Description != "" {
+		yamlutil.AddScalar(msgNode, "summary", d.Description)
+	}
+	yamlutil.AddScalar(msgNode, "contentType", d.ContentType)
+
+	if d.PayloadType != nil {
+		payloadNode := yamlutil.Mapping()
+		yamlutil.AddScalar(payloadNode, "$ref", "#/components/schemas/"+d.PayloadType.Obj().Name())
+		yamlutil.AddMapping(msgNode, "payload", payloadNode)
+
+		s, err := jsonschema.SchemaFromType(d.PayloadType)
+		if err != nil {
+			return nil, fmt.Errorf("schema for %s payload: %w", d.Name, err)
+		}
+		schemas[d.PayloadType.Obj().Name()] = s
+	}
+
+	// headers — CE binding as JSONSchema const properties.
+	headersNode := yamlutil.Mapping()
+	yamlutil.AddScalar(headersNode, "type", "object")
+
+	propsNode := yamlutil.Mapping()
+	// Sort header property keys alphabetically.
+	for _, hk := range []string{"ce-source", "ce-specversion", "ce-type"} {
+		propNode := yamlutil.Mapping()
+		yamlutil.AddScalar(propNode, "type", "string")
+		var constVal string
+		switch hk {
+		case "ce-type":
+			constVal = d.CEType
+		case "ce-source":
+			constVal = d.CESource
+		case "ce-specversion":
+			constVal = d.Version
+		}
+		yamlutil.AddScalar(propNode, "const", constVal)
+		yamlutil.AddMapping(propsNode, hk, propNode)
+	}
+	yamlutil.AddMapping(headersNode, "properties", propsNode)
+	yamlutil.AddMapping(msgNode, "headers", headersNode)
+	return msgNode, nil
+}
+
 // Build returns the YAML bytes of the AsyncAPI 3.0 document.
 func Build(in Input) ([]byte, error) {
 	// Group descriptors by ExposureKey (fall back to Name when ExposureKey is empty).
@@ -113,56 +162,10 @@ func Build(in Input) ([]byte, error) {
 	})
 
 	for _, d := range allDescs {
-		msgNode := yamlutil.Mapping()
-		yamlutil.AddScalar(msgNode, "name", d.Name)
-		yamlutil.AddScalar(msgNode, "title", d.Name)
-		if d.Description != "" {
-			yamlutil.AddScalar(msgNode, "summary", d.Description)
+		msgNode, err := buildMessage(d, schemas)
+		if err != nil {
+			return nil, err
 		}
-		yamlutil.AddScalar(msgNode, "contentType", d.ContentType)
-
-		// payload $ref
-		if d.PayloadType != nil {
-			payloadNode := yamlutil.Mapping()
-			yamlutil.AddScalar(payloadNode, "$ref", "#/components/schemas/"+d.PayloadType.Obj().Name())
-			yamlutil.AddMapping(msgNode, "payload", payloadNode)
-
-			// collect schema
-			s, err := jsonschema.SchemaFromType(d.PayloadType)
-			if err != nil {
-				return nil, fmt.Errorf("schema for %s payload: %w", d.Name, err)
-			}
-			schemas[d.PayloadType.Obj().Name()] = s
-		}
-
-		// headers — CE binding as JSONSchema const properties.
-		headersNode := yamlutil.Mapping()
-		yamlutil.AddScalar(headersNode, "type", "object")
-
-		propsNode := yamlutil.Mapping()
-
-		// Sort header property keys alphabetically.
-		headerKeys := []string{"ce-source", "ce-specversion", "ce-type"}
-		sort.Strings(headerKeys)
-
-		for _, hk := range headerKeys {
-			propNode := yamlutil.Mapping()
-			yamlutil.AddScalar(propNode, "type", "string")
-			var constVal string
-			switch hk {
-			case "ce-type":
-				constVal = d.CEType
-			case "ce-source":
-				constVal = d.CESource
-			case "ce-specversion":
-				constVal = d.Version
-			}
-			yamlutil.AddScalar(propNode, "const", constVal)
-			yamlutil.AddMapping(propsNode, hk, propNode)
-		}
-		yamlutil.AddMapping(headersNode, "properties", propsNode)
-		yamlutil.AddMapping(msgNode, "headers", headersNode)
-
 		yamlutil.AddMapping(messagesCompNode, d.Name, msgNode)
 	}
 

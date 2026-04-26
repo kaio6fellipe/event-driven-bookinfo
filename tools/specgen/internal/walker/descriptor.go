@@ -59,7 +59,7 @@ func LoadExposed(moduleDir, importPath string) ([]DescriptorInfo, error) {
 						continue
 					}
 					if i >= len(vs.Values) {
-						return nil, fmt.Errorf("Exposed has no initializer")
+						return nil, fmt.Errorf("exposed slice has no initializer")
 					}
 					out, err := parseDescriptorSlice(pkg, vs.Values[i])
 					if err != nil {
@@ -70,23 +70,23 @@ func LoadExposed(moduleDir, importPath string) ([]DescriptorInfo, error) {
 			}
 		}
 	}
-	return nil, fmt.Errorf("Exposed not found in %s", pkg.PkgPath)
+	return nil, fmt.Errorf("exposed slice not found in %s", pkg.PkgPath)
 }
 
 func parseDescriptorSlice(pkg *packages.Package, expr ast.Expr) ([]DescriptorInfo, error) {
 	cl, ok := expr.(*ast.CompositeLit)
 	if !ok {
-		return nil, fmt.Errorf("Exposed initializer is not a composite literal")
+		return nil, fmt.Errorf("exposed slice initializer is not a composite literal")
 	}
 	out := make([]DescriptorInfo, 0, len(cl.Elts))
 	for i, elt := range cl.Elts {
 		ec, ok := elt.(*ast.CompositeLit)
 		if !ok {
-			return nil, fmt.Errorf("Exposed[%d] is not a composite literal", i)
+			return nil, fmt.Errorf("exposed[%d] is not a composite literal", i)
 		}
 		d, err := parseDescriptorFields(pkg, ec)
 		if err != nil {
-			return nil, fmt.Errorf("Exposed[%d]: %w", i, err)
+			return nil, fmt.Errorf("exposed[%d]: %w", i, err)
 		}
 		out = append(out, d)
 	}
@@ -98,62 +98,53 @@ func parseDescriptorFields(pkg *packages.Package, cl *ast.CompositeLit) (Descrip
 	for _, elt := range cl.Elts {
 		kv, ok := elt.(*ast.KeyValueExpr)
 		if !ok {
-			return d, fmt.Errorf("Descriptor field must use Key: Value form")
+			return d, fmt.Errorf("descriptor field must use Key: Value form")
 		}
 		name, ok := kv.Key.(*ast.Ident)
 		if !ok {
-			return d, fmt.Errorf("Descriptor field key is not an identifier")
+			return d, fmt.Errorf("descriptor field key is not an identifier")
 		}
-		switch name.Name {
-		case "Name":
-			s, err := stringLit(kv.Value)
-			if err != nil {
-				return d, err
-			}
-			d.Name = s
-		case "ExposureKey":
-			s, err := stringLit(kv.Value)
-			if err != nil {
-				return d, err
-			}
-			d.ExposureKey = s
-		case "CEType":
-			s, err := stringLit(kv.Value)
-			if err != nil {
-				return d, err
-			}
-			d.CEType = s
-		case "CESource":
-			s, err := stringLit(kv.Value)
-			if err != nil {
-				return d, err
-			}
-			d.CESource = s
-		case "Version":
-			s, err := stringLit(kv.Value)
-			if err != nil {
-				return d, err
-			}
-			d.Version = s
-		case "ContentType":
-			s, err := stringLit(kv.Value)
-			if err != nil {
-				return d, err
-			}
-			d.ContentType = s
-		case "Description":
-			s, err := stringLit(kv.Value)
-			if err != nil {
-				return d, err
-			}
-			d.Description = s
-		case "Payload":
-			t, err := namedType(pkg, kv.Value)
-			if err != nil {
-				return d, fmt.Errorf("Payload: %w", err)
-			}
-			d.PayloadType = t
+		if err := setDescriptorField(&d, pkg, name.Name, kv.Value); err != nil {
+			return d, err
 		}
 	}
 	return d, nil
+}
+
+func setDescriptorStringField(d *DescriptorInfo, fieldName string, value ast.Expr) error {
+	s, err := stringLit(value)
+	if err != nil {
+		return err
+	}
+	switch fieldName {
+	case "Name":
+		d.Name = s
+	case "ExposureKey":
+		d.ExposureKey = s
+	case "CEType":
+		d.CEType = s
+	case "CESource":
+		d.CESource = s
+	case "Version":
+		d.Version = s
+	case "ContentType":
+		d.ContentType = s
+	case "Description":
+		d.Description = s
+	}
+	return nil
+}
+
+func setDescriptorField(d *DescriptorInfo, pkg *packages.Package, fieldName string, value ast.Expr) error {
+	switch fieldName {
+	case "Name", "ExposureKey", "CEType", "CESource", "Version", "ContentType", "Description":
+		return setDescriptorStringField(d, fieldName, value)
+	case "Payload":
+		t, err := namedType(pkg, value)
+		if err != nil {
+			return fmt.Errorf("payload: %w", err)
+		}
+		d.PayloadType = t
+	}
+	return nil
 }

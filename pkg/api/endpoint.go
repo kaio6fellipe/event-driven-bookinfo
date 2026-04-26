@@ -9,7 +9,7 @@
 // At runtime, the handler's RegisterRoutes loops over the same slice the
 // generator reads, so any drift between the slice and the handlers fails at
 // program start (Register panics on a missing handler).
-package api
+package api //nolint:revive // small focused package; name matches directory convention
 
 import (
 	"fmt"

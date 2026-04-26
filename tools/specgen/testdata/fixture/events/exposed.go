@@ -17,6 +17,24 @@ type Descriptor struct {
 	Description string
 }
 
+type ConsumedDescriptor struct {
+	Name            string
+	SourceService   string
+	SourceEventName string
+	CEType          string
+	Description     string
+}
+
+var Consumed = []ConsumedDescriptor{
+	{
+		Name:            "thing-updated",
+		SourceService:   "other-service",
+		SourceEventName: "thing-updated",
+		CEType:          "com.other.thing-updated",
+		Description:     "Reacts to upstream updates.",
+	},
+}
+
 var Exposed = []Descriptor{
 	{
 		Name:        "thing-created",

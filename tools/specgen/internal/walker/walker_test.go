@@ -91,3 +91,42 @@ func TestLoadExposed_Fixture(t *testing.T) {
 		t.Errorf("PayloadType = %v, want ThingCreatedPayload", d.PayloadType)
 	}
 }
+
+func TestLoadConsumed_Fixture(t *testing.T) {
+	fixtureDir, err := filepath.Abs("../../testdata/fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	consumed, err := walker.LoadConsumed(fixtureDir, "fixture/events")
+	if err != nil {
+		t.Fatalf("LoadConsumed: %v", err)
+	}
+	if len(consumed) != 1 {
+		t.Fatalf("len = %d, want 1", len(consumed))
+	}
+	c := consumed[0]
+	if c.Name != "thing-updated" {
+		t.Errorf("Name = %q, want thing-updated", c.Name)
+	}
+	if c.SourceService != "other-service" {
+		t.Errorf("SourceService = %q, want other-service", c.SourceService)
+	}
+	if c.SourceEventName != "thing-updated" {
+		t.Errorf("SourceEventName = %q, want thing-updated", c.SourceEventName)
+	}
+	if c.CEType != "com.other.thing-updated" {
+		t.Errorf("CEType = %q, want com.other.thing-updated", c.CEType)
+	}
+}
+
+func TestLoadConsumed_AbsentSlice(t *testing.T) {
+	fixtureDir, _ := filepath.Abs("../../testdata/fixture")
+	consumed, err := walker.LoadConsumed(fixtureDir, "fixture/api")
+	if err != nil {
+		t.Fatalf("LoadConsumed: %v", err)
+	}
+	if consumed != nil {
+		t.Errorf("expected nil consumed (slice absent), got %v", consumed)
+	}
+}

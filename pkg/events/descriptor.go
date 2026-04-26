@@ -55,6 +55,34 @@ type Descriptor struct {
 	Description string
 }
 
+// ConsumedDescriptor describes one CloudEvent type a service consumes.
+// Surfaced in services/<svc>/api/catalog-info.yaml as a Backstage
+// 'consumesApis' relationship to the producing service's -events API.
+type ConsumedDescriptor struct {
+	// Name is the local logical identifier; matches the events.consumed.<key>
+	// in deploy/<svc>/values-local.yaml.
+	Name string
+
+	// SourceService is the producing service name (e.g. "details",
+	// "ingestion"). Used to build the consumesApis entry as
+	// "<SourceService>-events".
+	SourceService string
+
+	// SourceEventName is the Name field of the producer-side Descriptor
+	// this consumer subscribes to (e.g. "book-added"). Cross-references
+	// the producer for documentation and tooling.
+	SourceEventName string
+
+	// CEType is the cloudevents type the consumer's sensor filter matches
+	// on (e.g. "com.bookinfo.details.book-added"). Should equal the
+	// producer's Descriptor.CEType.
+	CEType string
+
+	// Description is a human-readable explanation of why this service
+	// consumes this event.
+	Description string
+}
+
 // ResolveExposureKey returns ExposureKey when set, falling back to Name.
 func (d Descriptor) ResolveExposureKey() string {
 	if d.ExposureKey != "" {

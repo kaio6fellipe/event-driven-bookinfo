@@ -6,7 +6,7 @@ info:
   version: 1.0.0
 channels:
   events:
-    address: events
+    address: bookinfo_ratings_events
     messages:
       rating-submitted:
         $ref: '#/components/messages/rating-submitted'

@@ -14,6 +14,7 @@ var Exposed = []events.Descriptor{
 	{
 		Name:        "review-submitted",
 		ExposureKey: "events",
+		Topic:       "bookinfo_reviews_events",
 		CEType:      "com.bookinfo.reviews.review-submitted",
 		CESource:    "reviews",
 		Version:     "1.0",
@@ -24,6 +25,7 @@ var Exposed = []events.Descriptor{
 	{
 		Name:        "review-deleted",
 		ExposureKey: "events",
+		Topic:       "bookinfo_reviews_events",
 		CEType:      "com.bookinfo.reviews.review-deleted",
 		CESource:    "reviews",
 		Version:     "1.0",

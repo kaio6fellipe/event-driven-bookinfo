@@ -55,3 +55,16 @@ func (d Descriptor) ResolveExposureKey() string {
 	}
 	return d.Name
 }
+
+// Find returns the descriptor in s whose Name matches; panics if no
+// match is found. Use to pick a descriptor by name in a producer
+// wrapper instead of indexing Exposed by position (which is fragile
+// when the slice is appended to).
+func Find(s []Descriptor, name string) Descriptor {
+	for _, d := range s {
+		if d.Name == name {
+			return d
+		}
+	}
+	panic("events.Find: no descriptor with name " + name)
+}

@@ -45,6 +45,18 @@ func schemaFor(t types.Type) (*Schema, error) {
 		return &Schema{Type: "array", Items: inner}, nil
 	case *types.Named:
 		return schemaFor(tt.Underlying())
+	case *types.Alias:
+		// any / interface{} aliases — treat as schema-less (accepts anything).
+		if _, ok := tt.Rhs().(*types.Interface); ok {
+			return &Schema{Type: "object"}, nil
+		}
+		return schemaFor(tt.Rhs())
+	case *types.Interface:
+		// any / interface{} — no schema constraint.
+		return &Schema{Type: "object"}, nil
+	case *types.Map:
+		// map[K]V — represent as a generic object; key type is always string in JSON.
+		return &Schema{Type: "object"}, nil
 	case *types.Pointer:
 		return schemaFor(tt.Elem())
 	case *types.Struct:

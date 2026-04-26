@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/api"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/core/domain"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/core/port"
@@ -19,10 +20,14 @@ func NewHandler(svc port.IngestionService) *Handler {
 	return &Handler{svc: svc}
 }
 
-// RegisterRoutes registers the ingestion routes on the given mux.
+// RegisterRoutes registers the ingestion routes on the given mux by
+// looping over the Endpoints slice in endpoints.go — single source of
+// truth for runtime routing and OpenAPI generation.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /v1/ingestion/trigger", h.triggerScrape)
-	mux.HandleFunc("GET /v1/ingestion/status", h.getStatus)
+	api.Register(mux, Endpoints, map[string]http.HandlerFunc{
+		"POST /v1/ingestion/trigger": h.triggerScrape,
+		"GET /v1/ingestion/status":   h.getStatus,
+	})
 }
 
 func (h *Handler) triggerScrape(w http.ResponseWriter, r *http.Request) {

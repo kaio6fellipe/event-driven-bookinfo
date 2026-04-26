@@ -36,8 +36,6 @@ cqrs:
   endpoints:
     book-added:
       port: 12000
-      method: POST
-      endpoint: /v1/details
       triggers:
         - name: create-detail
           url: self
@@ -60,9 +58,6 @@ events:
     events:
       topic: bookinfo_details_events
       eventBusName: kafka
-      contentType: application/json
-      eventTypes:
-        - com.bookinfo.details.book-added
   consumed:
     raw-books-details:
       eventSourceName: ingestion-raw-books-details

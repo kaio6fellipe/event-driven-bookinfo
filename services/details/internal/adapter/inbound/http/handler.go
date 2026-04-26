@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/api"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/core/port"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/core/service"
@@ -23,9 +24,11 @@ func NewHandler(svc port.DetailService) *Handler {
 
 // RegisterRoutes registers the details routes on the given mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /v1/details", h.listDetails)
-	mux.HandleFunc("GET /v1/details/{id}", h.getDetail)
-	mux.HandleFunc("POST /v1/details", h.addDetail)
+	api.Register(mux, Endpoints, map[string]http.HandlerFunc{
+		"GET /v1/details":      h.listDetails,
+		"GET /v1/details/{id}": h.getDetail,
+		"POST /v1/details":     h.addDetail,
+	})
 }
 
 func (h *Handler) listDetails(w http.ResponseWriter, r *http.Request) {

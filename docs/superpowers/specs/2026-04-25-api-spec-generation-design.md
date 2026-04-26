@@ -349,3 +349,42 @@ Rollback granularity is one service's PR.
   YAML churn alongside Go changes. Acceptable trade-off — the alternative
   (gitignored specs) hides spec changes from review entirely, which works
   against the contract-as-source-of-truth goal.
+
+## Skipped: productpage
+
+`productpage` is the only service in this monorepo that does not
+participate in the generated API catalog. The decision is intentional:
+
+- **It is a BFF (HTML + HTMX), not a service-to-service API surface.**
+  The handlers under `services/productpage/internal/handler/` return
+  `text/html` for the user-facing pages and HTMX partials. The single
+  REST endpoint `GET /v1/products/{id}` is consumed by productpage's own
+  frontend (HTMX poll), not by other services in the system.
+- **Its layout does not match the discovery contract.** `tools/specgen`
+  walks `services/<svc>/internal/adapter/inbound/http/endpoints.go` and
+  `services/<svc>/internal/adapter/outbound/kafka/exposed.go`.
+  productpage uses a flat `internal/handler/` layout (no hex-arch
+  inbound/outbound split) and has no kafka producer, so neither slice
+  has a natural home there without restructuring the package.
+- **The Backstage event-catalog scaffolding template targets
+  cross-team integration use cases.** A team browsing the catalog and
+  clicking "configure to my service" wants to wire a *consumer* to one
+  of the events exposed elsewhere in the system. productpage exposes
+  none of the events the template cares about (no kafka producer); its
+  HTML responses are not actionable in that flow.
+- **Practical rollback path.** Anyone needing to surface productpage's
+  REST endpoint in Backstage can either (a) extend the specgen walker
+  to discover an alternative `endpoints.go` location and map
+  `text/html` operations to OpenAPI 3.1's `responses.<status>.content
+  ['text/html']` form, or (b) refactor productpage to the canonical
+  hex-arch layout and migrate it like the others. Neither is in scope
+  for the initial rollout.
+
+`productpage` therefore has no `services/productpage/api/` directory
+and no `deploy/productpage/values-generated.yaml`. The Makefile's dual-
+`-f` Helm install (`make k8s-deploy`) already short-circuits on missing
+`values-generated.yaml`, so productpage's install line falls back to
+the single `-f deploy/productpage/values-local.yaml` form transparently.
+The CI `specs-drift` job naturally ignores productpage because the
+runner's `DiscoverServices` only enumerates services that have one of
+the declarative slices.

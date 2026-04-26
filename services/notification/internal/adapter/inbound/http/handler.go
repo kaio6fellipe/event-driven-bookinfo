@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/api"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/notification/internal/core/domain"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/notification/internal/core/port"
@@ -22,11 +23,15 @@ func NewHandler(svc port.NotificationService) *Handler {
 	return &Handler{svc: svc}
 }
 
-// RegisterRoutes registers the notification routes on the given mux.
+// RegisterRoutes registers the notification routes on the given mux by
+// looping over the Endpoints slice in endpoints.go — single source of
+// truth for runtime routing and OpenAPI generation.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /v1/notifications", h.dispatch)
-	mux.HandleFunc("GET /v1/notifications/{id}", h.getByID)
-	mux.HandleFunc("GET /v1/notifications", h.listByRecipient)
+	api.Register(mux, Endpoints, map[string]http.HandlerFunc{
+		"POST /v1/notifications":     h.dispatch,
+		"GET /v1/notifications/{id}": h.getByID,
+		"GET /v1/notifications":      h.listByRecipient,
+	})
 }
 
 func (h *Handler) dispatch(w http.ResponseWriter, r *http.Request) {

@@ -13,21 +13,21 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 	"go.opentelemetry.io/otel/codes"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/core/domain"
 )
 
 const (
-	ceTypeRatingSubmitted = "com.bookinfo.ratings.rating-submitted"
-	ceSource              = "ratings"
-	ceVersion             = "1.0"
-
 	defaultPartitions        = 3
 	defaultReplicationFactor = 1
 )
 
-type submittedBody struct {
+// RatingSubmittedPayload is the marshaled Kafka record value for a
+// rating-submitted CloudEvent. Exported because the events.Descriptor in
+// exposed.go references it as a JSONSchema source for tools/specgen.
+type RatingSubmittedPayload struct {
 	ID             string `json:"id,omitempty"`
 	ProductID      string `json:"product_id"`
 	Reviewer       string `json:"reviewer"`
@@ -66,44 +66,41 @@ func NewProducerWithClient(client Client, topic string) *Producer {
 	return &Producer{client: client, topic: topic}
 }
 
-// PublishRatingSubmitted sends a rating-submitted CloudEvent to Kafka.
-func (p *Producer) PublishRatingSubmitted(ctx context.Context, evt domain.RatingSubmittedEvent) error {
+// Publish marshals payload to JSON, builds a CloudEvents-binary Kafka
+// record using the descriptor's CEType/CESource/Version, and produces it
+// to the producer's configured topic. recordKey is the partition key
+// (typically the natural-key field of payload, e.g. ProductID); when
+// empty, idempotencyKey is used as a fallback.
+func (p *Producer) Publish(ctx context.Context, d events.Descriptor, payload any, recordKey, idempotencyKey string) error {
 	logger := logging.FromContext(ctx)
 
-	body := submittedBody{
-		ID:             evt.ID,
-		ProductID:      evt.ProductID,
-		Reviewer:       evt.Reviewer,
-		Stars:          evt.Stars,
-		IdempotencyKey: evt.IdempotencyKey,
-	}
-	value, err := json.Marshal(body)
+	value, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("marshaling rating-submitted event: %w", err)
+		return fmt.Errorf("marshaling %s event: %w", d.Name, err)
 	}
 
-	recordKey := []byte(evt.ProductID)
-	if len(recordKey) == 0 {
-		recordKey = []byte(evt.IdempotencyKey)
+	keyBytes := []byte(recordKey)
+	if len(keyBytes) == 0 {
+		keyBytes = []byte(idempotencyKey)
 	}
 
 	now := time.Now().UTC()
 	record := &kgo.Record{
 		Topic: p.topic,
-		Key:   recordKey,
+		Key:   keyBytes,
 		Value: value,
 		Headers: []kgo.RecordHeader{
-			{Key: "ce_specversion", Value: []byte(ceVersion)},
-			{Key: "ce_type", Value: []byte(ceTypeRatingSubmitted)},
-			{Key: "ce_source", Value: []byte(ceSource)},
+			{Key: "ce_specversion", Value: []byte(d.Version)},
+			{Key: "ce_type", Value: []byte(d.CEType)},
+			{Key: "ce_source", Value: []byte(d.CESource)},
 			{Key: "ce_id", Value: []byte(uuid.New().String())},
 			{Key: "ce_time", Value: []byte(now.Format(time.RFC3339))},
-			{Key: "ce_subject", Value: []byte(evt.IdempotencyKey)},
-			{Key: "content-type", Value: []byte("application/json")},
+			{Key: "ce_subject", Value: []byte(recordKey)},
+			{Key: "content-type", Value: []byte(d.ContentType)},
 		},
 	}
 
-	ctx, span := telemetry.StartProducerSpan(ctx, p.topic, evt.IdempotencyKey)
+	ctx, span := telemetry.StartProducerSpan(ctx, p.topic, idempotencyKey)
 	defer span.End()
 
 	telemetry.InjectTraceContext(ctx, record)
@@ -115,8 +112,26 @@ func (p *Producer) PublishRatingSubmitted(ctx context.Context, evt domain.Rating
 		return fmt.Errorf("producing to Kafka: %w", err)
 	}
 
-	logger.Debug("published rating-submitted event", "topic", p.topic, "idempotency_key", evt.IdempotencyKey)
+	logger.Debug("published event",
+		"topic", p.topic,
+		"ce_type", d.CEType,
+		"idempotency_key", idempotencyKey,
+	)
 	return nil
+}
+
+// PublishRatingSubmitted sends a rating-submitted CloudEvent to Kafka.
+// Thin typed wrapper around Publish; the descriptor is the single source
+// of truth for CE headers (exposed.go).
+func (p *Producer) PublishRatingSubmitted(ctx context.Context, evt domain.RatingSubmittedEvent) error {
+	body := RatingSubmittedPayload{
+		ID:             evt.ID,
+		ProductID:      evt.ProductID,
+		Reviewer:       evt.Reviewer,
+		Stars:          evt.Stars,
+		IdempotencyKey: evt.IdempotencyKey,
+	}
+	return p.Publish(ctx, Exposed[0], body, evt.ProductID, evt.IdempotencyKey)
 }
 
 // Close flushes pending messages and closes the Kafka client.

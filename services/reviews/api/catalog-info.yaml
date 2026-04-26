@@ -2,22 +2,22 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: ratings
+  name: reviews
   annotations:
-    backstage.io/source-location: url:https://github.com/kaio6fellipe/event-driven-bookinfo/tree/main/services/ratings
+    backstage.io/source-location: url:https://github.com/kaio6fellipe/event-driven-bookinfo/tree/main/services/reviews
 spec:
   type: service
   lifecycle: experimental
   owner: bookinfo-team
   providesApis:
-    - ratings-rest
-    - ratings-events
+    - reviews-rest
+    - reviews-events
   consumesApis: []
 ---
 apiVersion: backstage.io/v1alpha1
 kind: API
 metadata:
-  name: ratings-rest
+  name: reviews-rest
 spec:
   type: openapi
   lifecycle: experimental
@@ -28,9 +28,9 @@ spec:
 apiVersion: backstage.io/v1alpha1
 kind: API
 metadata:
-  name: ratings-events
+  name: reviews-events
   annotations:
-    bookinfo.io/exposed-event-names: rating-submitted
+    bookinfo.io/exposed-event-names: review-submitted,review-deleted
 spec:
   type: asyncapi
   lifecycle: experimental

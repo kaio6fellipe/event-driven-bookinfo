@@ -69,13 +69,21 @@ func buildOperation(ep walker.EndpointInfo, schemas map[string]*jsonschema.Schem
 			return nil, fmt.Errorf("response schema for %s %s: %w", ep.Method, ep.Path, err)
 		}
 		schemas[ep.ResponseType.Obj().Name()] = s
+		ref := "#/components/schemas/" + ep.ResponseType.Obj().Name()
+		var responseSchema map[string]any
+		if ep.ResponseIsSlice {
+			responseSchema = map[string]any{
+				"type":  "array",
+				"items": map[string]any{"$ref": ref},
+			}
+		} else {
+			responseSchema = map[string]any{"$ref": ref}
+		}
 		responses[successStatus] = map[string]any{
 			"description": "success",
 			"content": map[string]any{
 				"application/json": map[string]any{
-					"schema": map[string]any{
-						"$ref": "#/components/schemas/" + ep.ResponseType.Obj().Name(),
-					},
+					"schema": responseSchema,
 				},
 			},
 		}

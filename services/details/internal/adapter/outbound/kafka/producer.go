@@ -13,22 +13,21 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 	"go.opentelemetry.io/otel/codes"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/core/domain"
 )
 
 const (
-	ceTypeBookAdded = "com.bookinfo.details.book-added"
-	ceSource        = "details"
-	ceVersion       = "1.0"
-
 	defaultPartitions        = 3
 	defaultReplicationFactor = 1
 )
 
-// bookAddedBody is the marshaled Kafka record value for a BookAddedEvent.
-type bookAddedBody struct {
+// BookAddedPayload is the marshaled Kafka record value for a book-added
+// CloudEvent. Exported because the events.Descriptor in exposed.go
+// references it as a JSONSchema source for tools/specgen.
+type BookAddedPayload struct {
 	ID             string `json:"id,omitempty"`
 	Title          string `json:"title"`
 	Author         string `json:"author"`
@@ -80,11 +79,64 @@ func NewProducerWithClient(client Client, topic string) *Producer {
 	return &Producer{client: client, topic: topic}
 }
 
-// PublishBookAdded sends a book-added CloudEvent to Kafka.
-func (p *Producer) PublishBookAdded(ctx context.Context, evt domain.BookAddedEvent) error {
+// Publish marshals payload to JSON, builds a CloudEvents-binary Kafka
+// record using the descriptor's CEType/CESource/Version, and produces it
+// to the producer's configured topic. recordKey is the partition key;
+// when empty, idempotencyKey is used as a fallback.
+func (p *Producer) Publish(ctx context.Context, d events.Descriptor, payload any, recordKey, idempotencyKey string) error {
 	logger := logging.FromContext(ctx)
 
-	body := bookAddedBody{
+	value, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshaling %s event: %w", d.Name, err)
+	}
+
+	keyBytes := []byte(recordKey)
+	if len(keyBytes) == 0 {
+		keyBytes = []byte(idempotencyKey)
+	}
+
+	now := time.Now().UTC()
+	record := &kgo.Record{
+		Topic: p.topic,
+		Key:   keyBytes,
+		Value: value,
+		Headers: []kgo.RecordHeader{
+			{Key: "ce_specversion", Value: []byte(d.Version)},
+			{Key: "ce_type", Value: []byte(d.CEType)},
+			{Key: "ce_source", Value: []byte(d.CESource)},
+			{Key: "ce_id", Value: []byte(uuid.New().String())},
+			{Key: "ce_time", Value: []byte(now.Format(time.RFC3339))},
+			{Key: "ce_subject", Value: []byte(recordKey)},
+			{Key: "content-type", Value: []byte(d.ContentType)},
+		},
+	}
+
+	ctx, span := telemetry.StartProducerSpan(ctx, p.topic, idempotencyKey)
+	defer span.End()
+
+	telemetry.InjectTraceContext(ctx, record)
+
+	results := p.client.ProduceSync(ctx, record)
+	if err := results.FirstErr(); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return fmt.Errorf("producing to Kafka: %w", err)
+	}
+
+	logger.Debug("published event",
+		"topic", p.topic,
+		"ce_type", d.CEType,
+		"idempotency_key", idempotencyKey,
+	)
+	return nil
+}
+
+// PublishBookAdded sends a book-added CloudEvent to Kafka.
+// Thin typed wrapper around Publish; the descriptor is the single source
+// of truth for CE headers (exposed.go).
+func (p *Producer) PublishBookAdded(ctx context.Context, evt domain.BookAddedEvent) error {
+	body := BookAddedPayload{
 		ID:             evt.ID,
 		Title:          evt.Title,
 		Author:         evt.Author,
@@ -97,42 +149,7 @@ func (p *Producer) PublishBookAdded(ctx context.Context, evt domain.BookAddedEve
 		ISBN13:         evt.ISBN13,
 		IdempotencyKey: evt.IdempotencyKey,
 	}
-
-	value, err := json.Marshal(body)
-	if err != nil {
-		return fmt.Errorf("marshaling book-added event: %w", err)
-	}
-
-	now := time.Now().UTC()
-	record := &kgo.Record{
-		Topic: p.topic,
-		Key:   []byte(evt.IdempotencyKey),
-		Value: value,
-		Headers: []kgo.RecordHeader{
-			{Key: "ce_specversion", Value: []byte(ceVersion)},
-			{Key: "ce_type", Value: []byte(ceTypeBookAdded)},
-			{Key: "ce_source", Value: []byte(ceSource)},
-			{Key: "ce_id", Value: []byte(uuid.New().String())},
-			{Key: "ce_time", Value: []byte(now.Format(time.RFC3339))},
-			{Key: "ce_subject", Value: []byte(evt.IdempotencyKey)},
-			{Key: "content-type", Value: []byte("application/json")},
-		},
-	}
-
-	ctx, span := telemetry.StartProducerSpan(ctx, p.topic, evt.IdempotencyKey)
-	defer span.End()
-
-	telemetry.InjectTraceContext(ctx, record)
-
-	results := p.client.ProduceSync(ctx, record)
-	if err := results.FirstErr(); err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		return fmt.Errorf("producing to Kafka: %w", err)
-	}
-
-	logger.Debug("published book-added event to Kafka", "topic", p.topic, "idempotency_key", evt.IdempotencyKey)
-	return nil
+	return p.Publish(ctx, Exposed[0], body, evt.IdempotencyKey, evt.IdempotencyKey)
 }
 
 // Close flushes pending messages and closes the Kafka client.

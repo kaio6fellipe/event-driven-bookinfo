@@ -18,7 +18,6 @@ events:
     raw-books-details:
       topic: raw_books_details
       eventBusName: kafka
-      contentType: application/json
 
 observability:
   otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"

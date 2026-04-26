@@ -15,6 +15,7 @@ type Descriptor struct {
 	ContentType string
 	Payload     any
 	Description string
+	Tags        []string
 }
 
 type ConsumedDescriptor struct {
@@ -46,5 +47,6 @@ var Exposed = []Descriptor{
 		ContentType: "application/json",
 		Payload:     ThingCreatedPayload{},
 		Description: "Emitted when a thing is created.",
+		Tags:        []string{"things"},
 	},
 }

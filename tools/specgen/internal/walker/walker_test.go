@@ -113,6 +113,12 @@ func TestLoadExposed_Fixture(t *testing.T) {
 	if d.PayloadType == nil || d.PayloadType.Obj().Name() != "ThingCreatedPayload" {
 		t.Errorf("PayloadType = %v, want ThingCreatedPayload", d.PayloadType)
 	}
+
+	// New: Tags is set on the fixture descriptor.
+	wantTags := []string{"things"}
+	if len(d.Tags) != 1 || d.Tags[0] != wantTags[0] {
+		t.Errorf("descriptor.Tags = %v, want %v", d.Tags, wantTags)
+	}
 }
 
 func TestLoadConsumed_Fixture(t *testing.T) {

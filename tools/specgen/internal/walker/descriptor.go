@@ -20,6 +20,7 @@ type DescriptorInfo struct {
 	ContentType string
 	Description string
 	PayloadType *types.Named
+	Tags        []string
 }
 
 // LoadExposed loads the package at moduleDir/<importPath> and returns its
@@ -263,6 +264,12 @@ func setDescriptorField(d *DescriptorInfo, pkg *packages.Package, fieldName stri
 			return fmt.Errorf("payload: %w", err)
 		}
 		d.PayloadType = t
+	case "Tags":
+		tags, err := stringSliceLit(value)
+		if err != nil {
+			return fmt.Errorf("tags: %w", err)
+		}
+		d.Tags = tags
 	}
 	return nil
 }

@@ -53,6 +53,10 @@ type Descriptor struct {
 
 	// Description is a human-readable summary surfaced in AsyncAPI.
 	Description string
+
+	// Tags is the AsyncAPI message/operation tags array. Leave empty/nil
+	// to default to [serviceName]. Set explicitly to override.
+	Tags []string
 }
 
 // ConsumedDescriptor describes one CloudEvent type a service consumes.

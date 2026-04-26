@@ -63,6 +63,9 @@ func buildOperation(ep walker.EndpointInfo, schemas map[string]*jsonschema.Schem
 	if ep.Method == http.MethodPost {
 		successStatus = strconv.Itoa(http.StatusCreated)
 	}
+	if ep.SuccessStatus != 0 {
+		successStatus = strconv.Itoa(ep.SuccessStatus)
+	}
 	if ep.ResponseType != nil {
 		s, err := jsonschema.SchemaFromType(ep.ResponseType)
 		if err != nil {

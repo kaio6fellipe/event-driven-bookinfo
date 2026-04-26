@@ -11,7 +11,10 @@ spec:
   owner: bookinfo-team
   providesApis:
     - notification-rest
-  consumesApis: []
+  consumesApis:
+    - details-events
+    - ratings-events
+    - reviews-events
 ---
 apiVersion: backstage.io/v1alpha1
 kind: API

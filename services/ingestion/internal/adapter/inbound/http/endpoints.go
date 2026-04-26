@@ -14,11 +14,12 @@ const APIVersion = "1.0.0"
 // loop, not by an HTTP handler.
 var Endpoints = []api.Endpoint{
 	{
-		Method:   "POST",
-		Path:     "/v1/ingestion/trigger",
-		Summary:  "Trigger a one-shot scrape (optionally overriding queries)",
-		Request:  TriggerRequest{},
-		Response: ScrapeResultResponse{},
+		Method:        "POST",
+		Path:          "/v1/ingestion/trigger",
+		Summary:       "Trigger a one-shot scrape (optionally overriding queries)",
+		SuccessStatus: 200,
+		Request:       TriggerRequest{},
+		Response:      ScrapeResultResponse{},
 		Errors: []api.ErrorResponse{
 			{Status: 400, Type: ErrorResponse{}},
 			{Status: 409, Type: ErrorResponse{}},

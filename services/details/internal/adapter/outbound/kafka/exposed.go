@@ -14,6 +14,7 @@ var Exposed = []events.Descriptor{
 	{
 		Name:        "book-added",
 		ExposureKey: "events",
+		Topic:       "bookinfo_details_events",
 		CEType:      "com.bookinfo.details.book-added",
 		CESource:    "details",
 		Version:     "1.0",

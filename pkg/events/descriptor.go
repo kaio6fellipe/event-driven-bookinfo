@@ -24,6 +24,13 @@ type Descriptor struct {
 	// to Name if empty.
 	ExposureKey string
 
+	// Topic is the wire-level Kafka topic name (e.g.
+	// "bookinfo_ratings_events"). Surfaced as the AsyncAPI channel
+	// address. When empty, ExposureKey (or Name) is used as a
+	// fallback so older services without an explicit Topic still
+	// generate a non-empty address.
+	Topic string
+
 	// CEType is the CloudEvents `type` attribute, e.g.
 	// "com.bookinfo.details.book-added".
 	CEType string
@@ -48,10 +55,51 @@ type Descriptor struct {
 	Description string
 }
 
+// ConsumedDescriptor describes one CloudEvent type a service consumes.
+// Surfaced in services/<svc>/api/catalog-info.yaml as a Backstage
+// 'consumesApis' relationship to the producing service's -events API.
+type ConsumedDescriptor struct {
+	// Name is the local logical identifier; matches the events.consumed.<key>
+	// in deploy/<svc>/values-local.yaml.
+	Name string
+
+	// SourceService is the producing service name (e.g. "details",
+	// "ingestion"). Used to build the consumesApis entry as
+	// "<SourceService>-events".
+	SourceService string
+
+	// SourceEventName is the Name field of the producer-side Descriptor
+	// this consumer subscribes to (e.g. "book-added"). Cross-references
+	// the producer for documentation and tooling.
+	SourceEventName string
+
+	// CEType is the cloudevents type the consumer's sensor filter matches
+	// on (e.g. "com.bookinfo.details.book-added"). Should equal the
+	// producer's Descriptor.CEType.
+	CEType string
+
+	// Description is a human-readable explanation of why this service
+	// consumes this event.
+	Description string
+}
+
 // ResolveExposureKey returns ExposureKey when set, falling back to Name.
 func (d Descriptor) ResolveExposureKey() string {
 	if d.ExposureKey != "" {
 		return d.ExposureKey
 	}
 	return d.Name
+}
+
+// Find returns the descriptor in s whose Name matches; panics if no
+// match is found. Use to pick a descriptor by name in a producer
+// wrapper instead of indexing Exposed by position (which is fragile
+// when the slice is appended to).
+func Find(s []Descriptor, name string) Descriptor {
+	for _, d := range s {
+		if d.Name == name {
+			return d
+		}
+	}
+	panic("events.Find: no descriptor with name " + name)
 }

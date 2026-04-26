@@ -5,6 +5,7 @@ package backstage
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -25,6 +26,10 @@ type Input struct {
 	// read for the bookinfo.io/exposed-event-names annotation.
 	ExposedSubset []walker.DescriptorInfo
 	ExposedNames  []string
+	// ConsumedSubset declares every CloudEvent type this service subscribes
+	// to. SourceService values are dedup'd and alphabetised to produce the
+	// consumesApis list in the Backstage Component spec.
+	ConsumedSubset []walker.ConsumedInfo
 }
 
 // Build returns the multi-document YAML bytes for a Backstage catalog-info.yaml.
@@ -103,7 +108,17 @@ func buildComponent(in Input) (*yaml.Node, error) {
 	}
 	yamlutil.AddMapping(spec, "providesApis", providesNode)
 
-	consumesNode, err := yamlutil.AnyToNode([]string{})
+	seen := map[string]bool{}
+	consumesApis := []string{}
+	for _, c := range in.ConsumedSubset {
+		api := c.SourceService + "-events"
+		if !seen[api] {
+			seen[api] = true
+			consumesApis = append(consumesApis, api)
+		}
+	}
+	sort.Strings(consumesApis)
+	consumesNode, err := yamlutil.AnyToNode(consumesApis)
 	if err != nil {
 		return nil, fmt.Errorf("converting consumesApis: %w", err)
 	}

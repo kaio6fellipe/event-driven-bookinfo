@@ -102,6 +102,7 @@ func generateOne(repoRoot string, svc Service) error {
 	var (
 		endpoints []walker.EndpointInfo
 		exposed   []walker.DescriptorInfo
+		consumed  []walker.ConsumedInfo
 		version   string
 	)
 
@@ -112,6 +113,12 @@ func generateOne(repoRoot string, svc Service) error {
 		}
 		endpoints = eps
 		version = ver
+
+		cs, err := walker.LoadConsumed(repoRoot, svc.HTTPPkg)
+		if err != nil {
+			return fmt.Errorf("loading consumed: %w", err)
+		}
+		consumed = cs
 
 		yamlBytes, err := openapi.Build(openapi.Input{
 			ServiceName: svc.Name,
@@ -152,13 +159,14 @@ func generateOne(repoRoot string, svc Service) error {
 		exposedNames[i] = d.Name
 	}
 	cBytes, err := backstage.Build(backstage.Input{
-		ServiceName:   svc.Name,
-		Owner:         "bookinfo-team",
-		RepoTreeURL:   "https://github.com/kaio6fellipe/event-driven-bookinfo/tree/main/services/" + svc.Name,
-		HasOpenAPI:    svc.HasHTTPPkg,
-		HasAsyncAPI:   svc.HasKafkaPkg,
-		ExposedNames:  exposedNames,
-		ExposedSubset: exposed,
+		ServiceName:    svc.Name,
+		Owner:          "bookinfo-team",
+		RepoTreeURL:    "https://github.com/kaio6fellipe/event-driven-bookinfo/tree/main/services/" + svc.Name,
+		HasOpenAPI:     svc.HasHTTPPkg,
+		HasAsyncAPI:    svc.HasKafkaPkg,
+		ExposedNames:   exposedNames,
+		ExposedSubset:  exposed,
+		ConsumedSubset: consumed,
 	})
 	if err != nil {
 		return fmt.Errorf("building catalog-info: %w", err)

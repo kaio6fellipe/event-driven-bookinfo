@@ -3,26 +3,15 @@ package kafka
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"strings"
-	"time"
-
-	"github.com/google/uuid"
-	"github.com/twmb/franz-go/pkg/kadm"
-	"github.com/twmb/franz-go/pkg/kgo"
-	"go.opentelemetry.io/otel/codes"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
-	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
-	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventskafka"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
 )
 
-const (
-	defaultPartitions        = 3
-	defaultReplicationFactor = 1
-)
+// Client re-exports eventskafka.Client so tests in this package can use
+// kafka.Client without importing pkg/eventskafka directly.
+type Client = eventskafka.Client
 
 // ReviewSubmittedPayload is the marshaled Kafka record value for a
 // review-submitted CloudEvent.
@@ -42,100 +31,25 @@ type ReviewDeletedPayload struct {
 	IdempotencyKey string `json:"idempotency_key"`
 }
 
-// Client abstracts the franz-go client for testing.
-type Client interface {
-	ProduceSync(ctx context.Context, rs ...*kgo.Record) kgo.ProduceResults
-	Close()
-}
-
-// Producer emits reviews domain events to Kafka.
+// Producer wraps eventskafka.Producer with service-specific typed
+// methods. The shared Publish, Close, and constructors come from the
+// embedded type.
 type Producer struct {
-	client Client
-	topic  string
+	*eventskafka.Producer
 }
 
-// NewProducer creates a real producer connecting to the brokers. Creates topic if missing.
+// NewProducer connects to the brokers and ensures the topic exists.
 func NewProducer(ctx context.Context, brokers, topic string) (*Producer, error) {
-	seeds := strings.Split(brokers, ",")
-	client, err := kgo.NewClient(kgo.SeedBrokers(seeds...), kgo.DefaultProduceTopic(topic))
+	inner, err := eventskafka.NewProducer(ctx, brokers, topic)
 	if err != nil {
-		return nil, fmt.Errorf("creating Kafka client: %w", err)
+		return nil, err
 	}
-	if err := ensureTopic(ctx, client, topic); err != nil {
-		client.Close()
-		return nil, fmt.Errorf("ensuring topic %q: %w", topic, err)
-	}
-	return &Producer{client: client, topic: topic}, nil
+	return &Producer{Producer: inner}, nil
 }
 
 // NewProducerWithClient creates a Producer with an injected client (for tests).
 func NewProducerWithClient(client Client, topic string) *Producer {
-	return &Producer{client: client, topic: topic}
-}
-
-// Publish sends a CloudEvent to Kafka using the given descriptor, payload,
-// record key, and idempotency key. The recordKey is used as the Kafka
-// partition key and ce_subject header; when empty, idempotencyKey is used
-// instead.
-func (p *Producer) Publish(ctx context.Context, d events.Descriptor, payload any, recordKey, idempotencyKey string) error {
-	logger := logging.FromContext(ctx)
-
-	value, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshaling %s event: %w", d.Name, err)
-	}
-
-	keyBytes := []byte(recordKey)
-	if len(keyBytes) == 0 {
-		keyBytes = []byte(idempotencyKey)
-	}
-
-	now := time.Now().UTC()
-	record := &kgo.Record{
-		Topic: p.topic,
-		Key:   keyBytes,
-		Value: value,
-		Headers: []kgo.RecordHeader{
-			{Key: "ce_specversion", Value: []byte(d.Version)},
-			{Key: "ce_type", Value: []byte(d.CEType)},
-			{Key: "ce_source", Value: []byte(d.CESource)},
-			{Key: "ce_id", Value: []byte(uuid.New().String())},
-			{Key: "ce_time", Value: []byte(now.Format(time.RFC3339))},
-			{Key: "ce_subject", Value: []byte(recordKey)},
-			{Key: "content-type", Value: []byte(d.ContentType)},
-		},
-	}
-
-	ctx, span := telemetry.StartProducerSpan(ctx, p.topic, idempotencyKey)
-	defer span.End()
-
-	telemetry.InjectTraceContext(ctx, record)
-
-	results := p.client.ProduceSync(ctx, record)
-	if err := results.FirstErr(); err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		return fmt.Errorf("producing to Kafka: %w", err)
-	}
-
-	logger.Debug("published event",
-		"topic", p.topic,
-		"ce_type", d.CEType,
-		"idempotency_key", idempotencyKey,
-	)
-	return nil
-}
-
-// descriptorFor returns the descriptor whose Name matches; panics if
-// Exposed is missing the named descriptor (drift between exposed.go
-// and the producer surfaces immediately).
-func descriptorFor(name string) events.Descriptor {
-	for _, d := range Exposed {
-		if d.Name == name {
-			return d
-		}
-	}
-	panic(fmt.Sprintf("kafka: no descriptor for event %q", name))
+	return &Producer{Producer: eventskafka.NewProducerWithClient(client, topic)}
 }
 
 // PublishReviewSubmitted sends a review-submitted CloudEvent to Kafka.
@@ -147,7 +61,7 @@ func (p *Producer) PublishReviewSubmitted(ctx context.Context, evt domain.Review
 		Text:           evt.Text,
 		IdempotencyKey: evt.IdempotencyKey,
 	}
-	return p.Publish(ctx, descriptorFor("review-submitted"), body, evt.ProductID, evt.IdempotencyKey)
+	return p.Publish(ctx, events.Find(Exposed, "review-submitted"), body, evt.ProductID, evt.IdempotencyKey)
 }
 
 // PublishReviewDeleted sends a review-deleted CloudEvent to Kafka.
@@ -157,26 +71,5 @@ func (p *Producer) PublishReviewDeleted(ctx context.Context, evt domain.ReviewDe
 		ProductID:      evt.ProductID,
 		IdempotencyKey: evt.IdempotencyKey,
 	}
-	return p.Publish(ctx, descriptorFor("review-deleted"), body, evt.ProductID, evt.IdempotencyKey)
-}
-
-// Close flushes and closes the underlying client.
-func (p *Producer) Close() { p.client.Close() }
-
-func ensureTopic(ctx context.Context, client *kgo.Client, topic string) error {
-	admin := kadm.NewClient(client)
-	resp, err := admin.CreateTopics(ctx, int32(defaultPartitions), int16(defaultReplicationFactor), nil, topic)
-	if err != nil {
-		return fmt.Errorf("creating topic: %w", err)
-	}
-	for _, t := range resp.Sorted() {
-		if t.Err != nil && t.ErrMessage != "" && !isTopicExistsError(t.ErrMessage) {
-			return fmt.Errorf("topic %q: %s", t.Topic, t.ErrMessage)
-		}
-	}
-	return nil
-}
-
-func isTopicExistsError(msg string) bool {
-	return strings.Contains(msg, "already exists") || strings.Contains(msg, "TOPIC_ALREADY_EXISTS")
+	return p.Publish(ctx, events.Find(Exposed, "review-deleted"), body, evt.ProductID, evt.IdempotencyKey)
 }

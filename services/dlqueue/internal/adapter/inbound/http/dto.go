@@ -70,11 +70,11 @@ type BatchResolveRequest struct {
 
 // BatchReplayRequest is the body of POST /v1/events/batch/replay.
 type BatchReplayRequest struct {
-	Status        string `json:"status"`
-	EventSource   string `json:"event_source"`
-	SensorName    string `json:"sensor_name"`
-	FailedTrigger string `json:"failed_trigger"`
-	Limit         int    `json:"limit"`
+	Status        string `json:"status,omitempty"`
+	EventSource   string `json:"event_source,omitempty"`
+	SensorName    string `json:"sensor_name,omitempty"`
+	FailedTrigger string `json:"failed_trigger,omitempty"`
+	Limit         int    `json:"limit,omitempty"`
 }
 
 // BatchActionResponse is the response body of batch endpoints.

@@ -69,6 +69,19 @@ func buildMessage(d walker.DescriptorInfo, schemas map[string]*jsonschema.Schema
 	return msgNode, nil
 }
 
+// channelAddress returns the wire-level Kafka topic name for the channel.
+// It prefers Topic from the first descriptor that has one set, falling back
+// to the ExposureKey so that older services without an explicit Topic still
+// produce a non-empty address.
+func channelAddress(group []walker.DescriptorInfo, exposureKey string) string {
+	for _, d := range group {
+		if d.Topic != "" {
+			return d.Topic
+		}
+	}
+	return exposureKey
+}
+
 // Build returns the YAML bytes of the AsyncAPI 3.0 document.
 func Build(in Input) ([]byte, error) {
 	// Group descriptors by ExposureKey (fall back to Name when ExposureKey is empty).
@@ -122,7 +135,7 @@ func Build(in Input) ([]byte, error) {
 		})
 
 		channelNode := yamlutil.Mapping()
-		yamlutil.AddScalar(channelNode, "address", key)
+		yamlutil.AddScalar(channelNode, "address", channelAddress(g.descriptors, key))
 
 		messagesNode := yamlutil.Mapping()
 		for _, d := range sortedDescs {

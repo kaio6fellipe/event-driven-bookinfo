@@ -14,7 +14,7 @@ paths:
               $ref: '#/components/schemas/CreateThingRequest'
         required: true
       responses:
-        "201":
+        "200":
           content:
             application/json:
               schema:
@@ -69,6 +69,12 @@ components:
     GetThingResponse:
       type: object
       properties:
+        created_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: string
+          format: date-time
         id:
           type: string
         name:
@@ -76,3 +82,4 @@ components:
       required:
         - id
         - name
+        - created_at

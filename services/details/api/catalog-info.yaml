@@ -12,7 +12,8 @@ spec:
   providesApis:
     - details-rest
     - details-events
-  consumesApis: []
+  consumesApis:
+    - ingestion-events
 ---
 apiVersion: backstage.io/v1alpha1
 kind: API

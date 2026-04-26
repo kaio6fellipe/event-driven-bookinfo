@@ -10,6 +10,7 @@ var Exposed = []events.Descriptor{
 	{
 		Name:        "rating-submitted",
 		ExposureKey: "events",
+		Topic:       "bookinfo_ratings_events",
 		CEType:      "com.bookinfo.ratings.rating-submitted",
 		CESource:    "ratings",
 		Version:     "1.0",

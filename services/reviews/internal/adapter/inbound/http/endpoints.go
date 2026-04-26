@@ -36,11 +36,12 @@ var Endpoints = []api.Endpoint{
 		},
 	},
 	{
-		Method:    "POST",
-		Path:      "/v1/reviews/delete",
-		Summary:   "Delete a review by ID (Sensor-routed command)",
-		EventName: "review-deleted",
-		Request:   DeleteReviewRequest{},
+		Method:        "POST",
+		Path:          "/v1/reviews/delete",
+		Summary:       "Delete a review by ID (Sensor-routed command)",
+		EventName:     "review-deleted",
+		SuccessStatus: 204,
+		Request:       DeleteReviewRequest{},
 		Errors: []api.ErrorResponse{
 			{Status: 400, Type: ErrorResponse{}},
 			{Status: 500, Type: ErrorResponse{}},

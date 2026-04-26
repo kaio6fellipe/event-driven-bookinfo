@@ -526,3 +526,158 @@ func TestPartialReviewsWithDeleting(t *testing.T) {
 		t.Errorf("expected HTMX polling trigger 'every 2s' in response")
 	}
 }
+
+func TestPartialRatingSubmit_ParseFormFails(t *testing.T) {
+	detailsURL, reviewsURL, ratingsURL := setupMockServers(t)
+
+	detailsClient := client.NewDetailsClient(detailsURL)
+	reviewsClient := client.NewReviewsClient(reviewsURL)
+	ratingsClient := client.NewRatingsClient(ratingsURL)
+
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, pending.NoopStore{}, templateDir(t))
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	// Body larger than the 1MB MaxBytesReader limit.
+	body := strings.Repeat("x", (1<<20)+1)
+	req := httptest.NewRequest(http.MethodPost, "/partials/rating", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusUnprocessableEntity)
+	}
+
+	if !strings.Contains(rec.Body.String(), "Invalid form data") {
+		t.Errorf("expected 'Invalid form data' in body, got:\n%s", rec.Body.String())
+	}
+}
+
+func TestPartialRatingSubmit_InvalidStars(t *testing.T) {
+	detailsURL, reviewsURL, ratingsURL := setupMockServers(t)
+
+	detailsClient := client.NewDetailsClient(detailsURL)
+	reviewsClient := client.NewReviewsClient(reviewsURL)
+	ratingsClient := client.NewRatingsClient(ratingsURL)
+
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, pending.NoopStore{}, templateDir(t))
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	formData := "product_id=product-1&reviewer=bob&stars=abc"
+	req := httptest.NewRequest(http.MethodPost, "/partials/rating", strings.NewReader(formData))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusUnprocessableEntity)
+	}
+
+	if !strings.Contains(rec.Body.String(), "Invalid stars value") {
+		t.Errorf("expected 'Invalid stars value' in body, got:\n%s", rec.Body.String())
+	}
+}
+
+func TestPartialRatingSubmit_RatingsServiceFails(t *testing.T) {
+	detailsURL, reviewsURL, _ := setupMockServers(t)
+
+	// Override the ratings server with one that always errors.
+	failingRatingsMux := http.NewServeMux()
+	failingRatingsMux.HandleFunc("POST /v1/ratings", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"ratings unavailable"}`))
+	})
+	failingRatingsServer := httptest.NewServer(failingRatingsMux)
+	t.Cleanup(failingRatingsServer.Close)
+
+	detailsClient := client.NewDetailsClient(detailsURL)
+	reviewsClient := client.NewReviewsClient(reviewsURL)
+	ratingsClient := client.NewRatingsClient(failingRatingsServer.URL)
+
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, pending.NoopStore{}, templateDir(t))
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	formData := "product_id=product-1&reviewer=bob&stars=5"
+	req := httptest.NewRequest(http.MethodPost, "/partials/rating", strings.NewReader(formData))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadGateway)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "Failed to submit:") {
+		t.Errorf("expected 'Failed to submit:' in body, got:\n%s", body)
+	}
+}
+
+func TestPartialRatingSubmit_ReviewSubmitFails(t *testing.T) {
+	detailsURL, _, _ := setupMockServers(t)
+
+	// Ratings succeeds.
+	okRatingsMux := http.NewServeMux()
+	okRatingsMux.HandleFunc("POST /v1/ratings", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":         "rating-1",
+			"product_id": "product-1",
+			"reviewer":   "bob",
+			"stars":      5,
+		})
+	})
+	okRatingsServer := httptest.NewServer(okRatingsMux)
+	t.Cleanup(okRatingsServer.Close)
+
+	// Reviews POST fails.
+	failingReviewsMux := http.NewServeMux()
+	failingReviewsMux.HandleFunc("GET /v1/reviews/{id}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"product_id": r.PathValue("id"),
+			"reviews":    []any{},
+			"pagination": map[string]any{"page": 1, "page_size": 10, "total_items": 0, "total_pages": 0},
+		})
+	})
+	failingReviewsMux.HandleFunc("POST /v1/reviews", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"reviews unavailable"}`))
+	})
+	failingReviewsServer := httptest.NewServer(failingReviewsMux)
+	t.Cleanup(failingReviewsServer.Close)
+
+	detailsClient := client.NewDetailsClient(detailsURL)
+	reviewsClient := client.NewReviewsClient(failingReviewsServer.URL)
+	ratingsClient := client.NewRatingsClient(okRatingsServer.URL)
+
+	h := handler.NewHandler(detailsClient, reviewsClient, ratingsClient, pending.NoopStore{}, templateDir(t))
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	formData := "product_id=product-1&reviewer=bob&stars=5&text=Great+book"
+	req := httptest.NewRequest(http.MethodPost, "/partials/rating", strings.NewReader(formData))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "Review submitted successfully!") {
+		t.Errorf("expected success banner in body, got:\n%s", body)
+	}
+	if !strings.Contains(body, "reviews service is unavailable") {
+		t.Errorf("expected ReviewWarning in body, got:\n%s", body)
+	}
+}

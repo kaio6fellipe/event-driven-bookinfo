@@ -377,8 +377,11 @@ k8s-deploy: ##@Kubernetes Build images, import to k3d, deploy apps + HTTPRoutes
 	@printf "$(BOLD)[4/4] Deploying services via Helm...$(NC)\n"
 	@for svc in $(SERVICES); do \
 		printf "  Installing $$svc...\n"; \
+		gen=""; \
+		[ -f deploy/$$svc/values-generated.yaml ] && gen="-f deploy/$$svc/values-generated.yaml"; \
 		$(HELM) upgrade --install $$svc charts/bookinfo-service \
 			--namespace $(K8S_NS_BOOKINFO) \
+			$$gen \
 			-f deploy/$$svc/values-local.yaml || exit 1; \
 	done
 	@printf "\n$(BOLD)Waiting for deployments...$(NC)\n"
@@ -426,8 +429,11 @@ k8s-rebuild: ##@Kubernetes Fast iteration: rebuild images, reimport, rollout res
 		k3d image import event-driven-bookinfo/$$svc:local -c $(K8S_CLUSTER) || exit 1; \
 	done
 	@for svc in $(SERVICES); do \
+		gen=""; \
+		[ -f deploy/$$svc/values-generated.yaml ] && gen="-f deploy/$$svc/values-generated.yaml"; \
 		$(HELM) upgrade --install $$svc charts/bookinfo-service \
 			--namespace $(K8S_NS_BOOKINFO) \
+			$$gen \
 			-f deploy/$$svc/values-local.yaml || exit 1; \
 	done
 	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write ingestion; do \
@@ -560,6 +566,30 @@ endif
 	helm template $(SERVICE) charts/bookinfo-service \
 		-f deploy/$(SERVICE)/values-local.yaml \
 		--namespace $(K8S_NS_BOOKINFO)
+
+# ─── API specs ─────────────────────────────────────────────────────────────
+
+SPECGEN_BIN := bin/specgen
+
+.PHONY: $(SPECGEN_BIN)
+$(SPECGEN_BIN):
+	@mkdir -p bin
+	@go build -o $(SPECGEN_BIN) ./tools/specgen
+
+.PHONY: generate-specs
+generate-specs: ##@Specs Regenerate openapi/asyncapi/catalog-info/values-generated for every service
+	@$(MAKE) --no-print-directory $(SPECGEN_BIN)
+	@$(SPECGEN_BIN) all --repo-root .
+
+.PHONY: lint-specs
+lint-specs: ##@Specs Run spectral against all generated specs
+	@$(MAKE) --no-print-directory $(SPECGEN_BIN)
+	@$(SPECGEN_BIN) lint --repo-root .
+
+.PHONY: diff-specs
+diff-specs: ##@Specs oasdiff for each OpenAPI spec vs origin/main; fails on breaking changes
+	@$(MAKE) --no-print-directory $(SPECGEN_BIN)
+	@$(SPECGEN_BIN) diff --repo-root .
 
 # ─── Help ───────────────────────────────────────────────────────────────────
 

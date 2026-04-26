@@ -309,3 +309,82 @@ jobs:
           fi
           git commit -m "chore(badges): update coverage [skip ci]"
           git push origin badges
+
+  specs-drift:
+    name: API specs drift
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: "1.26.2"
+
+      - name: Regenerate specs
+        run: make generate-specs
+
+      - name: Verify no drift
+        run: |
+          if ! git diff --exit-code; then
+            echo "::error::Generated specs are stale. Run 'make generate-specs' locally and commit the result."
+            exit 1
+          fi
+
+  specs-lint:
+    name: API specs lint
+    runs-on: ubuntu-latest
+    needs: specs-drift
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: "1.26.2"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4 # TODO(specgen): pin to commit SHA in a follow-up
+        with:
+          node-version: "20"
+
+      - name: Run spectral
+        run: make lint-specs
+
+  specs-breaking:
+    name: API specs breaking-change
+    runs-on: ubuntu-latest
+    needs: specs-drift
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: "1.26.2"
+
+      - name: Install oasdiff
+        run: go install github.com/oasdiff/oasdiff@latest
+
+      - name: Run oasdiff
+        run: |
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'breaking-change') }}" == "true" ]]; then
+            echo "PR labeled 'breaking-change' — running oasdiff in advisory mode."
+            make diff-specs || true
+          else
+            make diff-specs
+          fi

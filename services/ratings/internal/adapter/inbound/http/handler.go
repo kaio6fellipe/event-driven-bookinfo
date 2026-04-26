@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/api"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/core/port"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/core/service"
@@ -21,10 +22,14 @@ func NewHandler(svc port.RatingService) *Handler {
 	return &Handler{svc: svc}
 }
 
-// RegisterRoutes registers the ratings routes on the given mux.
+// RegisterRoutes registers the ratings routes on the given mux by looping
+// over the Endpoints slice declared in endpoints.go — single source of
+// truth for runtime routing and OpenAPI generation.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /v1/ratings/{id}", h.getProductRatings)
-	mux.HandleFunc("POST /v1/ratings", h.submitRating)
+	api.Register(mux, Endpoints, map[string]http.HandlerFunc{
+		"GET /v1/ratings/{id}": h.getProductRatings,
+		"POST /v1/ratings":     h.submitRating,
+	})
 }
 
 func (h *Handler) getProductRatings(w http.ResponseWriter, r *http.Request) {

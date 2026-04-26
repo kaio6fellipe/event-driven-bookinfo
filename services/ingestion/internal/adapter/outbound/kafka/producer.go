@@ -13,23 +13,23 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 	"go.opentelemetry.io/otel/codes"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/core/domain"
 )
 
 const (
-	ceType    = "com.bookinfo.ingestion.book-added"
-	ceSource  = "ingestion"
-	ceVersion = "1.0"
-
 	defaultPartitions        = 3
 	defaultReplicationFactor = 1
 )
 
-// bookEvent matches the details service AddDetailRequest DTO.
-// The sensor uses passthrough payload, so this must match what details-write expects.
-type bookEvent struct {
+// BookEvent is the marshaled Kafka record value for a book-added
+// CloudEvent. Its JSON shape matches details' AddDetailRequest, since
+// the details Sensor uses passthrough payload. Exported so the
+// events.Descriptor in exposed.go can reference it as a JSONSchema
+// source for tools/specgen.
+type BookEvent struct {
 	Title          string `json:"title"`
 	Author         string `json:"author"`
 	Year           int    `json:"year"`
@@ -80,47 +80,41 @@ func NewProducerWithClient(client Client, topic string) *Producer {
 	return &Producer{client: client, topic: topic}
 }
 
-// PublishBookAdded sends a book-added CloudEvent to Kafka.
-func (p *Producer) PublishBookAdded(ctx context.Context, book domain.Book) error {
+// Publish marshals payload to JSON, builds a CloudEvents-binary Kafka
+// record using the descriptor's CEType/CESource/Version, and produces it
+// to the producer's configured topic. recordKey is the partition key
+// (typically the natural-key field of payload, e.g. ISBN); when empty,
+// idempotencyKey is used as a fallback.
+func (p *Producer) Publish(ctx context.Context, d events.Descriptor, payload any, recordKey, idempotencyKey string) error {
 	logger := logging.FromContext(ctx)
 
-	isbn10, isbn13 := classifyISBN(book.ISBN)
-
-	evt := bookEvent{
-		Title:          book.Title,
-		Author:         strings.Join(book.Authors, ", "),
-		Year:           book.PublishYear,
-		Type:           "paperback",
-		Pages:          book.Pages,
-		Publisher:      book.Publisher,
-		Language:       book.Language,
-		ISBN10:         isbn10,
-		ISBN13:         isbn13,
-		IdempotencyKey: fmt.Sprintf("ingestion-isbn-%s", book.ISBN),
+	value, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshaling %s event: %w", d.Name, err)
 	}
 
-	value, err := json.Marshal(evt)
-	if err != nil {
-		return fmt.Errorf("marshaling book event: %w", err)
+	keyBytes := []byte(recordKey)
+	if len(keyBytes) == 0 {
+		keyBytes = []byte(idempotencyKey)
 	}
 
 	now := time.Now().UTC()
 	record := &kgo.Record{
 		Topic: p.topic,
-		Key:   []byte(book.ISBN),
+		Key:   keyBytes,
 		Value: value,
 		Headers: []kgo.RecordHeader{
-			{Key: "ce_specversion", Value: []byte(ceVersion)},
-			{Key: "ce_type", Value: []byte(ceType)},
-			{Key: "ce_source", Value: []byte(ceSource)},
+			{Key: "ce_specversion", Value: []byte(d.Version)},
+			{Key: "ce_type", Value: []byte(d.CEType)},
+			{Key: "ce_source", Value: []byte(d.CESource)},
 			{Key: "ce_id", Value: []byte(uuid.New().String())},
 			{Key: "ce_time", Value: []byte(now.Format(time.RFC3339))},
-			{Key: "ce_subject", Value: []byte(book.ISBN)},
-			{Key: "content-type", Value: []byte("application/json")},
+			{Key: "ce_subject", Value: []byte(idempotencyKey)},
+			{Key: "content-type", Value: []byte(d.ContentType)},
 		},
 	}
 
-	ctx, span := telemetry.StartProducerSpan(ctx, p.topic, book.ISBN)
+	ctx, span := telemetry.StartProducerSpan(ctx, p.topic, idempotencyKey)
 	defer span.End()
 
 	telemetry.InjectTraceContext(ctx, record)
@@ -132,8 +126,35 @@ func (p *Producer) PublishBookAdded(ctx context.Context, book domain.Book) error
 		return fmt.Errorf("producing to Kafka: %w", err)
 	}
 
-	logger.Debug("published book-added event to Kafka", "topic", p.topic, "isbn", book.ISBN)
+	logger.Debug("published event",
+		"topic", p.topic,
+		"ce_type", d.CEType,
+		"idempotency_key", idempotencyKey,
+	)
 	return nil
+}
+
+// PublishBookAdded sends a book-added CloudEvent to Kafka. Thin typed
+// wrapper around Publish; the descriptor is the single source of truth
+// for CE headers (exposed.go).
+func (p *Producer) PublishBookAdded(ctx context.Context, book domain.Book) error {
+	isbn10, isbn13 := classifyISBN(book.ISBN)
+	idempotencyKey := fmt.Sprintf("ingestion-isbn-%s", book.ISBN)
+
+	evt := BookEvent{
+		Title:          book.Title,
+		Author:         strings.Join(book.Authors, ", "),
+		Year:           book.PublishYear,
+		Type:           "paperback",
+		Pages:          book.Pages,
+		Publisher:      book.Publisher,
+		Language:       book.Language,
+		ISBN10:         isbn10,
+		ISBN13:         isbn13,
+		IdempotencyKey: idempotencyKey,
+	}
+
+	return p.Publish(ctx, Exposed[0], evt, book.ISBN, idempotencyKey)
 }
 
 // Close flushes pending messages and closes the Kafka client.

@@ -37,8 +37,6 @@ cqrs:
   endpoints:
     review-submitted:
       port: 12001
-      method: POST
-      endpoint: /v1/reviews
       triggers:
         - name: create-review
           url: self
@@ -46,8 +44,6 @@ cqrs:
             - passthrough
     review-deleted:
       port: 12003
-      method: POST
-      endpoint: /v1/reviews/delete
       triggers:
         - name: delete-review-write
           url: self
@@ -73,7 +69,3 @@ events:
     events:
       topic: bookinfo_reviews_events
       eventBusName: kafka
-      contentType: application/json
-      eventTypes:
-        - com.bookinfo.reviews.review-submitted
-        - com.bookinfo.reviews.review-deleted

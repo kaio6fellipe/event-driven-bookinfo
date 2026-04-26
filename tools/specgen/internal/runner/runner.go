@@ -26,8 +26,9 @@ type Service struct {
 
 const modulePath = "github.com/kaio6fellipe/event-driven-bookinfo"
 
-// DiscoverServices returns every directory under <repoRoot>/services/ that
-// contains either an http endpoints.go or a kafka exposed.go.
+// DiscoverServices returns every service under <repoRoot>/services/ that has
+// migrated: either internal/adapter/inbound/http/endpoints.go (HTTP) or
+// internal/adapter/outbound/kafka/exposed.go (Kafka) must exist.
 func DiscoverServices(repoRoot string) ([]Service, error) {
 	entries, err := os.ReadDir(filepath.Join(repoRoot, "services"))
 	if err != nil {
@@ -42,8 +43,8 @@ func DiscoverServices(repoRoot string) ([]Service, error) {
 		root := filepath.Join(repoRoot, "services", e.Name())
 		svc := Service{Name: e.Name(), Root: root}
 
-		httpDir := filepath.Join(root, "internal/adapter/inbound/http")
-		if _, err := os.Stat(httpDir); err == nil {
+		httpEndpoints := filepath.Join(root, "internal/adapter/inbound/http/endpoints.go")
+		if _, err := os.Stat(httpEndpoints); err == nil {
 			svc.HasHTTPPkg = true
 			svc.HTTPPkg = modulePath + "/services/" + e.Name() + "/internal/adapter/inbound/http"
 		}
@@ -60,19 +61,25 @@ func DiscoverServices(repoRoot string) ([]Service, error) {
 	return out, nil
 }
 
-// RunAll regenerates artifacts for every discovered service. Skips per-service
-// failures so a missing endpoints.go in one service doesn't block another.
+// RunAll regenerates artifacts for every discovered service. Per-service
+// failures are printed and accumulated; the function returns a sentinel error
+// if any service failed so the caller can exit non-zero.
 func RunAll(repoRoot string) error {
 	svcs, err := DiscoverServices(repoRoot)
 	if err != nil {
 		return err
 	}
+	var hadFailure bool
 	for _, s := range svcs {
 		if err := generateOne(repoRoot, s); err != nil {
 			fmt.Fprintf(os.Stderr, "specgen: %s SKIPPED: %v\n", s.Name, err)
+			hadFailure = true
 			continue
 		}
 		fmt.Printf("specgen: %s OK\n", s.Name)
+	}
+	if hadFailure {
+		return fmt.Errorf("one or more services failed (see SKIPPED messages above)")
 	}
 	return nil
 }
@@ -80,9 +87,11 @@ func RunAll(repoRoot string) error {
 // writeFile ensures the parent directory exists before writing, creating it
 // only on first actual write — so failed services leave no breadcrumbs.
 func writeFile(path string, data []byte) error {
+	// #nosec G301 -- generated artifact dirs need group/other read for tooling
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("creating directory for %s: %w", path, err)
 	}
+	// #nosec G306 -- generated artifact files need group/other read for tooling
 	return os.WriteFile(path, data, 0o644)
 }
 

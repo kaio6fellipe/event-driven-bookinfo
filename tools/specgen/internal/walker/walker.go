@@ -16,13 +16,14 @@ import (
 
 // EndpointInfo is the walker's view of one element in `var Endpoints []api.Endpoint`.
 type EndpointInfo struct {
-	Method       string
-	Path         string
-	Summary      string
-	EventName    string
-	RequestType  *types.Named // nil when omitted
-	ResponseType *types.Named // nil when omitted
-	Errors       []ErrorInfo
+	Method          string
+	Path            string
+	Summary         string
+	EventName       string
+	RequestType     *types.Named // nil when omitted
+	ResponseType    *types.Named // nil when omitted; holds element type when ResponseIsSlice is true
+	ResponseIsSlice bool         // true when the response is []NamedType (array of ResponseType)
+	Errors          []ErrorInfo
 }
 
 // ErrorInfo is the walker's view of an api.ErrorResponse element.

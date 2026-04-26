@@ -125,11 +125,12 @@ func setEndpointField(ep *EndpointInfo, pkg *packages.Package, fieldName string,
 		}
 		ep.RequestType = t
 	case "Response":
-		t, err := namedType(pkg, value)
+		named, isSlice, err := typeInfo(pkg, value)
 		if err != nil {
 			return fmt.Errorf("response: %w", err)
 		}
-		ep.ResponseType = t
+		ep.ResponseType = named
+		ep.ResponseIsSlice = isSlice
 	case "Errors":
 		errs, err := parseErrorSlice(pkg, value)
 		if err != nil {
@@ -213,4 +214,31 @@ func namedType(pkg *packages.Package, expr ast.Expr) (*types.Named, error) {
 		return nil, fmt.Errorf("composite literal type is not a named type")
 	}
 	return named, nil
+}
+
+// typeInfo resolves a composite literal to its named element type and whether
+// it represents a slice (e.g. `[]Foo{}`). Returns (named, isSlice, error).
+// For a plain struct literal `Foo{}`, isSlice is false.
+// For a slice literal `[]Foo{}`, isSlice is true and named is the element type.
+func typeInfo(pkg *packages.Package, expr ast.Expr) (*types.Named, bool, error) {
+	cl, ok := expr.(*ast.CompositeLit)
+	if !ok {
+		return nil, false, fmt.Errorf("not a composite literal")
+	}
+	tv, ok := pkg.TypesInfo.Types[cl]
+	if !ok {
+		return nil, false, fmt.Errorf("no type info for composite literal")
+	}
+	switch t := tv.Type.(type) {
+	case *types.Named:
+		return t, false, nil
+	case *types.Slice:
+		named, ok := t.Elem().(*types.Named)
+		if !ok {
+			return nil, false, fmt.Errorf("slice element type is not a named type")
+		}
+		return named, true, nil
+	default:
+		return nil, false, fmt.Errorf("composite literal type %T is not a named type or slice of named types", tv.Type)
+	}
 }

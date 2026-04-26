@@ -26,9 +26,6 @@ events:
     events:
       topic: bookinfo_ratings_events
       eventBusName: kafka
-      contentType: application/json
-      eventTypes:
-        - com.bookinfo.ratings.rating-submitted
 
 cqrs:
   enabled: true

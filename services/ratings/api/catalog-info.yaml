@@ -11,6 +11,7 @@ spec:
   owner: bookinfo-team
   providesApis:
     - ratings-rest
+    - ratings-events
   consumesApis: []
 ---
 apiVersion: backstage.io/v1alpha1
@@ -23,3 +24,16 @@ spec:
   owner: bookinfo-team
   definition:
     $text: ./openapi.yaml
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: ratings-events
+  annotations:
+    bookinfo.io/exposed-event-names: rating-submitted
+spec:
+  type: asyncapi
+  lifecycle: experimental
+  owner: bookinfo-team
+  definition:
+    $text: ./asyncapi.yaml

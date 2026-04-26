@@ -95,7 +95,7 @@ func (p *Producer) Publish(ctx context.Context, d events.Descriptor, payload any
 			{Key: "ce_source", Value: []byte(d.CESource)},
 			{Key: "ce_id", Value: []byte(uuid.New().String())},
 			{Key: "ce_time", Value: []byte(now.Format(time.RFC3339))},
-			{Key: "ce_subject", Value: []byte(idempotencyKey)},
+			{Key: "ce_subject", Value: []byte(recordKey)},
 			{Key: "content-type", Value: []byte(d.ContentType)},
 		},
 	}

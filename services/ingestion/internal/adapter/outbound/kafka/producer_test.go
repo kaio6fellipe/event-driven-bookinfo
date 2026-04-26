@@ -3,7 +3,6 @@ package kafka_test
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"testing"
 
@@ -117,9 +116,8 @@ func TestPublishBookAdded(t *testing.T) {
 			if headers["ce_specversion"] != "1.0" {
 				t.Errorf("ce_specversion = %q, want %q", headers["ce_specversion"], "1.0")
 			}
-			wantSubject := fmt.Sprintf("ingestion-isbn-%s", tt.wantKey)
-			if headers["ce_subject"] != wantSubject {
-				t.Errorf("ce_subject = %q, want %q", headers["ce_subject"], wantSubject)
+			if headers["ce_subject"] != tt.wantKey {
+				t.Errorf("ce_subject = %q, want %q", headers["ce_subject"], tt.wantKey)
 			}
 			if headers["content-type"] != "application/json" {
 				t.Errorf("content-type = %q, want %q", headers["content-type"], "application/json")

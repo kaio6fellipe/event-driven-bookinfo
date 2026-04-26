@@ -259,12 +259,6 @@ components:
           type: string
         status:
           type: string
-      required:
-        - status
-        - event_source
-        - sensor_name
-        - failed_trigger
-        - limit
     BatchResolveRequest:
       type: object
       properties:

@@ -5,6 +5,11 @@
         <strong>Review submitted successfully!</strong> You gave {{.Stars}} star{{if gt .Stars 1}}s{{end}}.
     </div>
 </div>
+{{if .ReviewWarning}}
+<div class="warning-banner" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.5rem; color: #fbbf24;">
+    {{.ReviewWarning}}
+</div>
+{{end}}
 {{if .ProductID}}
 <div hx-get="/partials/reviews/{{.ProductID}}"
      hx-trigger="load"

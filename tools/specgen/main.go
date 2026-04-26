@@ -14,11 +14,11 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"os"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/tools/specgen/internal/diff"
 	"github.com/kaio6fellipe/event-driven-bookinfo/tools/specgen/internal/lint"
 	"github.com/kaio6fellipe/event-driven-bookinfo/tools/specgen/internal/runner"
 )
@@ -83,4 +83,11 @@ func runLint(args []string) error {
 	}
 	return lint.Run(*repoRoot)
 }
-func runDiff(args []string) error { return errors.New("not implemented") }
+func runDiff(args []string) error {
+	fs := flag.NewFlagSet("diff", flag.ExitOnError)
+	repoRoot := fs.String("repo-root", ".", "repository root")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	return diff.Run(*repoRoot)
+}

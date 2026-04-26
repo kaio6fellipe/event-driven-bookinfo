@@ -49,6 +49,29 @@ func TestLoadEndpoints_Fixture(t *testing.T) {
 	if post.SuccessStatus != 200 {
 		t.Errorf("endpoints[1].SuccessStatus = %d, want 200", post.SuccessStatus)
 	}
+
+	// First endpoint (GET): new fields are zero/nil.
+	if get.OperationID != "" {
+		t.Errorf("endpoints[0].OperationID = %q, want empty", get.OperationID)
+	}
+	if get.Description != "" {
+		t.Errorf("endpoints[0].Description = %q, want empty", get.Description)
+	}
+	if get.Tags != nil {
+		t.Errorf("endpoints[0].Tags = %v, want nil", get.Tags)
+	}
+
+	// Second endpoint (POST): explicit overrides.
+	if post.OperationID != "createThing" {
+		t.Errorf("endpoints[1].OperationID = %q, want createThing", post.OperationID)
+	}
+	if post.Description != "Creates a new thing record and emits a thing-created event." {
+		t.Errorf("endpoints[1].Description = %q", post.Description)
+	}
+	wantTags := []string{"things", "v1"}
+	if len(post.Tags) != 2 || post.Tags[0] != wantTags[0] || post.Tags[1] != wantTags[1] {
+		t.Errorf("endpoints[1].Tags = %v, want %v", post.Tags, wantTags)
+	}
 }
 
 func TestLoadExposed_Fixture(t *testing.T) {

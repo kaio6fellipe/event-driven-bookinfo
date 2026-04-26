@@ -24,6 +24,13 @@ type Descriptor struct {
 	// to Name if empty.
 	ExposureKey string
 
+	// Topic is the wire-level Kafka topic name (e.g.
+	// "bookinfo_ratings_events"). Surfaced as the AsyncAPI channel
+	// address. When empty, ExposureKey (or Name) is used as a
+	// fallback so older services without an explicit Topic still
+	// generate a non-empty address.
+	Topic string
+
 	// CEType is the CloudEvents `type` attribute, e.g.
 	// "com.bookinfo.details.book-added".
 	CEType string

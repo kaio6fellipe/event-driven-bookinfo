@@ -13,6 +13,7 @@ import (
 type DescriptorInfo struct {
 	Name        string
 	ExposureKey string
+	Topic       string
 	CEType      string
 	CESource    string
 	Version     string
@@ -121,6 +122,8 @@ func setDescriptorStringField(d *DescriptorInfo, fieldName string, value ast.Exp
 		d.Name = s
 	case "ExposureKey":
 		d.ExposureKey = s
+	case "Topic":
+		d.Topic = s
 	case "CEType":
 		d.CEType = s
 	case "CESource":
@@ -137,7 +140,7 @@ func setDescriptorStringField(d *DescriptorInfo, fieldName string, value ast.Exp
 
 func setDescriptorField(d *DescriptorInfo, pkg *packages.Package, fieldName string, value ast.Expr) error {
 	switch fieldName {
-	case "Name", "ExposureKey", "CEType", "CESource", "Version", "ContentType", "Description":
+	case "Name", "ExposureKey", "Topic", "CEType", "CESource", "Version", "ContentType", "Description":
 		return setDescriptorStringField(d, fieldName, value)
 	case "Payload":
 		t, err := namedType(pkg, value)

@@ -269,7 +269,7 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB limit
 	if err := r.ParseForm(); err != nil {
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusUnprocessableEntity)
 		_ = h.templates.ExecuteTemplate(w, "rating-form.html", map[string]any{
 			"Success": false,
 			"Error":   "Invalid form data",
@@ -284,7 +284,7 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 
 	stars, err := strconv.Atoi(starsStr)
 	if err != nil {
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusUnprocessableEntity)
 		_ = h.templates.ExecuteTemplate(w, "rating-form.html", map[string]any{
 			"Success": false,
 			"Error":   "Invalid stars value",
@@ -297,7 +297,7 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 	_, err = h.ratingsClient.SubmitRating(r.Context(), productID, reviewer, stars, idempotencyKey)
 	if err != nil {
 		logger.Warn("failed to submit rating", "error", err)
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusBadGateway)
 		_ = h.templates.ExecuteTemplate(w, "rating-form.html", map[string]any{
 			"Success": false,
 			"Error":   err.Error(),
@@ -305,9 +305,11 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var reviewWarning string
 	if reviewText != "" {
 		if err := h.reviewsClient.SubmitReview(r.Context(), productID, reviewer, reviewText, idempotencyKey); err != nil {
 			logger.Warn("failed to submit review", "error", err)
+			reviewWarning = "Your rating was submitted; the reviews service is unavailable — please retry the review separately."
 		}
 
 		if err := h.pendingStore.StorePending(r.Context(), productID, pending.NewReview(reviewer, reviewText, stars)); err != nil {
@@ -317,9 +319,10 @@ func (h *Handler) partialRatingSubmit(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = h.templates.ExecuteTemplate(w, "rating-form.html", map[string]any{
-		"Success":   true,
-		"Stars":     stars,
-		"ProductID": productID,
+		"Success":       true,
+		"Stars":         stars,
+		"ProductID":     productID,
+		"ReviewWarning": reviewWarning,
 	})
 }
 

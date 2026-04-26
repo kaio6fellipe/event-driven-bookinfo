@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bookinfo — Product Page</title>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script>
+        // Treat 422 (validation errors) and 502 (upstream failure) as
+        // swap-eligible so the partialRatingSubmit handler's error
+        // template visibly replaces the form section. Other 4xx/5xx
+        // responses keep the default error behavior.
+        htmx.config.responseHandling = [
+            { code: '204', swap: false },
+            { code: '[23]..', swap: true },
+            { code: '422', swap: true },
+            { code: '502', swap: true },
+            { code: '[45]..', swap: false, error: true },
+            { code: '...', swap: false }
+        ];
+    </script>
     <style>
         :root {
             --bg: #0f1117;

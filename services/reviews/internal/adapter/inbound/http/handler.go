@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/api"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/port"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/service"
@@ -30,9 +31,11 @@ func NewHandler(svc port.ReviewService) *Handler {
 
 // RegisterRoutes registers the reviews routes on the given mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /v1/reviews/{id}", h.getProductReviews)
-	mux.HandleFunc("POST /v1/reviews", h.submitReview)
-	mux.HandleFunc("POST /v1/reviews/delete", h.deleteReview)
+	api.Register(mux, Endpoints, map[string]http.HandlerFunc{
+		"GET /v1/reviews/{id}":    h.getProductReviews,
+		"POST /v1/reviews":        h.submitReview,
+		"POST /v1/reviews/delete": h.deleteReview,
+	})
 }
 
 func (h *Handler) getProductReviews(w http.ResponseWriter, r *http.Request) {
@@ -121,9 +124,7 @@ func (h *Handler) submitReview(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) deleteReview(w http.ResponseWriter, r *http.Request) {
 	logger := logging.FromContext(r.Context())
 
-	var req struct {
-		ReviewID string `json:"review_id"`
-	}
+	var req DeleteReviewRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ReviewID == "" {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "review_id is required"})
 		return

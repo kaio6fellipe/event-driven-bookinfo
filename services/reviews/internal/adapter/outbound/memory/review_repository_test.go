@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/memory"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
@@ -91,5 +92,46 @@ func TestDeleteByID_NotFound(t *testing.T) {
 	err := repo.DeleteByID(context.Background(), "nonexistent-id")
 	if !errors.Is(err, domain.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestFindByProductID_OrdersNewestFirst(t *testing.T) {
+	repo := memory.NewReviewRepository()
+	now := time.Now().UTC()
+
+	saves := []struct {
+		id        string
+		reviewer  string
+		createdAt time.Time
+	}{
+		{id: "id-oldest", reviewer: "oldest", createdAt: now},
+		{id: "id-newest", reviewer: "newest", createdAt: now.Add(2 * time.Minute)},
+		{id: "id-middle", reviewer: "middle", createdAt: now.Add(1 * time.Minute)},
+	}
+	for _, s := range saves {
+		rev := domain.Review{
+			ID:        s.id,
+			ProductID: "product-1",
+			Reviewer:  s.reviewer,
+			Text:      "text",
+			CreatedAt: s.createdAt,
+		}
+		if err := repo.Save(context.Background(), &rev); err != nil {
+			t.Fatalf("saving %q: %v", s.id, err)
+		}
+	}
+
+	out, total, err := repo.FindByProductID(context.Background(), "product-1", 0, 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 3 {
+		t.Fatalf("total = %d, want 3", total)
+	}
+	want := []string{"newest", "middle", "oldest"}
+	for i, w := range want {
+		if out[i].Reviewer != w {
+			t.Errorf("out[%d].Reviewer = %q, want %q", i, out[i].Reviewer, w)
+		}
 	}
 }

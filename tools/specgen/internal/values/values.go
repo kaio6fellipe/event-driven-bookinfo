@@ -3,9 +3,9 @@
 //
 // It owns only the keys derived from spec:
 //   - cqrs.endpoints.<EventName>.{method, endpoint} for POST endpoints with an EventName
-//   - events.exposed.<ExposureKey>.{contentType, eventTypes} for Exposed descriptors
+//   - events.exposed.<ExposureKey>.{topic, contentType, eventTypes} for Exposed descriptors
 //
-// Everything else (port, topic, broker, replica count) stays in the
+// Everything else (port, broker, replica count) stays in the
 // hand-edited values-local.yaml, which is deep-merged with this file at
 // helm install time.
 package values
@@ -37,6 +37,7 @@ type cqrsEntry struct {
 
 // exposedGroup holds the aggregated fields for one events.exposed entry.
 type exposedGroup struct {
+	topic       string   // Topic shared by all descriptors in the group (enforced equal)
 	contentType string   // ContentType of the first descriptor (sorted by Name)
 	ceTypes     []string // Union of all CETypes in the group, sorted alphabetically
 }
@@ -75,10 +76,11 @@ func buildCQRSNode(endpoints []walker.EndpointInfo) *yaml.Node {
 }
 
 // buildExposedNode constructs the events: YAML mapping node from Exposed
-// descriptors. Returns nil when the slice is empty.
-func buildExposedNode(exposed []walker.DescriptorInfo) *yaml.Node {
+// descriptors. Returns nil, nil when the slice is empty.
+// Returns an error when descriptors sharing an ExposureKey disagree on Topic.
+func buildExposedNode(exposed []walker.DescriptorInfo) (*yaml.Node, error) {
 	if len(exposed) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Group descriptors by ExposureKey (fall back to Name when ExposureKey is empty).
@@ -99,7 +101,7 @@ func buildExposedNode(exposed []walker.DescriptorInfo) *yaml.Node {
 	}
 
 	// For each group, sort descriptors by Name so ContentType is deterministic
-	// (first by Name order), and sort CETypes alphabetically.
+	// (first by Name order), enforce Topic agreement, and sort CETypes alphabetically.
 	for key, g := range groupMap {
 		var descs []walker.DescriptorInfo
 		for _, d := range exposed {
@@ -115,7 +117,13 @@ func buildExposedNode(exposed []walker.DescriptorInfo) *yaml.Node {
 			return descs[i].Name < descs[j].Name
 		})
 		if len(descs) > 0 {
+			g.topic = descs[0].Topic
 			g.contentType = descs[0].ContentType
+		}
+		for _, d := range descs[1:] {
+			if d.Topic != g.topic {
+				return nil, fmt.Errorf("events.exposed.%s: descriptors disagree on Topic (%q vs %q)", key, g.topic, d.Topic)
+			}
 		}
 		sort.Strings(g.ceTypes)
 	}
@@ -126,6 +134,9 @@ func buildExposedNode(exposed []walker.DescriptorInfo) *yaml.Node {
 	for _, key := range groupOrder {
 		g := groupMap[key]
 		entryNode := yamlutil.Mapping()
+		if g.topic != "" {
+			yamlutil.AddScalar(entryNode, "topic", g.topic)
+		}
 		yamlutil.AddScalar(entryNode, "contentType", g.contentType)
 
 		seqNode := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
@@ -139,7 +150,7 @@ func buildExposedNode(exposed []walker.DescriptorInfo) *yaml.Node {
 	}
 	eventsNode := yamlutil.Mapping()
 	yamlutil.AddMapping(eventsNode, "exposed", exposedNode)
-	return eventsNode
+	return eventsNode, nil
 }
 
 // Build returns the YAML bytes of the values-generated.yaml document.
@@ -158,7 +169,11 @@ func Build(in Input) ([]byte, error) {
 		yamlutil.AddMapping(docNode, "cqrs", cqrsNode)
 	}
 
-	if eventsNode := buildExposedNode(in.Exposed); eventsNode != nil {
+	eventsNode, err := buildExposedNode(in.Exposed)
+	if err != nil {
+		return nil, fmt.Errorf("building events.exposed: %w", err)
+	}
+	if eventsNode != nil {
 		yamlutil.AddMapping(docNode, "events", eventsNode)
 	}
 

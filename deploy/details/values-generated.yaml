@@ -10,6 +10,7 @@ cqrs:
 events:
   exposed:
     events:
+      topic: bookinfo_details_events
       contentType: application/json
       eventTypes:
         - com.bookinfo.details.book-added

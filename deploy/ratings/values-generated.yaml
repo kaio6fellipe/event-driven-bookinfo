@@ -10,6 +10,7 @@ cqrs:
 events:
   exposed:
     events:
+      topic: bookinfo_ratings_events
       contentType: application/json
       eventTypes:
         - com.bookinfo.ratings.rating-submitted

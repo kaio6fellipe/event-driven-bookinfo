@@ -35,14 +35,6 @@ cqrs:
       requests:
         cpu: 50m
         memory: 64Mi
-  endpoints:
-    dlq-event-received:
-      port: 12004
-      triggers:
-        - name: ingest-dlq-event
-          url: self
-          payload:
-            - passthrough
 
 gateway:
   name: default-gw

@@ -47,7 +47,7 @@ events:
               dest: channel
       dlq:
         enabled: true
-        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/v1/events"
+        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"
     review-submitted:
       eventSourceName: reviews-events
       eventName: events
@@ -74,7 +74,7 @@ events:
               dest: channel
       dlq:
         enabled: true
-        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/v1/events"
+        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"
     review-deleted:
       eventSourceName: reviews-events
       eventName: events
@@ -101,7 +101,7 @@ events:
               dest: channel
       dlq:
         enabled: true
-        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/v1/events"
+        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"
     rating-submitted:
       eventSourceName: ratings-events
       eventName: events
@@ -128,4 +128,4 @@ events:
               dest: channel
       dlq:
         enabled: true
-        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/v1/events"
+        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"

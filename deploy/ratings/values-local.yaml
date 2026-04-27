@@ -22,10 +22,6 @@ observability:
 events:
   kafka:
     broker: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
-  exposed:
-    events:
-      topic: bookinfo_ratings_events
-      eventBusName: kafka
 
 cqrs:
   enabled: true
@@ -41,18 +37,10 @@ cqrs:
       requests:
         cpu: 50m
         memory: 64Mi
-  endpoints:
-    rating-submitted:
-      port: 12002
-      triggers:
-        - name: create-rating
-          url: self
-          payload:
-            - passthrough
 
 sensor:
   dlq:
-    url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/v1/events"
+    url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"
 
 gateway:
   name: default-gw

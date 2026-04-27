@@ -17,7 +17,7 @@ metadata:
   labels:
     {{- include "bookinfo-service.labels" . | nindent 4 }}
 spec:
-  eventBusName: {{ .Values.cqrs.eventBusName }}
+  eventBusName: {{ .Values.events.busName }}
   {{- with .Values.observability.otelEndpoint }}
   template:
     container:

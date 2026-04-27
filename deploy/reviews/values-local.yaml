@@ -34,28 +34,10 @@ cqrs:
       requests:
         cpu: 50m
         memory: 64Mi
-  endpoints:
-    review-submitted:
-      port: 12001
-      triggers:
-        - name: create-review
-          url: self
-          payload:
-            - passthrough
-    review-deleted:
-      port: 12003
-      triggers:
-        - name: delete-review-write
-          url: self
-          payload:
-            - src:
-                dependencyName: review-deleted-dep
-                dataKey: body.review_id
-              dest: review_id
 
 sensor:
   dlq:
-    url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/v1/events"
+    url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"
 
 gateway:
   name: default-gw
@@ -65,7 +47,3 @@ gateway:
 events:
   kafka:
     broker: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
-  exposed:
-    events:
-      topic: bookinfo_reviews_events
-      eventBusName: kafka

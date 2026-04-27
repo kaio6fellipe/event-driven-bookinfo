@@ -10,5 +10,5 @@ Write Service: {{ include "bookinfo-service.fullname" . }}-write.{{ .Release.Nam
 {{- end }}
 
 {{- range $eventName, $endpoint := .Values.cqrs.endpoints }}
-EventSource: {{ $eventName }} (port {{ $endpoint.port }}, {{ $endpoint.method }} {{ $endpoint.endpoint }})
+EventSource: {{ $eventName }} (port {{ $.Values.cqrs.eventSource.port }}, {{ $endpoint.method }} {{ $endpoint.endpoint }})
 {{- end }}

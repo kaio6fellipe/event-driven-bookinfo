@@ -13,6 +13,7 @@ cqrs:
 events:
   exposed:
     events:
+      topic: bookinfo_reviews_events
       contentType: application/json
       eventTypes:
         - com.bookinfo.reviews.review-deleted

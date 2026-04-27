@@ -1,12 +1,6 @@
 {{/* charts/bookinfo-service/templates/sensor.yaml */}}
-{{- $hasEndpoints := false }}
-{{- $endpointCount := 0 }}
-{{- range $_, $ep := .Values.cqrs.endpoints }}
-{{- if $ep.triggers }}
-{{- $hasEndpoints = true }}
-{{- $endpointCount = add $endpointCount 1 }}
-{{- end }}
-{{- end }}
+{{- $endpointCount := len .Values.cqrs.endpoints }}
+{{- $hasEndpoints := gt $endpointCount 0 }}
 {{- if $hasEndpoints }}
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -15,7 +9,7 @@ metadata:
   labels:
     {{- include "bookinfo-service.labels" . | nindent 4 }}
 spec:
-  eventBusName: {{ .Values.cqrs.eventBusName }}
+  eventBusName: {{ .Values.events.busName }}
   {{- with .Values.observability.otelEndpoint }}
   template:
     container:
@@ -33,7 +27,11 @@ spec:
     {{- end }}
   triggers:
     {{- range $eventName, $endpoint := $.Values.cqrs.endpoints }}
-    {{- range $trigger := $endpoint.triggers }}
+    {{- $triggers := $endpoint.triggers }}
+    {{- if not $triggers }}
+    {{- $triggers = list (dict "name" $eventName "url" "self" "payload" (list "passthrough")) }}
+    {{- end }}
+    {{- range $trigger := $triggers }}
     {{- /* Resolve trigger URL */ -}}
     {{- $triggerURL := $trigger.url }}
     {{- if eq $trigger.url "self" }}
@@ -90,7 +88,7 @@ spec:
         jitter: {{ $.Values.sensor.retryStrategy.jitter }}
       {{- /* Auto-generate DLQ trigger */ -}}
       {{- if $.Values.sensor.dlq.enabled }}
-      {{- $esURL := printf "http://%s-eventsource-svc.%s.svc.cluster.local:%v%s" $eventName $.Release.Namespace $endpoint.port $endpoint.endpoint }}
+      {{- $esURL := printf "http://%s-eventsource-svc.%s.svc.cluster.local:%v%s" $eventName $.Release.Namespace $.Values.cqrs.eventSource.port $endpoint.endpoint }}
       dlqTrigger:
         template:
           name: dlq-{{ $trigger.name }}

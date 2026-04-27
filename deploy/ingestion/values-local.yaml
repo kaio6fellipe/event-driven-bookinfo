@@ -14,10 +14,6 @@ config:
 events:
   kafka:
     broker: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
-  exposed:
-    raw-books-details:
-      topic: raw_books_details
-      eventBusName: kafka
 
 observability:
   otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"

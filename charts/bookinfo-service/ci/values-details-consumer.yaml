@@ -10,14 +10,8 @@ cqrs:
   enabled: true
   endpoints:
     book-added:
-      port: 12000
       method: POST
       endpoint: /v1/details
-      triggers:
-        - name: create-detail
-          url: self
-          payload:
-            - passthrough
 
 sensor:
   dlq:

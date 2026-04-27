@@ -33,18 +33,10 @@ cqrs:
       requests:
         cpu: 50m
         memory: 64Mi
-  endpoints:
-    book-added:
-      port: 12000
-      triggers:
-        - name: create-detail
-          url: self
-          payload:
-            - passthrough
 
 sensor:
   dlq:
-    url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/v1/events"
+    url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"
 
 gateway:
   name: default-gw
@@ -54,10 +46,6 @@ gateway:
 events:
   kafka:
     broker: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
-  exposed:
-    events:
-      topic: bookinfo_details_events
-      eventBusName: kafka
   consumed:
     raw-books-details:
       eventSourceName: ingestion-raw-books-details
@@ -71,4 +59,4 @@ events:
             - passthrough
       dlq:
         enabled: true
-        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12004/v1/events"
+        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"

@@ -91,7 +91,11 @@ cqrs:
   write:
     replicas: 1
     resources: {}
-  eventBusName: kafka
+  # -- Default port for webhook EventSource pods (Argo Events allows multiple
+  # webhooks on the same port within a single EventSource pod, and pods are
+  # isolated, so 12000 is reused across every CQRS endpoint).
+  eventSource:
+    port: 12000
   endpoints: {}
 
 # -- Sensor defaults
@@ -150,12 +154,14 @@ routes: []
 
 # -- Kafka event pipeline (independent of CQRS)
 events:
+  # -- Default Argo Events EventBus name. Used by EventSource (CQRS webhook),
+  # kafka EventSource (exposed events), and Sensor (CQRS + consumer).
+  busName: kafka
   kafka:
     broker: ""
   exposed: {}
     # event-name:
     #   topic: kafka_topic_name
-    #   eventBusName: kafka
     #   contentType: application/json
     #   eventTypes:                        # optional, rendered as bookinfo.io/emitted-ce-types annotation on the EventSource
     #     - com.bookinfo.<service>.<event>

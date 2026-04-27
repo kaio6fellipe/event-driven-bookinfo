@@ -218,7 +218,7 @@ For exposing one event:
 
 | Resource | Argo Events | Pub/Sub + Eventarc | Notes |
 |---|---|---|---|
-| Topic / stream | Kafka topic (Strimzi `KafkaTopic`) | Pub/Sub Topic (Crossplane `Topic`) | Equivalent at concept level |
+| Topic / stream | Kafka topic (auto-created by broker on first publish) | Pub/Sub Topic (Crossplane `Topic`) | Argo side has no provisioning artifact for the topic; GCP side does |
 | Bus bridge | Kafka EventSource CR | n/a | GCP has no equivalent construct |
 | Producer identity | Chart KSA (in-cluster) | GSA + IAM publisher binding + KSA annotation | |
 | Producer SDK | franz-go (Kafka client) | `cloud.google.com/go/pubsub` | |

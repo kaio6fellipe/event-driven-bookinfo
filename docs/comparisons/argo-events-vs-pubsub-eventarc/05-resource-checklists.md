@@ -177,12 +177,13 @@ Example: a new `inventory` service that polls an external API and publishes to a
 
 Helm values + chart-rendered cluster resources:
 
-- 1 Strimzi `KafkaTopic` for `bookinfo_inventory_events`.
 - 1 Kafka `EventSource` (`inventory-events`).
 - The service Deployment + Service (auto-created by the chart).
 - 1 chart-managed KSA (auto-created).
 
-**K8s objects added: 1 KafkaTopic + 1 EventSource + 1 Deployment + 1 Service + 1 ServiceAccount = 5.**
+The Kafka topic `bookinfo_inventory_events` is **not** provisioned as a CR — Strimzi's broker auto-creates it on first publish from franz-go.
+
+**K8s objects added: 1 EventSource + 1 Deployment + 1 Service + 1 ServiceAccount = 4.**
 
 ### Pub/Sub + Eventarc
 
@@ -200,6 +201,6 @@ In-cluster:
 
 **GCP-side objects added: 4.** **IAM bindings added: 1.** **K8s objects added: 3** (Deployment, Service, KSA — same as before, plus the annotation).
 
-**Delta:** argo: 5 K8s objects (1 messaging-related: KafkaTopic + EventSource = 2) / GCP: 4 GCP-side + 1 IAM + 3 K8s + KSA annotation.
+**Delta:** argo: 4 K8s objects (1 messaging-related: EventSource only) / GCP: 4 GCP-side + 1 IAM + 3 K8s + KSA annotation.
 
-The headline number — **+5 messaging-related objects on GCP vs +2 on argo for a fresh producer** — is the resource-burden gap that scales with producer count. For the four producers in the project today (details, reviews, ratings, ingestion), GCP would have provisioned **+12 extra GCP-side artifacts and +4 extra IAM bindings** that argo collapses into in-cluster RBAC.
+The headline number — **5 messaging-related objects on GCP (4 GCP-side + 1 IAM binding) vs 1 on argo for a fresh producer** — is the resource-burden gap that scales with producer count. For the four producers in the project today (details, reviews, ratings, ingestion), GCP would have provisioned **+12 extra GCP-side artifacts and +4 extra IAM bindings** that argo collapses into in-cluster RBAC, against the **4 Kafka EventSources** that already exist.

@@ -91,7 +91,7 @@ This is the opinionated section. Same operational changes, different resource co
 
 | Operational change | Argo Events | Pub/Sub + Eventarc |
 |---|---|---|
-| Expose a new event from a service | +1 Kafka EventSource (CR) — assumes Kafka topic already provisioned | +1 Topic + 1 GSA + 1 IAM publisher binding + 1 KSA annotation (4 GCP-side artifacts) |
+| Expose a new event from a service | +1 Kafka EventSource (CR); Kafka topic auto-creates on first publish | +1 Topic + 1 GSA + 1 IAM publisher binding + 1 KSA annotation (4 GCP-side artifacts) |
 | Consume one event with ce_type filter (existing consumer) | +1 dependency entry + 1 trigger entry on existing Sensor (0 new CRs) | +1 Subscription + 1 IAM subscriber binding + (if new identity) 1 GSA + 1 KSA annotation |
 | Fan-in 4 ce_types into one consumer | 1 Consumer Sensor with 4 dependencies (the current `notification-consumer-sensor`) | 4 Subscriptions, each with its own filter expression and IAM binding |
 | New CQRS write-path service with 1 endpoint | +1 webhook EventSource + 1 Sensor + the chart-rendered ClusterIP Service for the EventSource | +1 Topic + 1 Subscription + 1 GSA + 1 IAM subscriber binding + 1 KSA annotation; the publisher adapter side adds another GSA + IAM publisher binding |

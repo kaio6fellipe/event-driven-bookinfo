@@ -27,7 +27,7 @@ flowchart LR
 
 ingestion is the standout case: stateless, single Deployment (no CQRS split), no inbound HTTP at all — it polls and emits. The other three producers emit as a side effect of CQRS write handling.
 
-Per-producer cost: 1 Kafka topic (Strimzi `KafkaTopic`) + 1 Kafka EventSource (CR). The franz-go client does the work; no separate adapter needed.
+Per-producer cost: **1 Kafka EventSource (CR)**. The Kafka topic itself is not provisioned as a CR — Strimzi's broker auto-creates it on first publish from franz-go. No separate adapter needed.
 
 ## Alternative — Pub/Sub publish via SDK with Workload Identity
 
@@ -100,11 +100,11 @@ spec:
 
 | Resource | Argo Events | Pub/Sub + Eventarc | Notes |
 |---|---|---|---|
-| Stream object | Strimzi `KafkaTopic` | `Topic` (Pub/Sub) | 1:1 |
+| Stream object | Kafka topic (broker auto-creates on first publish; no CR provisioned) | `Topic` (Pub/Sub, Crossplane CR) | argo provisions nothing for the topic |
 | Bus bridge | Kafka EventSource CR | n/a | Removed |
 | Producer SDK | franz-go | `cloud.google.com/go/pubsub` | |
 | Producer identity | Chart KSA | GSA + WI binding + IAM publisher binding + KSA annotation | |
-| Total provisioned | 2 (KafkaTopic + EventSource) | 4 (Topic + GSA + IAMMember + WI binding) + 1 KSA annotation | argo: 2 / GCP: 4 + annotation |
+| Total provisioned | 1 (EventSource only) | 4 (Topic + GSA + IAMMember + WI binding) + 1 KSA annotation | argo: 1 / GCP: 4 + annotation |
 
 ## Tradeoffs
 

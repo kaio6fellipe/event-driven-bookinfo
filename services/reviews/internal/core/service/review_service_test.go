@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/memory"
@@ -225,5 +226,35 @@ func TestDeleteReview_PublishesEvent(t *testing.T) {
 	}
 	if pub.deleted[0].ReviewID != "rev_missing" {
 		t.Errorf("ReviewID = %q", pub.deleted[0].ReviewID)
+	}
+}
+
+func TestGetProductReviews_OrderedNewestFirst(t *testing.T) {
+	repo := memory.NewReviewRepository()
+	client := &stubRatingsClient{
+		data: &domain.RatingData{Average: 0, Count: 0, IndividualRatings: map[string]int{}},
+	}
+	svc := service.NewReviewService(repo, client, idempotency.NewMemoryStore(), &fakeReviewPublisher{})
+
+	ctx := context.Background()
+	for _, reviewer := range []string{"first", "second", "third"} {
+		if _, err := svc.SubmitReview(ctx, "product-1", reviewer, "text", ""); err != nil {
+			t.Fatalf("submitting %q: %v", reviewer, err)
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+
+	reviews, total, err := svc.GetProductReviews(ctx, "product-1", 1, 10)
+	if err != nil {
+		t.Fatalf("getting reviews: %v", err)
+	}
+	if total != 3 {
+		t.Fatalf("total = %d, want 3", total)
+	}
+	want := []string{"third", "second", "first"}
+	for i, w := range want {
+		if reviews[i].Reviewer != w {
+			t.Errorf("reviews[%d].Reviewer = %q, want %q", i, reviews[i].Reviewer, w)
+		}
 	}
 }

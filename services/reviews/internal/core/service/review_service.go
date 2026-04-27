@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
@@ -73,6 +74,7 @@ func (s *ReviewService) SubmitReview(ctx context.Context, productID, reviewer, t
 	if err != nil {
 		return nil, fmt.Errorf("creating review: %w", err)
 	}
+	review.CreatedAt = time.Now().UTC()
 
 	alreadyProcessed, err := s.idempotency.CheckAndRecord(ctx, key)
 	if err != nil {

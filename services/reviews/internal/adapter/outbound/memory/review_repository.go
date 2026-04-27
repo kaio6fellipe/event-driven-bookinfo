@@ -3,6 +3,7 @@ package memory
 
 import (
 	"context"
+	"sort"
 	"sync"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
@@ -34,9 +35,17 @@ func (r *ReviewRepository) FindByProductID(_ context.Context, productID string, 
 				ProductID: review.ProductID,
 				Reviewer:  review.Reviewer,
 				Text:      review.Text,
+				CreatedAt: review.CreatedAt,
 			})
 		}
 	}
+
+	sort.SliceStable(filtered, func(i, j int) bool {
+		if !filtered[i].CreatedAt.Equal(filtered[j].CreatedAt) {
+			return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
+		}
+		return filtered[i].ID < filtered[j].ID
+	})
 
 	total := len(filtered)
 

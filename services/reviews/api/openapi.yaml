@@ -152,6 +152,9 @@ components:
           items:
             type: object
             properties:
+              created_at:
+                type: string
+                format: date-time
               id:
                 type: string
               product_id:
@@ -181,6 +184,7 @@ components:
               - product_id
               - reviewer
               - text
+              - created_at
       required:
         - product_id
         - reviews
@@ -188,6 +192,9 @@ components:
     ReviewResponse:
       type: object
       properties:
+        created_at:
+          type: string
+          format: date-time
         id:
           type: string
         product_id:
@@ -217,6 +224,7 @@ components:
         - product_id
         - reviewer
         - text
+        - created_at
     SubmitReviewRequest:
       type: object
       properties:

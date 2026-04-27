@@ -1,6 +1,8 @@
 // Package http provides HTTP handlers and DTOs for the reviews service.
 package http //nolint:revive // package name matches directory convention
 
+import "time"
+
 // SubmitReviewRequest is the JSON body for POST /v1/reviews.
 type SubmitReviewRequest struct {
 	ProductID      string `json:"product_id"`
@@ -22,6 +24,7 @@ type ReviewResponse struct {
 	ProductID string                `json:"product_id"`
 	Reviewer  string                `json:"reviewer"`
 	Text      string                `json:"text"`
+	CreatedAt time.Time             `json:"created_at"`
 	Rating    *ReviewRatingResponse `json:"rating,omitempty"`
 }
 

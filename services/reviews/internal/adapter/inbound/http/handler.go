@@ -62,6 +62,7 @@ func (h *Handler) getProductReviews(w http.ResponseWriter, r *http.Request) {
 			ProductID: review.ProductID,
 			Reviewer:  review.Reviewer,
 			Text:      review.Text,
+			CreatedAt: review.CreatedAt,
 		}
 		if review.Rating != nil {
 			resp.Rating = &ReviewRatingResponse{
@@ -118,6 +119,7 @@ func (h *Handler) submitReview(w http.ResponseWriter, r *http.Request) {
 		ProductID: review.ProductID,
 		Reviewer:  review.Reviewer,
 		Text:      review.Text,
+		CreatedAt: review.CreatedAt,
 	})
 }
 

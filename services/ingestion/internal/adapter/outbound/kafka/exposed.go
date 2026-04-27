@@ -7,10 +7,11 @@ import "github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
 // same slice to derive services/ingestion/api/asyncapi.yaml and the
 // events.exposed block in deploy/ingestion/values-generated.yaml.
 //
-// ExposureKey "raw-books-details" matches the existing chart key in
-// deploy/ingestion/values-local.yaml — the EventSource bound to the
-// raw_books_details Kafka topic. The CE type is a logical content type
-// (book-added), but the Helm grouping key is the topic-derived name.
+// ExposureKey "raw-books-details" generates the
+// events.exposed.raw-books-details block — the EventSource bound to
+// the raw_books_details Kafka topic. The CE type is a logical content
+// type (book-added), but the Helm grouping key is the topic-derived
+// name.
 var Exposed = []events.Descriptor{
 	{
 		Name:        "book-added",

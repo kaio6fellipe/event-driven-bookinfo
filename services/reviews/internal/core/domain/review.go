@@ -4,6 +4,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -31,6 +32,7 @@ type Review struct {
 	ProductID string
 	Reviewer  string
 	Text      string
+	CreatedAt time.Time
 	Rating    *ReviewRating
 }
 

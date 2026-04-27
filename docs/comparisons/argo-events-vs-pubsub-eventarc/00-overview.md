@@ -65,6 +65,8 @@ flowchart LR
 | Dead-letter | Sensor `dlqTrigger` (HTTP) | Subscription `dead_letter_policy` → DLQ Topic | (in `Subscription` spec) + extra `Topic` |
 | Identity | KSA (chart-managed) | KSA → GSA via Workload Identity | `cloudplatform.gcp.upbound.io/v1beta1` `ServiceAccount` + `iam.gcp.upbound.io/v1beta1` `ServiceAccountIAMMember` |
 | Per-resource permission | RBAC on KSA | `IAMMember` (e.g. `roles/pubsub.publisher`, `roles/pubsub.subscriber`) | `pubsub.gcp.upbound.io/v1beta1` `TopicIAMMember` / `SubscriptionIAMMember` |
+| Event type discriminator (`ce_type`) | CloudEvents `ce_type` attribute — the Sensor dependency uses `filters.data.path: headers.ce_type` to match a specific event type (e.g. `com.bookinfo.details.book-added`) | Same CloudEvents attribute, surfaced as `attributes.ce_type` in Pub/Sub message attributes; Subscription `filter` expression matches on it | (in `Subscription` spec filter expression) |
+| Implicit delivery identity (Pub/Sub service agent) | n/a — in-cluster RBAC covers delivery | `service-<PROJECT_NUMBER>@gcp-sa-pubsub.iam.gserviceaccount.com` — a GCP-managed agent that re-publishes dead-lettered messages to the DLQ Topic; must hold `roles/pubsub.publisher` on the DLQ Topic | `pubsub.gcp.upbound.io/v1beta1` `TopicIAMMember` on the DLQ Topic |
 
 ## Macro tradeoff matrix
 

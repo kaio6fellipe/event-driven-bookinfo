@@ -14,11 +14,5 @@ cqrs:
   enabled: true
   endpoints:
     dlq-event-received:
-      port: 12004
       method: POST
       endpoint: /v1/events
-      triggers:
-        - name: ingest-dlq-event
-          url: self
-          payload:
-            - passthrough

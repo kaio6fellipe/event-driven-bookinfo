@@ -11,6 +11,6 @@ spec:
   selector:
     eventsource-name: {{ $eventName }}
   ports:
-    - port: {{ $endpoint.port }}
-      targetPort: {{ $endpoint.port }}
+    - port: {{ default $.Values.cqrs.eventSource.port $endpoint.port }}
+      targetPort: {{ default $.Values.cqrs.eventSource.port $endpoint.port }}
 {{- end }}

@@ -24,7 +24,7 @@ spec:
           method: {{ $endpoint.method }}
       backendRefs:
         - name: {{ $eventName }}-eventsource-svc
-          port: {{ $endpoint.port }}
+          port: {{ default $.Values.cqrs.eventSource.port $endpoint.port }}
       {{- if or $.Values.gateway.timeouts.request $.Values.gateway.timeouts.backendRequest }}
       timeouts:
         {{- with $.Values.gateway.timeouts.request }}

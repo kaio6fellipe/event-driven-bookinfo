@@ -8,7 +8,7 @@ metadata:
   labels:
     {{- include "bookinfo-service.labels" $ | nindent 4 }}
 spec:
-  eventBusName: {{ $.Values.cqrs.eventBusName }}
+  eventBusName: {{ default $.Values.events.busName $.Values.cqrs.eventBusName }}
   {{- with $.Values.observability.otelEndpoint }}
   template:
     container:
@@ -20,7 +20,7 @@ spec:
   {{- end }}
   webhook:
     {{ $eventName }}:
-      port: {{ $endpoint.port | quote }}
+      port: {{ default $.Values.cqrs.eventSource.port $endpoint.port | quote }}
       endpoint: {{ $endpoint.endpoint }}
       method: {{ $endpoint.method }}
 {{- end }}

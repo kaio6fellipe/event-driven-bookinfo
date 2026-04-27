@@ -12,7 +12,7 @@ metadata:
     bookinfo.io/emitted-ce-types: {{ join "," . | quote }}
   {{- end }}
 spec:
-  eventBusName: {{ default $.Values.events.busName $event.eventBusName }}
+  eventBusName: {{ $.Values.events.busName }}
   template:
     serviceAccountName: {{ include "bookinfo-service.serviceAccountName" $ }}
     {{- with $.Values.observability.otelEndpoint }}

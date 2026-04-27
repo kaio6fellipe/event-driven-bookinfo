@@ -9,7 +9,7 @@ metadata:
   labels:
     {{- include "bookinfo-service.labels" . | nindent 4 }}
 spec:
-  eventBusName: {{ default .Values.events.busName .Values.cqrs.eventBusName }}
+  eventBusName: {{ .Values.events.busName }}
   {{- with .Values.observability.otelEndpoint }}
   template:
     container:
@@ -88,8 +88,7 @@ spec:
         jitter: {{ $.Values.sensor.retryStrategy.jitter }}
       {{- /* Auto-generate DLQ trigger */ -}}
       {{- if $.Values.sensor.dlq.enabled }}
-      {{- $esPort := default $.Values.cqrs.eventSource.port $endpoint.port }}
-      {{- $esURL := printf "http://%s-eventsource-svc.%s.svc.cluster.local:%v%s" $eventName $.Release.Namespace $esPort $endpoint.endpoint }}
+      {{- $esURL := printf "http://%s-eventsource-svc.%s.svc.cluster.local:%v%s" $eventName $.Release.Namespace $.Values.cqrs.eventSource.port $endpoint.endpoint }}
       dlqTrigger:
         template:
           name: dlq-{{ $trigger.name }}

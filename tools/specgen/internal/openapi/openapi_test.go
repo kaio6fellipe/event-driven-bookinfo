@@ -20,6 +20,17 @@ func TestBuild_FixtureMatchesGolden(t *testing.T) {
 		ServiceName: "fixture",
 		Version:     version,
 		Endpoints:   endpoints,
+		Metadata: openapi.SpecMetadata{
+			OrgName:     "bookinfo-team",
+			OrgURL:      "https://github.com/kaio6fellipe/event-driven-bookinfo",
+			OrgEmail:    "noreply@bookinfo.local",
+			LicenseName: "Apache-2.0",
+			LicenseURL:  "https://www.apache.org/licenses/LICENSE-2.0",
+			OpenAPIServer: openapi.ServerEntry{
+				URL:         "http://localhost:8080",
+				Description: "Local k3d gateway",
+			},
+		},
 	})
 	if err != nil {
 		t.Fatalf("Build: %v", err)

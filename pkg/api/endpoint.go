@@ -22,9 +22,25 @@ import (
 // tools/specgen can resolve them via go/types and build JSONSchemas. Leave
 // nil when the operation has no body in that direction.
 type Endpoint struct {
-	Method    string // "GET" | "POST" | "PUT" | "DELETE" | etc.
-	Path      string // stdlib mux path with {param} placeholders
-	Summary   string // one-line OpenAPI summary
+	Method  string // "GET" | "POST" | "PUT" | "DELETE" | etc.
+	Path    string // stdlib mux path with {param} placeholders
+	Summary string // one-line OpenAPI summary
+
+	// OperationID is the OpenAPI operationId. Leave empty to auto-generate
+	// from method+path (e.g. "POST /v1/ratings" → "postV1Ratings"). When set,
+	// the explicit value wins.
+	OperationID string
+
+	// Description is the multi-line OpenAPI operation description. Leave
+	// empty to default to Summary. Set explicitly for richer text or when
+	// Summary is too terse.
+	Description string
+
+	// Tags is the OpenAPI operation tags array. Leave empty/nil to default
+	// to [serviceName]. Set explicitly to override (e.g. ["operations"] for
+	// admin endpoints, or [serviceName, "v1"] for versioned APIs).
+	Tags []string
+
 	EventName string // optional: when set on a POST, generates cqrs.endpoints.<EventName>
 	// SuccessStatus overrides the default success-response status code in
 	// the generated OpenAPI spec. Zero (the default) means "use the

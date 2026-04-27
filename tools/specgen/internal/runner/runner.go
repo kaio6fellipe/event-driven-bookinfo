@@ -124,6 +124,17 @@ func generateOne(repoRoot string, svc Service) error {
 			ServiceName: svc.Name,
 			Version:     version,
 			Endpoints:   endpoints,
+			Metadata: openapi.SpecMetadata{
+				OrgName:     Metadata.OrgName,
+				OrgURL:      Metadata.OrgURL,
+				OrgEmail:    Metadata.OrgEmail,
+				LicenseName: Metadata.LicenseName,
+				LicenseURL:  Metadata.LicenseURL,
+				OpenAPIServer: openapi.ServerEntry{
+					URL:         Metadata.OpenAPIServer.URL,
+					Description: Metadata.OpenAPIServer.Description,
+				},
+			},
 		})
 		if err != nil {
 			return fmt.Errorf("building OpenAPI: %w", err)
@@ -144,6 +155,17 @@ func generateOne(repoRoot string, svc Service) error {
 			ServiceName: svc.Name,
 			Version:     version, // ok if empty when only AsyncAPI side present
 			Exposed:     exposed,
+			Metadata: asyncapi.SpecMetadata{
+				OrgName:     Metadata.OrgName,
+				OrgURL:      Metadata.OrgURL,
+				OrgEmail:    Metadata.OrgEmail,
+				LicenseName: Metadata.LicenseName,
+				LicenseURL:  Metadata.LicenseURL,
+				AsyncAPIServer: asyncapi.ServerEntry{
+					URL:         Metadata.AsyncAPIServer.URL,
+					Description: Metadata.AsyncAPIServer.Description,
+				},
+			},
 		})
 		if err != nil {
 			return fmt.Errorf("building AsyncAPI: %w", err)

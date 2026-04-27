@@ -19,6 +19,9 @@ type EndpointInfo struct {
 	Method          string
 	Path            string
 	Summary         string
+	OperationID     string
+	Description     string
+	Tags            []string
 	EventName       string
 	SuccessStatus   int          // 0 means "use method default" (201 for POST, 200 otherwise)
 	RequestType     *types.Named // nil when omitted

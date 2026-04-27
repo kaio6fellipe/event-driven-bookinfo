@@ -6,6 +6,9 @@ type Endpoint struct {
 	Method        string
 	Path          string
 	Summary       string
+	OperationID   string
+	Description   string
+	Tags          []string
 	EventName     string
 	SuccessStatus int
 	Request       any
@@ -30,6 +33,9 @@ var Endpoints = []Endpoint{
 		Method:        "POST",
 		Path:          "/v1/things",
 		Summary:       "Create a thing",
+		OperationID:   "createThing",
+		Description:   "Creates a new thing record and emits a thing-created event.",
+		Tags:          []string{"things", "v1"},
 		EventName:     "thing-created",
 		SuccessStatus: 200,
 		Request:       CreateThingRequest{},

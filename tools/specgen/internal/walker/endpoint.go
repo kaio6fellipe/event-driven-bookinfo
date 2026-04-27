@@ -108,6 +108,10 @@ func setEndpointStringField(ep *EndpointInfo, fieldName string, value ast.Expr) 
 		ep.Path = s
 	case "Summary":
 		ep.Summary = s
+	case "OperationID":
+		ep.OperationID = s
+	case "Description":
+		ep.Description = s
 	case "EventName":
 		ep.EventName = s
 	}
@@ -116,8 +120,14 @@ func setEndpointStringField(ep *EndpointInfo, fieldName string, value ast.Expr) 
 
 func setEndpointField(ep *EndpointInfo, pkg *packages.Package, fieldName string, value ast.Expr) error {
 	switch fieldName {
-	case "Method", "Path", "Summary", "EventName":
+	case "Method", "Path", "Summary", "OperationID", "Description", "EventName":
 		return setEndpointStringField(ep, fieldName, value)
+	case "Tags":
+		tags, err := stringSliceLit(value)
+		if err != nil {
+			return fmt.Errorf("tags: %w", err)
+		}
+		ep.Tags = tags
 	case "SuccessStatus":
 		n, err := intLit(value)
 		if err != nil {
@@ -188,6 +198,23 @@ func parseErrorSlice(pkg *packages.Package, expr ast.Expr) ([]ErrorInfo, error) 
 			}
 		}
 		out = append(out, info)
+	}
+	return out, nil
+}
+
+// stringSliceLit unquotes a Go []string composite literal AST node.
+func stringSliceLit(expr ast.Expr) ([]string, error) {
+	cl, ok := expr.(*ast.CompositeLit)
+	if !ok {
+		return nil, fmt.Errorf("not a composite literal")
+	}
+	out := make([]string, 0, len(cl.Elts))
+	for i, elt := range cl.Elts {
+		s, err := stringLit(elt)
+		if err != nil {
+			return nil, fmt.Errorf("element %d: %w", i, err)
+		}
+		out = append(out, s)
 	}
 	return out, nil
 }

@@ -91,7 +91,6 @@ cqrs:
   write:
     replicas: 1
     resources: {}
-  eventBusName: kafka
   # -- Default port for webhook EventSource pods (Argo Events allows multiple
   # webhooks on the same port within a single EventSource pod, and pods are
   # isolated, so 12000 is reused across every CQRS endpoint).

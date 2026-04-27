@@ -59,7 +59,7 @@ flowchart LR
 | Stream / topic | Kafka topic | Pub/Sub Topic | `pubsub.gcp.upbound.io/v1beta1` `Topic` |
 | Producer-side bridge | `EventSource` (kafka type) | None — subscribers attach directly | n/a |
 | HTTP ingress for writes | `EventSource` (webhook type) | Eventarc generic HTTP source OR thin in-cluster publisher service | `eventarc.gcp.upbound.io/v1beta1` `Trigger` (Eventarc path) |
-| Routing logic | `Sensor` with `dependencies` and `triggers` | Subscription with `filter` + push endpoint, OR Eventarc `Trigger` | `pubsub.gcp.upbound.io/v1beta1` `Subscription` |
+| Routing logic | `Sensor` with `dependencies` and `triggers` | Pull-mode Subscription (with `filter` if needed) + Eventarc `Trigger` (`destination.gke`) — push subscriptions can't reach in-cluster services privately | `pubsub.gcp.upbound.io/v1beta1` `Subscription` + `eventarc.gcp.upbound.io/v1beta1` `Trigger` |
 | Filter on event metadata | Sensor `filters.data` (e.g. `headers.ce_type`) | Subscription `filter` expression on attributes | (in `Subscription` spec) |
 | Retry on delivery failure | Sensor `retryStrategy` | Subscription `retryPolicy` | (in `Subscription` spec) |
 | Dead-letter | Sensor `dlqTrigger` (HTTP) | Subscription `dead_letter_policy` → DLQ Topic | (in `Subscription` spec) + extra `Topic` |
@@ -78,7 +78,7 @@ flowchart LR
 | Identity model uniformity | One chart-managed KSA per service covers everything via in-cluster RBAC | Per-event GSA + IAM bindings + KSA annotation; per-subscription Pub/Sub identity | argo wins |
 | Schema enforcement | None at the bus layer | Pub/Sub Schemas (Avro / Protobuf) attachable to a Topic | GCP wins |
 | Replay model | Kafka offset replay or dlqueue-driven re-POST | Pub/Sub `seek` (timestamp / snapshot) + DLQ resubscribe | depends — see notes |
-| Latency profile | In-cluster Sensor → in-cluster service: low single-digit ms p50 | Pub/Sub push round-trip: tens of ms p50 to in-cluster GKE endpoint | argo wins |
+| Latency profile | In-cluster Sensor → in-cluster service: low single-digit ms p50 | Pub/Sub → Eventarc → GKE-internal forwarder → in-cluster service: tens of ms p50 | argo wins |
 | Cost model | Cluster compute for Kafka brokers + sensor pods (sunk capacity) | Per-message Pub/Sub + Eventarc fees; no broker compute | depends — see notes |
 | Vendor lock-in | None (CNCF projects + open-source brokers) | High (Pub/Sub + Eventarc are first-party GCP) | argo wins |
 | Observability story | OTel-instrumented sensors + EventSource span coverage; same stack as the rest of the cluster | Cloud Trace + Cloud Logging integration out of the box; correlating with in-cluster traces requires extra glue | depends — see notes |
@@ -92,10 +92,10 @@ This is the opinionated section. Same operational changes, different resource co
 | Operational change | Argo Events | Pub/Sub + Eventarc |
 |---|---|---|
 | Expose a new event from a service | +1 Kafka EventSource (CR); Kafka topic auto-creates on first publish | +1 Topic + 1 GSA + 1 IAM publisher binding + 1 KSA annotation (4 GCP-side artifacts) |
-| Consume one event with ce_type filter (existing consumer) | +1 dependency entry + 1 trigger entry on existing Sensor (0 new CRs) | +1 Subscription + 1 IAM subscriber binding + (if new identity) 1 GSA + 1 KSA annotation |
-| Fan-in 4 ce_types into one consumer | 1 Consumer Sensor with 4 dependencies (the current `notification-consumer-sensor`) | 4 Subscriptions, each with its own filter expression and IAM binding |
-| New CQRS write-path service with 1 endpoint | +1 webhook EventSource + 1 Sensor + the chart-rendered ClusterIP Service for the EventSource | +1 Topic + 1 Subscription + 1 GSA + 1 IAM subscriber binding + 1 KSA annotation; the publisher adapter side adds another GSA + IAM publisher binding |
-| Enable DLQ on a new consumer | 0 new resources — sensor `dlqTrigger` renders automatically when `sensor.dlq.enabled: true` | +1 DLQ Topic (or reuse one) + `dead_letter_policy` on the Subscription + 1 IAM binding granting Pub/Sub service agent publisher rights to the DLQ Topic |
+| Consume one event with ce_type filter (existing consumer) | +1 dependency entry + 1 trigger entry on existing Sensor (0 new CRs) | +1 Subscription (pull-mode, with filter) + 1 Eventarc Trigger (`destination.gke`) + 1 IAM subscriber binding + (if new identity) 1 GSA + 1 KSA annotation |
+| Fan-in 4 ce_types into one consumer | 1 Consumer Sensor with 4 dependencies (the current `notification-consumer-sensor`) | 4 Subscriptions + 4 Eventarc Triggers, each with its own filter expression and IAM binding |
+| New CQRS write-path service with 1 endpoint | +1 webhook EventSource + 1 Sensor + the chart-rendered ClusterIP Service for the EventSource | +1 Topic + 1 Eventarc Trigger (`destination.gke`) + 1 GSA + 1 WI binding + 1 KSA annotation; the publisher adapter side adds another GSA + IAM publisher binding |
+| Enable DLQ on a new consumer | 0 new resources — sensor `dlqTrigger` renders automatically when `sensor.dlq.enabled: true` | +`deadLetterPolicy` block on the consumer's Subscription (one-time per project: 1 DLQ Topic + 1 Eventarc Trigger from DLQ Topic to dlqueue-write + 1 IAM binding granting Pub/Sub service agent publisher rights to the DLQ Topic) |
 
 ## How to read this doc set
 

@@ -137,25 +137,35 @@ Fan-in cost: **1 Sensor CR with 4 dependencies and 4 triggers**. Adding a 5th ce
 
 The other consumer Sensor in the cluster, `details-consumer-sensor`, has 1 dependency (`ingestion-raw-books-details`, no ce_type filter) and is shown in [`04-ingestion-producer.md`](04-ingestion-producer.md).
 
-## Alternative — Per-ce_type push Subscriptions
+## Alternative — Per-ce_type Subscriptions delivered via Eventarc
 
-Pub/Sub Subscription `filter` expressions match on message attributes. To replicate the notification fan-in, you provision four push Subscriptions on the relevant Topics, each with a filter expression on `attributes.ce_type`.
+Pub/Sub push subscriptions deliver over the public internet — they cannot reach an in-cluster GKE service through the VPC. The supported pattern for internal delivery is **Eventarc** with `destination.gke`, which provisions a GKE-internal forwarder and routes traffic privately.
+
+Pub/Sub Subscription `filter` expressions still do the per-ce_type filtering, but the Subscription is **pull-mode only** (no `pushConfig`). An Eventarc Trigger references that Subscription via `transport.pubsub.subscriptionRef` and dispatches to the in-cluster service via its GKE destination.
+
+To replicate the notification fan-in: four Subscriptions (each with a ce_type filter) plus four Eventarc Triggers, each routing to `notification-write`.
 
 ```mermaid
 flowchart LR
-    DTopic(Pub/Sub Topic<br/>bookinfo-details-events) --> Sub1(Subscription<br/>filter: ce_type=book-added)
-    RTopic(Pub/Sub Topic<br/>bookinfo-reviews-events) --> Sub2(Subscription<br/>filter: ce_type=review-submitted)
-    RTopic --> Sub3(Subscription<br/>filter: ce_type=review-deleted)
-    ATopic(Pub/Sub Topic<br/>bookinfo-ratings-events) --> Sub4(Subscription<br/>filter: ce_type=rating-submitted)
-    Sub1 -->|HTTPS POST /v1/notifications| NW[notification-write]
-    Sub2 -->|HTTPS POST /v1/notifications| NW
-    Sub3 -->|HTTPS POST /v1/notifications| NW
-    Sub4 -->|HTTPS POST /v1/notifications| NW
+    DTopic(Pub/Sub Topic<br/>bookinfo-details-events) --> Sub1(Subscription<br/>filter: ce_type=book-added<br/>pull-mode)
+    RTopic(Pub/Sub Topic<br/>bookinfo-reviews-events) --> Sub2(Subscription<br/>filter: ce_type=review-submitted<br/>pull-mode)
+    RTopic --> Sub3(Subscription<br/>filter: ce_type=review-deleted<br/>pull-mode)
+    ATopic(Pub/Sub Topic<br/>bookinfo-ratings-events) --> Sub4(Subscription<br/>filter: ce_type=rating-submitted<br/>pull-mode)
+    Sub1 --> T1[[Eventarc Trigger<br/>destination.gke]]
+    Sub2 --> T2[[Eventarc Trigger<br/>destination.gke]]
+    Sub3 --> T3[[Eventarc Trigger<br/>destination.gke]]
+    Sub4 --> T4[[Eventarc Trigger<br/>destination.gke]]
+    T1 -->|GKE-internal HTTPS<br/>POST /v1/notifications| NW[notification-write]
+    T2 -->|GKE-internal HTTPS<br/>POST /v1/notifications| NW
+    T3 -->|GKE-internal HTTPS<br/>POST /v1/notifications| NW
+    T4 -->|GKE-internal HTTPS<br/>POST /v1/notifications| NW
 ```
 
-Fan-in cost: **4 Subscriptions** + **4 IAM `roles/pubsub.subscriber` bindings** + **1 GSA for the push delivery identity** + **1 KSA annotation**. Adding a 5th ce_type adds 1 Subscription + 1 IAM binding.
+Fan-in cost: **4 Subscriptions** + **4 Eventarc Triggers** + **4 IAM `roles/pubsub.subscriber` bindings** + **1 GSA for the Eventarc invoker identity** (with `roles/eventarc.eventReceiver`) + **1 KSA annotation**. Adding a 5th ce_type adds 1 Subscription + 1 Trigger + 1 IAM binding.
 
-### Crossplane resources (one Subscription example: book-added → notification)
+(One-time per cluster: the Eventarc GKE destination feature must be enabled and the in-cluster forwarder must be deployed. This is set up once per project/cluster, not per consumer.)
+
+### Crossplane resources (one Subscription + Eventarc Trigger example: book-added → notification)
 
 ```yaml
 # upbound/provider-gcp@v2.5.0
@@ -166,7 +176,7 @@ metadata:
 spec:
   forProvider:
     accountId: notification-subscriber
-    displayName: notification consumer identity
+    displayName: notification consumer / Eventarc invoker identity
   providerConfigRef:
     name: gcp-default
 ---
@@ -187,10 +197,7 @@ spec:
       deadLetterTopicRef:
         name: bookinfo-dlq
       maxDeliveryAttempts: 5
-    pushConfig:
-      pushEndpoint: https://notification-write.bookinfo.svc.cluster.local/v1/notifications
-      oidcToken:
-        serviceAccountEmail: notification-subscriber@<PROJECT_ID>.iam.gserviceaccount.com
+    # No pushConfig — pull-mode subscription consumed by Eventarc.
   providerConfigRef:
     name: gcp-default
 ---
@@ -206,11 +213,37 @@ spec:
     member: serviceAccount:notification-subscriber@<PROJECT_ID>.iam.gserviceaccount.com
   providerConfigRef:
     name: gcp-default
+---
+apiVersion: eventarc.gcp.upbound.io/v1beta1
+kind: Trigger
+metadata:
+  name: notification-book-added
+spec:
+  forProvider:
+    location: <REGION>
+    matchingCriteria:
+      - attribute: type
+        value: google.cloud.pubsub.topic.v1.messagePublished
+    transport:
+      pubsub:
+        subscriptionRef:
+          name: notification-book-added
+    destination:
+      gke:
+        cluster: bookinfo-cluster
+        location: <REGION>
+        namespace: bookinfo
+        service: notification-write
+        path: /v1/notifications
+    serviceAccountRef:
+      name: notification-subscriber
+  providerConfigRef:
+    name: gcp-default
 ```
 
-The remaining three ce_types (`review-submitted`, `review-deleted`, `rating-submitted`) each get a near-identical Subscription + binding pair. The GSA and DLQ Topic are reused.
+The remaining three ce_types (`review-submitted`, `review-deleted`, `rating-submitted`) each get a near-identical Subscription + IAMMember + Trigger trio. The GSA and DLQ Topic are reused across all four.
 
-The pushEndpoint shown is illustrative — Pub/Sub push to an in-cluster service requires either an internal-facing public hostname or the Eventarc GKE destination flavor. See [`01-cqrs.md`](01-cqrs.md) for the GKE-internal channel discussion.
+`destination.gke` routes traffic through Eventarc's GKE-internal forwarder — no public ingress, no public DNS. Filtering on `attributes.ce_type` happens at the Subscription layer (server-side) because Eventarc's `matchingCriteria` cannot inspect Pub/Sub message attributes; it only matches on the CloudEvent envelope's `type` (which is the same `messagePublished` value for every message on the topic).
 
 ## Side-by-side resources
 
@@ -228,15 +261,15 @@ For consuming one event with a ce_type filter:
 | Resource | Argo Events | Pub/Sub + Eventarc | Notes |
 |---|---|---|---|
 | Filter | Sensor `filters.data.path: headers.ce_type` (in-Sensor) | `Subscription.filter` expression on `attributes.ce_type` (managed-side) | |
-| Routing rule | Sensor dependency + trigger entry | Subscription with push config | |
-| Aggregation | One Sensor CR per consumer service, N dependencies | One Subscription per ce_type | argo collapses, GCP fans out |
-| Identity | Chart KSA | GSA + WI binding for push identity (OIDC) | |
-| IAM binding for delivery | n/a (in-cluster RBAC) | `roles/pubsub.subscriber` on Subscription | |
+| Routing rule | Sensor dependency + trigger entry | Pull-mode Subscription + Eventarc Trigger with `destination.gke` | Push-mode Pub/Sub can't reach in-cluster services privately |
+| Aggregation | One Sensor CR per consumer service, N dependencies | One Subscription + one Eventarc Trigger per ce_type | argo collapses, GCP fans out |
+| Identity | Chart KSA | GSA + WI binding for the Eventarc invoker (also `roles/eventarc.eventReceiver`) | |
+| IAM binding for delivery | n/a (in-cluster RBAC) | `roles/pubsub.subscriber` on Subscription (per ce_type) | |
 
 ## Tradeoffs
 
 - **Filter location matters for cost.** Argo's Sensor filter runs in-cluster after the message arrives at the EventBus, so unmatched messages still cross the bus. Pub/Sub's Subscription filter runs server-side — unmatched messages don't get delivered and don't cost ack/nack budget. For high-volume topics with low-match consumers, this is a real win for GCP.
-- **Subscription explosion vs Sensor multiplexing.** N ce_types in one consumer = 1 Argo Sensor or N Pub/Sub Subscriptions. The Sensor change is "add 2 YAML entries"; the Pub/Sub change is "add 1 Subscription + 1 IAM binding per ce_type". Adding a 5th notification ce_type today is ~5 lines of values change; on Pub/Sub it's a fresh Crossplane manifest.
+- **Subscription + Trigger explosion vs Sensor multiplexing.** N ce_types in one consumer = 1 Argo Sensor or N (Subscription + Eventarc Trigger) pairs on GCP. The Sensor change is "add 2 YAML entries"; the GCP change is "add 1 Subscription + 1 Eventarc Trigger + 1 IAM binding per ce_type". Adding a 5th notification ce_type today is ~5 lines of values change; on GCP it's three fresh Crossplane manifests.
 - **The Kafka EventSource bridge has no analogue.** This collapses a layer in the GCP design: producers publish straight to the Topic, consumers subscribe straight to the Topic. One less concept to learn, one less CR per producer.
 - **Pub/Sub `filter` expression syntax has limits.** No nested attribute paths, no string functions. The four current notification ce_types are exact matches and translate cleanly; if you ever need prefix matching (e.g. `ce_type starts_with "com.bookinfo.reviews."`), you'll need to either flatten the attribute set, fan out further, or filter app-side.
 

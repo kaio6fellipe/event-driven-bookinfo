@@ -174,10 +174,10 @@ resource counts in `05-resource-checklists.md` are reproducible.
 | EventBus (kafka) | None — Pub/Sub is the bus, no separate construct |
 | Webhook EventSource (CQRS write) | Either (a) thin in-cluster publisher Go service that accepts POST and calls `Topic.Publish()`, or (b) Eventarc generic HTTP source. Doc shows (a) as the primary design and (b) as alternative |
 | Kafka EventSource (`events.exposed` bridge) | None — subscribers attach directly to the Pub/Sub Topic |
-| CQRS Sensor | One Pub/Sub push Subscription per `cqrs.endpoints` entry, OR one Eventarc Trigger per endpoint. Push destination = `<svc>-write` ClusterIP via Service URL |
-| Consumer Sensor (with ce_type filter) | One push Subscription per ce_type with Subscription `filter` expression on `attributes.ce_type` |
+| CQRS Sensor | One Eventarc Trigger per `cqrs.endpoints` entry, with `transport.pubsub.topicRef` and `destination.gke` pointing at `<svc>-write`. Pub/Sub push subscriptions cannot reach in-cluster GKE services privately, so Eventarc is the supported delivery path |
+| Consumer Sensor (with ce_type filter) | One pull-mode Subscription per ce_type with `filter` expression on `attributes.ce_type`, paired with one Eventarc Trigger that consumes via `transport.pubsub.subscriptionRef` and delivers via `destination.gke` |
 | Sensor `retryStrategy` | Subscription `retryPolicy` (`minimumBackoff`, `maximumBackoff`) |
-| Sensor `dlqTrigger` | Subscription `dead_letter_policy` → DLQ Topic → second Subscription that pushes to dlqueue-write |
+| Sensor `dlqTrigger` | Subscription `dead_letter_policy` → DLQ Topic → Eventarc Trigger from DLQ Topic to dlqueue-write (`destination.gke`) |
 | Producer service publishes to Kafka | Producer service publishes to Pub/Sub Topic via Pub/Sub Go client; auth via Workload Identity |
 
 ### Resource accounting basis

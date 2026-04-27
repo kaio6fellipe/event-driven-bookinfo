@@ -83,12 +83,13 @@ The chart re-renders the existing `notification-consumer-sensor` with one more d
 
 ### Pub/Sub + Eventarc
 
-- 1 new `Subscription` on `bookinfo-reviews-events` with filter `attributes.ce_type = "com.bookinfo.reviews.review-edited"` + `pushConfig` to `notification-write` + `deadLetterPolicy` to the shared DLQ Topic.
-- 1 new `SubscriptionIAMMember` granting `roles/pubsub.subscriber` to the existing `notification-subscriber` GSA.
+- 1 new `Subscription` on `bookinfo-reviews-events` with filter `attributes.ce_type = "com.bookinfo.reviews.review-edited"` + `deadLetterPolicy` to the shared DLQ Topic. **Pull-mode** (no `pushConfig`) — Eventarc consumes it.
+- 1 new Eventarc `Trigger` referencing the Subscription (`transport.pubsub.subscriptionRef`) with `destination.gke` pointing at `notification-write`.
+- 1 new `SubscriptionIAMMember` granting `roles/pubsub.subscriber` to the existing `notification-subscriber` GSA (which is also the Trigger's invoker).
 
-**GCP-side objects added: 1.** **IAM bindings added: 1.**
+**GCP-side objects added: 2** (Subscription + Trigger). **IAM bindings added: 1.**
 
-**Delta:** argo +0 / GCP +1 + 1 IAM.
+**Delta:** argo +0 / GCP +2 + 1 IAM.
 
 ## Scenario C — New CQRS write-path service with 1 endpoint
 
@@ -121,7 +122,7 @@ Chart-rendered cluster resources:
 ### Pub/Sub + Eventarc
 
 - 1 `Topic` (`cqrs-wishlist-added`).
-- 1 `ServiceAccount` (GSA) for the wishlist-write push delivery identity.
+- 1 `ServiceAccount` (GSA) for the Eventarc invoker delivering to wishlist-write.
 - 1 `ServiceAccountIAMMember` (WI binding) for the new GSA + KSA pair.
 - 1 `Trigger` (Eventarc) targeting the GKE destination `wishlist-write` at path `/v1/wishlists`.
 - 1 publisher-adapter Service (in-cluster) OR Eventarc generic HTTP source for the inbound POST.

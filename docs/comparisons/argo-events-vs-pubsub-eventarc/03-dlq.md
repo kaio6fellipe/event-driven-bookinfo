@@ -26,22 +26,22 @@ Dedup key on the dlqueue side: `SHA-256(sensor_name + failed_trigger + payload)`
 
 Resource cost: **0 new resources per consumer** to enable DLQ. The trigger renders inside the existing Sensor.
 
-## Alternative — Subscription `dead_letter_policy`
+## Alternative — Subscription `dead_letter_policy` + Eventarc delivery
 
-GCP-native DLQ is configured per Subscription. After `maxDeliveryAttempts` failures (subject to `Subscription.retryPolicy`), the Pub/Sub service agent re-publishes the message to a designated DLQ Topic. A second Subscription on that Topic pushes to dlqueue-write.
+GCP-native DLQ is configured per Subscription. After `maxDeliveryAttempts` failures (subject to `Subscription.retryPolicy`), the Pub/Sub service agent re-publishes the message to a designated DLQ Topic. The DLQ Topic is then delivered to `dlqueue-write` via an Eventarc Trigger with `destination.gke` (Pub/Sub push subscriptions cannot reach in-cluster GKE services privately).
 
 ```mermaid
 flowchart LR
-    Topic(Source Topic) --> Sub(Push Subscription<br/>dead_letter_policy: dlq-events<br/>maxDeliveryAttempts: 5)
-    Sub -->|delivery success| Target[Target Service]
+    Topic(Source Topic) --> Sub(Subscription<br/>dead_letter_policy: dlq-events<br/>maxDeliveryAttempts: 5)
+    Sub -->|delivery success via Eventarc| Target[Target Service]
     Sub -.->|after 5 failed attempts| DLQT(DLQ Topic<br/>dlq-events)
-    DLQT --> DLQSub(Push Subscription<br/>dlq-events.dlqueue-write)
-    DLQSub -->|HTTPS POST /v1/events| DLQW[dlqueue-write]
+    DLQT --> DLQTrigger[[Eventarc Trigger<br/>destination.gke: dlqueue-write]]
+    DLQTrigger -->|GKE-internal HTTPS<br/>POST /v1/events| DLQW[dlqueue-write]
 ```
 
-Resource cost per consumer that wants DLQ enabled: 1 `dead_letter_policy` field on its Subscription + (one-time) 1 DLQ Topic + 1 Subscription on the DLQ Topic + IAM binding granting `roles/pubsub.publisher` on the DLQ Topic to the project's Pub/Sub service agent (`service-<project-number>@gcp-sa-pubsub.iam.gserviceaccount.com`).
+Resource cost per consumer that wants DLQ enabled: 1 `dead_letter_policy` field on its Subscription. One-time per project: 1 DLQ Topic + 1 Eventarc Trigger from the DLQ Topic to `dlqueue-write` + IAM binding granting `roles/pubsub.publisher` on the DLQ Topic to the project's Pub/Sub service agent (`service-<project-number>@gcp-sa-pubsub.iam.gserviceaccount.com`) + 1 GSA for the Eventarc invoker.
 
-### Crossplane resources (DLQ Topic + project-wide IAM)
+### Crossplane resources (DLQ Topic + project-wide IAM + Eventarc delivery)
 
 ```yaml
 # upbound/provider-gcp@v2.5.0
@@ -68,19 +68,40 @@ spec:
   providerConfigRef:
     name: gcp-default
 ---
-apiVersion: pubsub.gcp.upbound.io/v1beta1
-kind: Subscription
+apiVersion: cloudplatform.gcp.upbound.io/v1beta1
+kind: ServiceAccount
+metadata:
+  name: dlqueue-eventarc-invoker
+spec:
+  forProvider:
+    accountId: dlqueue-eventarc-invoker
+    displayName: Eventarc invoker for dlqueue-write
+  providerConfigRef:
+    name: gcp-default
+---
+apiVersion: eventarc.gcp.upbound.io/v1beta1
+kind: Trigger
 metadata:
   name: bookinfo-dlq-to-dlqueue
 spec:
   forProvider:
-    topicRef:
-      name: bookinfo-dlq
-    ackDeadlineSeconds: 30
-    pushConfig:
-      pushEndpoint: https://dlqueue-write.bookinfo.svc.cluster.local/v1/events
-      oidcToken:
-        serviceAccountEmail: dlqueue-subscriber@<PROJECT_ID>.iam.gserviceaccount.com
+    location: <REGION>
+    matchingCriteria:
+      - attribute: type
+        value: google.cloud.pubsub.topic.v1.messagePublished
+    transport:
+      pubsub:
+        topicRef:
+          name: bookinfo-dlq
+    destination:
+      gke:
+        cluster: bookinfo-cluster
+        location: <REGION>
+        namespace: bookinfo
+        service: dlqueue-write
+        path: /v1/events
+    serviceAccountRef:
+      name: dlqueue-eventarc-invoker
   providerConfigRef:
     name: gcp-default
 ```
@@ -102,7 +123,7 @@ spec:
 |---|---|---|
 | Per-consumer DLQ enablement | `sensor.dlq.enabled: true` (1 boolean, default true) | `deadLetterPolicy` block on each Subscription |
 | Shared DLQ destination | `dlq-event-received` EventSource (1 cluster-wide) | DLQ Topic (1 cluster-wide) |
-| DLQ delivery path | Sensor → EventSource → Bus → dlqueue-sensor → dlqueue-write | DLQ Topic → Subscription → dlqueue-write |
+| DLQ delivery path | Sensor → EventSource → Bus → dlqueue-sensor → dlqueue-write | DLQ Topic → Eventarc Trigger (`destination.gke`) → dlqueue-write |
 | Payload enrichment | Sensor adds `sensor_name`, `failed_trigger`, etc. via `payload` mapping | Pub/Sub forwards original message; metadata goes in attributes (`googclient_deliveryattempt`, original Subscription path) |
 | Per-Subscription IAM | n/a (in-cluster RBAC) | `roles/pubsub.publisher` for the Pub/Sub service agent on the DLQ Topic |
 

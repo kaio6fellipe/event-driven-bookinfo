@@ -23,6 +23,7 @@ func TestBuild_FixtureMatchesGolden(t *testing.T) {
 		Metadata: asyncapi.SpecMetadata{
 			OrgName:     "bookinfo-team",
 			OrgURL:      "https://github.com/kaio6fellipe/event-driven-bookinfo",
+			OrgEmail:    "noreply@bookinfo.local",
 			LicenseName: "Apache-2.0",
 			LicenseURL:  "https://www.apache.org/licenses/LICENSE-2.0",
 			AsyncAPIServer: asyncapi.ServerEntry{

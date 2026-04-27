@@ -8,9 +8,12 @@ info:
   contact:
     name: bookinfo-team
     url: https://github.com/kaio6fellipe/event-driven-bookinfo
+    email: noreply@bookinfo.local
   license:
     name: Apache-2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
+  tags:
+    - name: things
 servers:
   kafka:
     host: bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092

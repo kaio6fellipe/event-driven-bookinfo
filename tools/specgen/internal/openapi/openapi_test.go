@@ -23,6 +23,7 @@ func TestBuild_FixtureMatchesGolden(t *testing.T) {
 		Metadata: openapi.SpecMetadata{
 			OrgName:     "bookinfo-team",
 			OrgURL:      "https://github.com/kaio6fellipe/event-driven-bookinfo",
+			OrgEmail:    "noreply@bookinfo.local",
 			LicenseName: "Apache-2.0",
 			LicenseURL:  "https://www.apache.org/licenses/LICENSE-2.0",
 			OpenAPIServer: openapi.ServerEntry{

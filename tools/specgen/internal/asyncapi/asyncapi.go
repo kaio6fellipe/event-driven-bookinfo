@@ -26,6 +26,7 @@ type Input struct {
 type SpecMetadata struct {
 	OrgName        string
 	OrgURL         string
+	OrgEmail       string
 	LicenseName    string
 	LicenseURL     string
 	AsyncAPIServer ServerEntry
@@ -35,6 +36,12 @@ type SpecMetadata struct {
 type ServerEntry struct {
 	URL         string
 	Description string
+}
+
+// groupEntry groups descriptors sharing the same ExposureKey.
+type groupEntry struct {
+	key         string
+	descriptors []walker.DescriptorInfo
 }
 
 // buildMessage constructs the components.messages node for a single descriptor
@@ -178,14 +185,82 @@ func channelAddress(group []walker.DescriptorInfo, exposureKey string) string {
 	return exposureKey
 }
 
+// buildChannelsNode builds the channels mapping from ordered groups.
+func buildChannelsNode(groupOrder []string, groupMap map[string]*groupEntry) (*yaml.Node, error) {
+	channelsNode := yamlutil.Mapping()
+	for _, key := range groupOrder {
+		g := groupMap[key]
+		sortedDescs := make([]walker.DescriptorInfo, len(g.descriptors))
+		copy(sortedDescs, g.descriptors)
+		sort.Slice(sortedDescs, func(i, j int) bool {
+			return sortedDescs[i].Name < sortedDescs[j].Name
+		})
+
+		channelNode := yamlutil.Mapping()
+		yamlutil.AddScalar(channelNode, "address", channelAddress(g.descriptors, key))
+
+		messagesNode := yamlutil.Mapping()
+		for _, d := range sortedDescs {
+			msgRefNode := yamlutil.Mapping()
+			yamlutil.AddScalar(msgRefNode, "$ref", "#/components/messages/"+d.Name)
+			yamlutil.AddMapping(messagesNode, d.Name, msgRefNode)
+		}
+		yamlutil.AddMapping(channelNode, "messages", messagesNode)
+		yamlutil.AddMapping(channelsNode, key, channelNode)
+	}
+	return channelsNode, nil
+}
+
+// buildOperationsNode builds the operations mapping from ordered groups.
+func buildOperationsNode(groupOrder []string, groupMap map[string]*groupEntry, serviceName string) (*yaml.Node, error) {
+	operationsNode := yamlutil.Mapping()
+	for _, key := range groupOrder {
+		opTags := []string{serviceName}
+		if g := groupMap[key]; g != nil && len(g.descriptors) > 0 && len(g.descriptors[0].Tags) > 0 {
+			opTags = g.descriptors[0].Tags
+		}
+		opNode, err := buildOperationNode(key, serviceName, opTags)
+		if err != nil {
+			return nil, err
+		}
+		yamlutil.AddMapping(operationsNode, "send_"+key, opNode)
+	}
+	return operationsNode, nil
+}
+
+// buildInfoTagsNode returns a YAML sequence node of {name: tag} objects for all
+// unique tag names in exposed descriptors (sorted alphabetically). Returns nil
+// when the slice is empty so the caller can skip emitting the field.
+func buildInfoTagsNode(exposed []walker.DescriptorInfo, serviceName string) (*yaml.Node, error) {
+	tagSet := map[string]struct{}{}
+	for _, d := range exposed {
+		tags := d.Tags
+		if len(tags) == 0 {
+			tags = []string{serviceName}
+		}
+		for _, t := range tags {
+			tagSet[t] = struct{}{}
+		}
+	}
+	if len(tagSet) == 0 {
+		return nil, nil
+	}
+	tagNames := make([]string, 0, len(tagSet))
+	for t := range tagSet {
+		tagNames = append(tagNames, t)
+	}
+	sort.Strings(tagNames)
+	tagEntries := make([]any, 0, len(tagNames))
+	for _, t := range tagNames {
+		tagEntries = append(tagEntries, map[string]any{"name": t})
+	}
+	return yamlutil.AnyToNode(tagEntries)
+}
+
 // Build returns the YAML bytes of the AsyncAPI 3.1 document.
 func Build(in Input) ([]byte, error) {
 	// Group descriptors by ExposureKey (fall back to Name when ExposureKey is empty).
-	type group struct {
-		key         string
-		descriptors []walker.DescriptorInfo
-	}
-	groupMap := map[string]*group{}
+	groupMap := map[string]*groupEntry{}
 	groupOrder := []string{}
 
 	for _, d := range in.Exposed {
@@ -194,7 +269,7 @@ func Build(in Input) ([]byte, error) {
 			key = d.Name
 		}
 		if _, exists := groupMap[key]; !exists {
-			groupMap[key] = &group{key: key}
+			groupMap[key] = &groupEntry{key: key}
 			groupOrder = append(groupOrder, key)
 		}
 		groupMap[key].descriptors = append(groupMap[key].descriptors, d)
@@ -218,12 +293,22 @@ func Build(in Input) ([]byte, error) {
 	contactNode := yamlutil.Mapping()
 	yamlutil.AddScalar(contactNode, "name", in.Metadata.OrgName)
 	yamlutil.AddScalar(contactNode, "url", in.Metadata.OrgURL)
+	yamlutil.AddScalar(contactNode, "email", in.Metadata.OrgEmail)
 	yamlutil.AddMapping(infoNode, "contact", contactNode)
 
 	licenseNode := yamlutil.Mapping()
 	yamlutil.AddScalar(licenseNode, "name", in.Metadata.LicenseName)
 	yamlutil.AddScalar(licenseNode, "url", in.Metadata.LicenseURL)
 	yamlutil.AddMapping(infoNode, "license", licenseNode)
+
+	// info.tags — required by spectral asyncapi-3-tags rule ($.info.tags must be truthy).
+	infoTagsNode, err := buildInfoTagsNode(in.Exposed, in.ServiceName)
+	if err != nil {
+		return nil, fmt.Errorf("encoding info tags: %w", err)
+	}
+	if infoTagsNode != nil {
+		yamlutil.AddMapping(infoNode, "tags", infoTagsNode)
+	}
 
 	yamlutil.AddMapping(docNode, "info", infoNode)
 
@@ -237,45 +322,16 @@ func Build(in Input) ([]byte, error) {
 	yamlutil.AddMapping(docNode, "servers", serversNode)
 
 	// channels — one per ExposureKey group.
-	channelsNode := yamlutil.Mapping()
-	for _, key := range groupOrder {
-		g := groupMap[key]
-
-		// Sort message names within the group for determinism.
-		sortedDescs := make([]walker.DescriptorInfo, len(g.descriptors))
-		copy(sortedDescs, g.descriptors)
-		sort.Slice(sortedDescs, func(i, j int) bool {
-			return sortedDescs[i].Name < sortedDescs[j].Name
-		})
-
-		channelNode := yamlutil.Mapping()
-		yamlutil.AddScalar(channelNode, "address", channelAddress(g.descriptors, key))
-
-		messagesNode := yamlutil.Mapping()
-		for _, d := range sortedDescs {
-			msgRefNode := yamlutil.Mapping()
-			yamlutil.AddScalar(msgRefNode, "$ref", "#/components/messages/"+d.Name)
-			yamlutil.AddMapping(messagesNode, d.Name, msgRefNode)
-		}
-		yamlutil.AddMapping(channelNode, "messages", messagesNode)
-		yamlutil.AddMapping(channelsNode, key, channelNode)
+	channelsNode, err := buildChannelsNode(groupOrder, groupMap)
+	if err != nil {
+		return nil, err
 	}
 	yamlutil.AddMapping(docNode, "channels", channelsNode)
 
 	// operations — one send per ExposureKey group.
-	operationsNode := yamlutil.Mapping()
-	for _, key := range groupOrder {
-		// Operation tags: re-use the first descriptor's tags in the group, or
-		// default to [serviceName].
-		opTags := []string{in.ServiceName}
-		if g := groupMap[key]; g != nil && len(g.descriptors) > 0 && len(g.descriptors[0].Tags) > 0 {
-			opTags = g.descriptors[0].Tags
-		}
-		opNode, err := buildOperationNode(key, in.ServiceName, opTags)
-		if err != nil {
-			return nil, err
-		}
-		yamlutil.AddMapping(operationsNode, "send_"+key, opNode)
+	operationsNode, err := buildOperationsNode(groupOrder, groupMap, in.ServiceName)
+	if err != nil {
+		return nil, err
 	}
 	yamlutil.AddMapping(docNode, "operations", operationsNode)
 

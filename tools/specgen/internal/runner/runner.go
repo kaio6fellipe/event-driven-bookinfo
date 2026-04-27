@@ -127,6 +127,7 @@ func generateOne(repoRoot string, svc Service) error {
 			Metadata: openapi.SpecMetadata{
 				OrgName:     Metadata.OrgName,
 				OrgURL:      Metadata.OrgURL,
+				OrgEmail:    Metadata.OrgEmail,
 				LicenseName: Metadata.LicenseName,
 				LicenseURL:  Metadata.LicenseURL,
 				OpenAPIServer: openapi.ServerEntry{
@@ -157,6 +158,7 @@ func generateOne(repoRoot string, svc Service) error {
 			Metadata: asyncapi.SpecMetadata{
 				OrgName:     Metadata.OrgName,
 				OrgURL:      Metadata.OrgURL,
+				OrgEmail:    Metadata.OrgEmail,
 				LicenseName: Metadata.LicenseName,
 				LicenseURL:  Metadata.LicenseURL,
 				AsyncAPIServer: asyncapi.ServerEntry{

@@ -8,12 +8,17 @@ info:
   contact:
     name: bookinfo-team
     url: https://github.com/kaio6fellipe/event-driven-bookinfo
+    email: noreply@bookinfo.local
   license:
     name: Apache-2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
 servers:
   - description: Local k3d gateway
     url: http://localhost:8080
+tags:
+  - name: fixture
+  - name: things
+  - name: v1
 paths:
   /v1/things:
     post:

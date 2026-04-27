@@ -6,6 +6,7 @@ package runner
 type SpecMetadata struct {
 	OrgName        string
 	OrgURL         string
+	OrgEmail       string
 	LicenseName    string
 	LicenseURL     string
 	OpenAPIServer  ServerEntry
@@ -22,6 +23,7 @@ type ServerEntry struct {
 var Metadata = SpecMetadata{
 	OrgName:     "bookinfo-team",
 	OrgURL:      "https://github.com/kaio6fellipe/event-driven-bookinfo",
+	OrgEmail:    "noreply@bookinfo.local",
 	LicenseName: "Apache-2.0",
 	LicenseURL:  "https://www.apache.org/licenses/LICENSE-2.0",
 	OpenAPIServer: ServerEntry{

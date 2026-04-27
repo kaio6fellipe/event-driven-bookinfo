@@ -35,6 +35,7 @@ cqrs:
       requests:
         cpu: 50m
         memory: 64Mi
+
 gateway:
   name: default-gw
   namespace: platform

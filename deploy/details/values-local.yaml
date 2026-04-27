@@ -33,6 +33,7 @@ cqrs:
       requests:
         cpu: 50m
         memory: 64Mi
+
 sensor:
   dlq:
     url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"

@@ -271,11 +271,10 @@ Before the doc set is merged:
 ## Risks and notes
 
 - Crossplane provider API versions for `provider-upjet-gcp` evolve
-  faster than the doc set. The implementation plan must pin a
-  specific provider release tag before doc work begins; each YAML
-  snippet in the doc cites that pinned version, and the doc itself
-  notes that downstream readers should re-validate against newer
-  releases.
+  faster than the doc set. This doc set pins to
+  `upbound/provider-gcp@v2.5.0`; each YAML snippet cites that
+  pinned version in a comment header. Downstream readers should
+  re-validate against newer releases.
 - Pub/Sub `filter` expression syntax has limits (no nested attribute
   paths, no string functions); some `ce_type` patterns the project
   uses today (exact match) translate cleanly, but if any future

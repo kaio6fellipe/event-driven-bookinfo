@@ -32,7 +32,9 @@ func (r *ReviewRepository) FindByProductID(ctx context.Context, productID string
 	}
 
 	rows, err := r.pool.Query(ctx,
-		"SELECT id, product_id, reviewer, text FROM reviews WHERE product_id = $1 ORDER BY id LIMIT $2 OFFSET $3",
+		"SELECT id, product_id, reviewer, text, created_at "+
+			"FROM reviews WHERE product_id = $1 "+
+			"ORDER BY created_at DESC, id LIMIT $2 OFFSET $3",
 		productID, limit, offset,
 	)
 	if err != nil {
@@ -43,7 +45,7 @@ func (r *ReviewRepository) FindByProductID(ctx context.Context, productID string
 	var reviews []domain.Review
 	for rows.Next() {
 		var review domain.Review
-		if err := rows.Scan(&review.ID, &review.ProductID, &review.Reviewer, &review.Text); err != nil {
+		if err := rows.Scan(&review.ID, &review.ProductID, &review.Reviewer, &review.Text, &review.CreatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scanning review row: %w", err)
 		}
 		reviews = append(reviews, review)
@@ -59,8 +61,8 @@ func (r *ReviewRepository) FindByProductID(ctx context.Context, productID string
 // Save persists a review in PostgreSQL.
 func (r *ReviewRepository) Save(ctx context.Context, review *domain.Review) error {
 	_, err := r.pool.Exec(ctx,
-		"INSERT INTO reviews (id, product_id, reviewer, text) VALUES ($1, $2, $3, $4)",
-		review.ID, review.ProductID, review.Reviewer, review.Text,
+		"INSERT INTO reviews (id, product_id, reviewer, text, created_at) VALUES ($1, $2, $3, $4, $5)",
+		review.ID, review.ProductID, review.Reviewer, review.Text, review.CreatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("inserting review %s: %w", review.ID, err)

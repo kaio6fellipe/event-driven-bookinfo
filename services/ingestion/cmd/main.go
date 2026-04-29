@@ -18,7 +18,7 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/server"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/adapter/inbound/http"
-	kafkaadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/adapter/outbound/messaging"
+	messagingadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/adapter/outbound/messaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/adapter/outbound/openlibrary"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/core/service"
 )
@@ -77,7 +77,7 @@ func main() {
 	outboundClient := &http.Client{Timeout: 30 * time.Second}
 	fetcher := openlibrary.NewClient(outboundClient)
 
-	publisher, err := kafkaadapter.NewProducer(ctx, cfg.KafkaBrokers, cfg.KafkaTopic)
+	publisher, err := messagingadapter.NewProducer(ctx, cfg.KafkaBrokers, cfg.KafkaTopic)
 	if err != nil {
 		logger.Error("failed to create Kafka producer", "error", err)
 		os.Exit(1)

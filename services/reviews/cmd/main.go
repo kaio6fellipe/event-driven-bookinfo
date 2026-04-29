@@ -22,7 +22,7 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/inbound/http"
 	ratingshttp "github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/http"
-	reviewskafka "github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/messaging"
+	reviewsmessaging "github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/messaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/memory"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/postgres"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/port"
@@ -118,7 +118,7 @@ func main() {
 		if topic == "" {
 			topic = "bookinfo_reviews_events"
 		}
-		kProd, err := reviewskafka.NewProducer(ctx, cfg.KafkaBrokers, topic)
+		kProd, err := reviewsmessaging.NewProducer(ctx, cfg.KafkaBrokers, topic)
 		if err != nil {
 			logger.Error("failed to create Kafka producer", "error", err)
 			os.Exit(1)
@@ -127,7 +127,7 @@ func main() {
 		publisher = kProd
 		logger.Info("kafka publisher enabled", "topic", topic)
 	} else {
-		publisher = reviewskafka.NewNoopPublisher()
+		publisher = reviewsmessaging.NewNoopPublisher()
 		logger.Info("kafka publisher disabled — using no-op")
 	}
 

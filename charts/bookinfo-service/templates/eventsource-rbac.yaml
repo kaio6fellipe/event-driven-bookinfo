@@ -1,4 +1,4 @@
-{{/* charts/bookinfo-service/templates/kafka-eventsource-rbac.yaml */}}
+{{/* charts/bookinfo-service/templates/eventsource-rbac.yaml */}}
 {{- if .Values.events.exposed }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1

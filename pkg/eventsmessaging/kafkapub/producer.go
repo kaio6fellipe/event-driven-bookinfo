@@ -1,8 +1,9 @@
-// Package eventskafka provides a shared Kafka producer that builds
-// CloudEvents-binary records from an events.Descriptor. Each service's
-// outbound kafka adapter wraps *Producer with typed methods that pick
-// the right descriptor for each domain event.
-package eventskafka
+// Package kafkapub provides a shared Kafka producer (franz-go) that
+// builds CloudEvents-binary records from an events.Descriptor. It
+// implements eventsmessaging.Publisher; each service's outbound
+// messaging adapter wraps *Producer with typed methods that pick the
+// right descriptor for each domain event.
+package kafkapub
 
 import (
 	"context"

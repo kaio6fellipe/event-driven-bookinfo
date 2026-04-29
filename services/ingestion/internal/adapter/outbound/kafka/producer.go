@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventskafka"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging/kafkapub"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/core/domain"
 )
 
-// Client re-exports eventskafka.Client so tests in this package can use
-// kafka.Client without importing pkg/eventskafka directly.
-type Client = eventskafka.Client
+// Client re-exports kafkapub.Client so tests in this package can use
+// kafka.Client without importing pkg/eventsmessaging/kafkapub directly.
+type Client = kafkapub.Client
 
 // BookEvent is the marshaled Kafka record value for a book-added
 // CloudEvent. Its JSON shape matches details' AddDetailRequest, since
@@ -32,16 +32,16 @@ type BookEvent struct {
 	IdempotencyKey string `json:"idempotency_key"`
 }
 
-// Producer wraps eventskafka.Producer with service-specific typed
+// Producer wraps kafkapub.Producer with service-specific typed
 // methods. The shared Publish, Close, and constructors come from the
 // embedded type.
 type Producer struct {
-	*eventskafka.Producer
+	*kafkapub.Producer
 }
 
 // NewProducer connects to the brokers and ensures the topic exists.
 func NewProducer(ctx context.Context, brokers, topic string) (*Producer, error) {
-	inner, err := eventskafka.NewProducer(ctx, brokers, topic)
+	inner, err := kafkapub.NewProducer(ctx, brokers, topic)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func NewProducer(ctx context.Context, brokers, topic string) (*Producer, error) 
 
 // NewProducerWithClient creates a Producer with an injected client (for tests).
 func NewProducerWithClient(client Client, topic string) *Producer {
-	return &Producer{Producer: eventskafka.NewProducerWithClient(client, topic)}
+	return &Producer{Producer: kafkapub.NewProducerWithClient(client, topic)}
 }
 
 // PublishBookAdded sends a book-added CloudEvent to Kafka. Thin typed

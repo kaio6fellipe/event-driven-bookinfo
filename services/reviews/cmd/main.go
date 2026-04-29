@@ -14,7 +14,9 @@ import (
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/config"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/database"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging/kafkapub"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging/natspub"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/metrics"
@@ -152,8 +154,21 @@ func buildPublisher(ctx context.Context, cfg *config.Config, logger *slog.Logger
 		logger.Info("kafka publisher enabled", "topic", topic)
 		return kProd, kProd.Close
 	case "jetstream":
-		logger.Error("EVENT_BACKEND=jetstream not yet wired (phase 2)")
-		os.Exit(1)
+		natsURL := os.Getenv("NATS_URL")
+		if natsURL == "" {
+			logger.Error("NATS_URL must be set when EVENT_BACKEND=jetstream")
+			os.Exit(1)
+		}
+		token := os.Getenv("NATS_TOKEN")
+		d := events.Find(reviewsmessaging.Exposed, "review-submitted")
+		np, err := natspub.NewProducer(ctx, natsURL, token, d.Topic, d.Topic)
+		if err != nil {
+			logger.Error("init nats producer", "err", err)
+			os.Exit(1)
+		}
+		nProd := reviewsmessaging.NewProducer(np)
+		logger.Info("jetstream publisher enabled", "topic", d.Topic)
+		return nProd, nProd.Close
 	default:
 		logger.Error("unknown EVENT_BACKEND", "value", backend)
 		os.Exit(1)

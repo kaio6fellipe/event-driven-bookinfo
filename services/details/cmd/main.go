@@ -109,35 +109,12 @@ func main() {
 		idemStore = idempotency.NewMemoryStore()
 	}
 
-	backend := os.Getenv("EVENT_BACKEND")
-	var publisher port.EventPublisher
-	switch backend {
-	case "kafka", "":
-		if cfg.KafkaBrokers == "" {
-			publisher = messagingadapter.NewNoopPublisher()
-			logger.Info("kafka publisher disabled — using no-op")
-		} else {
-			kafkaTopic := cfg.KafkaTopic
-			if kafkaTopic == "" {
-				kafkaTopic = "bookinfo_details_events"
-			}
-			kPub, err := kafkapub.NewProducer(ctx, cfg.KafkaBrokers, kafkaTopic)
-			if err != nil {
-				logger.Error("failed to create Kafka producer", "error", err)
-				os.Exit(1)
-			}
-			kProd := messagingadapter.NewProducer(kPub)
-			defer kProd.Close()
-			publisher = kProd
-			logger.Info("kafka publisher enabled", "topic", kafkaTopic)
-		}
-	case "jetstream":
-		logger.Error("EVENT_BACKEND=jetstream not yet wired (phase 2)")
-		os.Exit(1)
-	default:
-		logger.Error("unknown EVENT_BACKEND", "value", backend)
-		os.Exit(1)
+	kafkaTopic := cfg.KafkaTopic
+	if kafkaTopic == "" {
+		kafkaTopic = "bookinfo_details_events"
 	}
+	publisher, closePublisher := buildPublisher(ctx, cfg, logger, kafkaTopic)
+	defer closePublisher()
 
 	svc := service.NewDetailService(repo, idemStore, publisher)
 	h := handler.NewHandler(svc)
@@ -150,4 +127,32 @@ func main() {
 		logger.Error("server error", "error", err)
 		os.Exit(1)
 	}
+}
+
+// buildPublisher selects a publisher based on EVENT_BACKEND. It returns
+// the publisher and a cleanup function to release underlying resources.
+func buildPublisher(ctx context.Context, cfg *config.Config, logger *slog.Logger, topic string) (port.EventPublisher, func()) {
+	backend := os.Getenv("EVENT_BACKEND")
+	switch backend {
+	case "kafka", "":
+		if cfg.KafkaBrokers == "" {
+			logger.Info("kafka publisher disabled — using no-op")
+			return messagingadapter.NewNoopPublisher(), func() {}
+		}
+		kPub, err := kafkapub.NewProducer(ctx, cfg.KafkaBrokers, topic)
+		if err != nil {
+			logger.Error("failed to create Kafka producer", "error", err)
+			os.Exit(1)
+		}
+		kProd := messagingadapter.NewProducer(kPub)
+		logger.Info("kafka publisher enabled", "topic", topic)
+		return kProd, kProd.Close
+	case "jetstream":
+		logger.Error("EVENT_BACKEND=jetstream not yet wired (phase 2)")
+		os.Exit(1)
+	default:
+		logger.Error("unknown EVENT_BACKEND", "value", backend)
+		os.Exit(1)
+	}
+	return nil, func() {} // unreachable
 }

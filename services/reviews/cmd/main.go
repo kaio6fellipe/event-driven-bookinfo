@@ -113,35 +113,12 @@ func main() {
 	ratingsURL := envOrDefault("RATINGS_SERVICE_URL", "http://localhost:8080")
 	ratingsClient := ratingshttp.NewRatingsClient(ratingsURL)
 
-	backend := os.Getenv("EVENT_BACKEND")
-	var publisher port.EventPublisher
-	switch backend {
-	case "kafka", "":
-		if cfg.KafkaBrokers == "" {
-			publisher = reviewsmessaging.NewNoopPublisher()
-			logger.Info("kafka publisher disabled — using no-op")
-		} else {
-			topic := cfg.KafkaTopic
-			if topic == "" {
-				topic = "bookinfo_reviews_events"
-			}
-			kPub, err := kafkapub.NewProducer(ctx, cfg.KafkaBrokers, topic)
-			if err != nil {
-				logger.Error("failed to create Kafka producer", "error", err)
-				os.Exit(1)
-			}
-			kProd := reviewsmessaging.NewProducer(kPub)
-			defer kProd.Close()
-			publisher = kProd
-			logger.Info("kafka publisher enabled", "topic", topic)
-		}
-	case "jetstream":
-		logger.Error("EVENT_BACKEND=jetstream not yet wired (phase 2)")
-		os.Exit(1)
-	default:
-		logger.Error("unknown EVENT_BACKEND", "value", backend)
-		os.Exit(1)
+	topic := cfg.KafkaTopic
+	if topic == "" {
+		topic = "bookinfo_reviews_events"
 	}
+	publisher, closePublisher := buildPublisher(ctx, cfg, logger, topic)
+	defer closePublisher()
 
 	svc := service.NewReviewService(repo, ratingsClient, idemStore, publisher)
 	h := handler.NewHandler(svc)
@@ -154,6 +131,34 @@ func main() {
 		logger.Error("server error", "error", err)
 		os.Exit(1)
 	}
+}
+
+// buildPublisher selects a publisher based on EVENT_BACKEND. It returns
+// the publisher and a cleanup function to release underlying resources.
+func buildPublisher(ctx context.Context, cfg *config.Config, logger *slog.Logger, topic string) (port.EventPublisher, func()) {
+	backend := os.Getenv("EVENT_BACKEND")
+	switch backend {
+	case "kafka", "":
+		if cfg.KafkaBrokers == "" {
+			logger.Info("kafka publisher disabled — using no-op")
+			return reviewsmessaging.NewNoopPublisher(), func() {}
+		}
+		kPub, err := kafkapub.NewProducer(ctx, cfg.KafkaBrokers, topic)
+		if err != nil {
+			logger.Error("failed to create Kafka producer", "error", err)
+			os.Exit(1)
+		}
+		kProd := reviewsmessaging.NewProducer(kPub)
+		logger.Info("kafka publisher enabled", "topic", topic)
+		return kProd, kProd.Close
+	case "jetstream":
+		logger.Error("EVENT_BACKEND=jetstream not yet wired (phase 2)")
+		os.Exit(1)
+	default:
+		logger.Error("unknown EVENT_BACKEND", "value", backend)
+		os.Exit(1)
+	}
+	return nil, func() {} // unreachable
 }
 
 func envOrDefault(key, defaultValue string) string {

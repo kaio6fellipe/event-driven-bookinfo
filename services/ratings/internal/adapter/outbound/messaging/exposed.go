@@ -1,4 +1,4 @@
-package kafka
+package messaging
 
 import "github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
 

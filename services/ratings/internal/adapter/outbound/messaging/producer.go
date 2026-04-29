@@ -1,5 +1,5 @@
-// Package kafka implements the EventPublisher port using a native Kafka producer.
-package kafka
+// Package messaging implements the EventPublisher port using a native Kafka producer.
+package messaging
 
 import (
 	"context"

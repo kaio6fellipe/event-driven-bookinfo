@@ -21,7 +21,7 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/server"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/inbound/http"
-	kafkaadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/kafka"
+	kafkaadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/messaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/memory"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/postgres"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/core/port"

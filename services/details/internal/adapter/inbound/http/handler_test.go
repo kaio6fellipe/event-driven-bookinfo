@@ -9,7 +9,7 @@ import (
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/inbound/http"
-	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/kafka"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/messaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/memory"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/core/service"
 )
@@ -17,7 +17,7 @@ import (
 func setupHandler(t *testing.T) *http.ServeMux {
 	t.Helper()
 	repo := memory.NewDetailRepository()
-	svc := service.NewDetailService(repo, idempotency.NewMemoryStore(), kafka.NewNoopPublisher())
+	svc := service.NewDetailService(repo, idempotency.NewMemoryStore(), messaging.NewNoopPublisher())
 	mux := http.NewServeMux()
 	h := handler.NewHandler(svc)
 	h.RegisterRoutes(mux)

@@ -1,4 +1,4 @@
-package kafka_test
+package messaging_test
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
-	kafkaadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/kafka"
+	kafkaadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/messaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/core/domain"
 )
 

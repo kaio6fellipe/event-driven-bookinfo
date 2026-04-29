@@ -78,12 +78,27 @@ func main() {
 	outboundClient := &http.Client{Timeout: 30 * time.Second}
 	fetcher := openlibrary.NewClient(outboundClient)
 
-	kPub, err := kafkapub.NewProducer(ctx, cfg.KafkaBrokers, cfg.KafkaTopic)
-	if err != nil {
-		logger.Error("failed to create Kafka producer", "error", err)
+	backend := os.Getenv("EVENT_BACKEND")
+	var publisher *messagingadapter.Producer
+	switch backend {
+	case "kafka", "":
+		if cfg.KafkaBrokers == "" {
+			logger.Error("KAFKA_BROKERS is required for ingestion service")
+			os.Exit(1)
+		}
+		kPub, err := kafkapub.NewProducer(ctx, cfg.KafkaBrokers, cfg.KafkaTopic)
+		if err != nil {
+			logger.Error("failed to create Kafka producer", "error", err)
+			os.Exit(1)
+		}
+		publisher = messagingadapter.NewProducer(kPub)
+	case "jetstream":
+		logger.Error("EVENT_BACKEND=jetstream not yet wired (phase 2)")
+		os.Exit(1)
+	default:
+		logger.Error("unknown EVENT_BACKEND", "value", backend)
 		os.Exit(1)
 	}
-	publisher := messagingadapter.NewProducer(kPub)
 	defer publisher.Close()
 
 	svc := service.NewIngestionService(fetcher, publisher, cfg.SearchQueries, cfg.MaxResultsPerQuery)

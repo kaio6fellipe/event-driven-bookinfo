@@ -2,42 +2,38 @@ package messaging_test
 
 import (
 	"context"
-	"encoding/json"
-	"sync"
+	"errors"
 	"testing"
 
-	"github.com/twmb/franz-go/pkg/kgo"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
 	kafkaadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/messaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
 )
 
-type fakeClient struct {
-	mu      sync.Mutex
-	records []*kgo.Record
+// fakePub captures the last Publish call for assertion.
+type fakePub struct {
+	last events.Descriptor
+	key  string
+	idem string
+	body any
+	err  error
 }
 
-func (f *fakeClient) ProduceSync(_ context.Context, rs ...*kgo.Record) kgo.ProduceResults {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	var results kgo.ProduceResults
-	for _, r := range rs {
-		f.records = append(f.records, r)
-		results = append(results, kgo.ProduceResult{Record: r})
-	}
-	return results
+func (f *fakePub) Publish(_ context.Context, d events.Descriptor, payload any, recordKey, idempotencyKey string) error {
+	f.last = d
+	f.key = recordKey
+	f.idem = idempotencyKey
+	f.body = payload
+	return f.err
 }
 
-func (f *fakeClient) Close() {}
+func (f *fakePub) Close() {}
 
 func TestPublishReviewSubmitted(t *testing.T) {
 	t.Parallel()
 
-	fc := &fakeClient{}
-	p := kafkaadapter.NewProducerWithClient(fc, "bookinfo_reviews_events")
+	fp := &fakePub{}
+	p := kafkaadapter.NewProducer(fp)
 
 	evt := domain.ReviewSubmittedEvent{
 		ID: "rev_1", ProductID: "prod-42", Reviewer: "alice", Text: "Great",
@@ -47,90 +43,69 @@ func TestPublishReviewSubmitted(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	fc.mu.Lock()
-	defer fc.mu.Unlock()
-	if len(fc.records) != 1 {
-		t.Fatalf("expected 1 record, got %d", len(fc.records))
+	if fp.last.CEType != "com.bookinfo.reviews.review-submitted" {
+		t.Errorf("ce_type = %q", fp.last.CEType)
 	}
-	r := fc.records[0]
-	headers := map[string]string{}
-	for _, h := range r.Headers {
-		headers[h.Key] = string(h.Value)
+	if fp.last.CESource != "reviews" {
+		t.Errorf("ce_source = %q", fp.last.CESource)
 	}
-	if headers["ce_type"] != "com.bookinfo.reviews.review-submitted" {
-		t.Errorf("ce_type = %q", headers["ce_type"])
+	if fp.key != evt.ProductID {
+		t.Errorf("record key = %q, want %q", fp.key, evt.ProductID)
 	}
-	if headers["ce_source"] != "reviews" {
-		t.Errorf("ce_source = %q", headers["ce_source"])
+	if fp.idem != evt.IdempotencyKey {
+		t.Errorf("idempotency key = %q, want %q", fp.idem, evt.IdempotencyKey)
 	}
-	var body map[string]interface{}
-	if err := json.Unmarshal(r.Value, &body); err != nil {
-		t.Fatalf("unmarshal: %v", err)
+
+	body, ok := fp.body.(kafkaadapter.ReviewSubmittedPayload)
+	if !ok {
+		t.Fatalf("payload type = %T, want ReviewSubmittedPayload", fp.body)
 	}
-	if body["product_id"] != "prod-42" {
-		t.Errorf("body product_id = %v, want %q", body["product_id"], "prod-42")
+	if body.ProductID != evt.ProductID {
+		t.Errorf("product_id = %q, want %q", body.ProductID, evt.ProductID)
 	}
-	if body["reviewer"] != "alice" {
-		t.Errorf("body reviewer = %v", body["reviewer"])
+	if body.Reviewer != evt.Reviewer {
+		t.Errorf("reviewer = %q, want %q", body.Reviewer, evt.Reviewer)
 	}
 }
 
 func TestPublishReviewDeleted(t *testing.T) {
 	t.Parallel()
 
-	fc := &fakeClient{}
-	p := kafkaadapter.NewProducerWithClient(fc, "bookinfo_reviews_events")
+	fp := &fakePub{}
+	p := kafkaadapter.NewProducer(fp)
 
 	evt := domain.ReviewDeletedEvent{ReviewID: "rev_99", ProductID: "prod-42", IdempotencyKey: "del-idem-1"}
 	if err := p.PublishReviewDeleted(context.Background(), evt); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	fc.mu.Lock()
-	defer fc.mu.Unlock()
-	r := fc.records[0]
-	headers := map[string]string{}
-	for _, h := range r.Headers {
-		headers[h.Key] = string(h.Value)
+	if fp.last.CEType != "com.bookinfo.reviews.review-deleted" {
+		t.Errorf("ce_type = %q", fp.last.CEType)
 	}
-	if headers["ce_type"] != "com.bookinfo.reviews.review-deleted" {
-		t.Errorf("ce_type = %q", headers["ce_type"])
+
+	body, ok := fp.body.(kafkaadapter.ReviewDeletedPayload)
+	if !ok {
+		t.Fatalf("payload type = %T, want ReviewDeletedPayload", fp.body)
 	}
-	var body map[string]interface{}
-	_ = json.Unmarshal(r.Value, &body)
-	if body["review_id"] != "rev_99" {
-		t.Errorf("body review_id = %v", body["review_id"])
+	if body.ReviewID != evt.ReviewID {
+		t.Errorf("review_id = %q, want %q", body.ReviewID, evt.ReviewID)
 	}
 }
 
-func TestPublishReviewSubmitted_InjectsTraceparent(t *testing.T) {
+func TestPublishReviewSubmitted_ProduceError(t *testing.T) {
 	t.Parallel()
 
-	otel.SetTracerProvider(sdktrace.NewTracerProvider())
-	otel.SetTextMapPropagator(propagation.TraceContext{})
-	ctx, span := otel.Tracer("test").Start(context.Background(), "parent")
-	defer span.End()
+	wantErr := errors.New("backend unavailable")
+	fp := &fakePub{err: wantErr}
+	p := kafkaadapter.NewProducer(fp)
 
-	fc := &fakeClient{}
-	p := kafkaadapter.NewProducerWithClient(fc, "bookinfo_reviews_events")
-
-	if err := p.PublishReviewSubmitted(ctx, domain.ReviewSubmittedEvent{
+	err := p.PublishReviewSubmitted(context.Background(), domain.ReviewSubmittedEvent{
 		ID: "r1", ProductID: "p", Reviewer: "u", Text: "ok", IdempotencyKey: "k1",
-	}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
-
-	fc.mu.Lock()
-	defer fc.mu.Unlock()
-	headers := map[string]string{}
-	for _, h := range fc.records[0].Headers {
-		headers[h.Key] = string(h.Value)
-	}
-	if headers["traceparent"] == "" {
-		t.Fatal("expected traceparent header, got none")
-	}
-	want := span.SpanContext().TraceID().String()
-	if got := headers["traceparent"]; len(got) < 35 || got[3:35] != want {
-		t.Errorf("traceparent = %q, want embedded trace_id %q", got, want)
+	if !errors.Is(err, wantErr) {
+		t.Errorf("err = %v, want to wrap %v", err, wantErr)
 	}
 }

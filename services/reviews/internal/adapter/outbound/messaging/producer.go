@@ -1,19 +1,16 @@
-// Package messaging implements the EventPublisher port using a native Kafka producer.
+// Package messaging implements the EventPublisher port using a backend
+// chosen at startup (kafka or jetstream).
 package messaging
 
 import (
 	"context"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
-	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging/kafkapub"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
 )
 
-// Client re-exports kafkapub.Client so tests in this package can use
-// kafka.Client without importing pkg/eventsmessaging/kafkapub directly.
-type Client = kafkapub.Client
-
-// ReviewSubmittedPayload is the marshaled Kafka record value for a
+// ReviewSubmittedPayload is the marshaled record value for a
 // review-submitted CloudEvent.
 type ReviewSubmittedPayload struct {
 	ID             string `json:"id,omitempty"`
@@ -23,7 +20,7 @@ type ReviewSubmittedPayload struct {
 	IdempotencyKey string `json:"idempotency_key"`
 }
 
-// ReviewDeletedPayload is the marshaled Kafka record value for a
+// ReviewDeletedPayload is the marshaled record value for a
 // review-deleted CloudEvent.
 type ReviewDeletedPayload struct {
 	ReviewID       string `json:"review_id"`
@@ -31,28 +28,22 @@ type ReviewDeletedPayload struct {
 	IdempotencyKey string `json:"idempotency_key"`
 }
 
-// Producer wraps kafkapub.Producer with service-specific typed
-// methods. The shared Publish, Close, and constructors come from the
-// embedded type.
+// Producer wraps an eventsmessaging.Publisher with service-specific
+// typed methods. The Publisher impl is chosen by cmd/main.go.
 type Producer struct {
-	*kafkapub.Producer
+	pub eventsmessaging.Publisher
 }
 
-// NewProducer connects to the brokers and ensures the topic exists.
-func NewProducer(ctx context.Context, brokers, topic string) (*Producer, error) {
-	inner, err := kafkapub.NewProducer(ctx, brokers, topic)
-	if err != nil {
-		return nil, err
-	}
-	return &Producer{Producer: inner}, nil
+// NewProducer builds a Producer from a Publisher. main.go decides which
+// concrete impl to pass.
+func NewProducer(pub eventsmessaging.Publisher) *Producer {
+	return &Producer{pub: pub}
 }
 
-// NewProducerWithClient creates a Producer with an injected client (for tests).
-func NewProducerWithClient(client Client, topic string) *Producer {
-	return &Producer{Producer: kafkapub.NewProducerWithClient(client, topic)}
-}
+// Close releases the underlying publisher.
+func (p *Producer) Close() { p.pub.Close() }
 
-// PublishReviewSubmitted sends a review-submitted CloudEvent to Kafka.
+// PublishReviewSubmitted sends a review-submitted CloudEvent to the configured backend.
 func (p *Producer) PublishReviewSubmitted(ctx context.Context, evt domain.ReviewSubmittedEvent) error {
 	body := ReviewSubmittedPayload{
 		ID:             evt.ID,
@@ -61,15 +52,15 @@ func (p *Producer) PublishReviewSubmitted(ctx context.Context, evt domain.Review
 		Text:           evt.Text,
 		IdempotencyKey: evt.IdempotencyKey,
 	}
-	return p.Publish(ctx, events.Find(Exposed, "review-submitted"), body, evt.ProductID, evt.IdempotencyKey)
+	return p.pub.Publish(ctx, events.Find(Exposed, "review-submitted"), body, evt.ProductID, evt.IdempotencyKey)
 }
 
-// PublishReviewDeleted sends a review-deleted CloudEvent to Kafka.
+// PublishReviewDeleted sends a review-deleted CloudEvent to the configured backend.
 func (p *Producer) PublishReviewDeleted(ctx context.Context, evt domain.ReviewDeletedEvent) error {
 	body := ReviewDeletedPayload{
 		ReviewID:       evt.ReviewID,
 		ProductID:      evt.ProductID,
 		IdempotencyKey: evt.IdempotencyKey,
 	}
-	return p.Publish(ctx, events.Find(Exposed, "review-deleted"), body, evt.ProductID, evt.IdempotencyKey)
+	return p.pub.Publish(ctx, events.Find(Exposed, "review-deleted"), body, evt.ProductID, evt.IdempotencyKey)
 }

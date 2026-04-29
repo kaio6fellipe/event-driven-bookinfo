@@ -14,6 +14,7 @@ import (
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/config"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/database"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging/kafkapub"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/metrics"
@@ -118,11 +119,12 @@ func main() {
 		if topic == "" {
 			topic = "bookinfo_reviews_events"
 		}
-		kProd, err := reviewsmessaging.NewProducer(ctx, cfg.KafkaBrokers, topic)
+		kPub, err := kafkapub.NewProducer(ctx, cfg.KafkaBrokers, topic)
 		if err != nil {
 			logger.Error("failed to create Kafka producer", "error", err)
 			os.Exit(1)
 		}
+		kProd := reviewsmessaging.NewProducer(kPub)
 		defer kProd.Close()
 		publisher = kProd
 		logger.Info("kafka publisher enabled", "topic", topic)

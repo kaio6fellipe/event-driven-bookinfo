@@ -45,3 +45,5 @@ coverage.out
 
 # Git worktrees
 .worktrees/
+
+docs/answer*.md

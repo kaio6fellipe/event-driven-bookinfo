@@ -18,6 +18,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 )
@@ -40,6 +41,9 @@ type Producer struct {
 	client Client
 	topic  string
 }
+
+// Compile-time check that *Producer satisfies the Publisher contract.
+var _ eventsmessaging.Publisher = (*Producer)(nil)
 
 // NewProducer creates a real producer connecting to the brokers. Creates
 // the topic if it does not exist.

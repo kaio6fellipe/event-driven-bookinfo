@@ -89,18 +89,21 @@ These coexist with productpage which uses neither `cqrs.endpoints` nor `events.e
 ## Local Kubernetes
 
 ```bash
-make run-k8s            # Full local k8s: k3d + platform + observability + apps
-make stop-k8s           # Delete k3d cluster
-make k8s-rebuild        # Fast iteration: rebuild images + redeploy (skip infra)
-make k8s-status         # Pod status + access URLs
-make k8s-logs           # Tail bookinfo namespace logs
+make run-k8s                      # Full local k8s: k3d + platform + observability + apps (default eventbus=kafka)
+make run-k8s EVENTBUS=jetstream   # Same but with NATS JetStream instead of Kafka
+make stop-k8s                     # Delete k3d cluster
+make k8s-rebuild                  # Fast iteration: rebuild images + redeploy (skip infra)
+make k8s-status                   # Pod status + access URLs
+make k8s-logs                     # Tail bookinfo namespace logs
 ```
 
 **Namespaces:** `platform` (Kafka, Argo Events, Gateway), `envoy-gateway-system` (Envoy Gateway), `observability` (Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy), `bookinfo` (apps, PostgreSQL, EventSources, Sensors, HTTPRoutes)
 
 **CQRS split:** details, reviews, ratings each have read + write Deployments. productpage is read-only. notification is write-only. Sensors target `-write` services.
 
-**Context safety:** All kubectl/helm calls use `--context=k3d-bookinfo-local`. Never mutates the user's active context.
+**Context safety:** All kubectl/helm calls use `--context=k3d-bookinfo-$(EVENTBUS)-local` (default `eventbus=kafka`, alternative `eventbus=jetstream`). Never mutates the user's active context.
+
+**EventBus selection:** The cluster is named `bookinfo-$(EVENTBUS)-local`. Mutually exclusive — start one, `make stop-k8s` it, then start the other. Apps run from the same image and pick backend at startup via `EVENT_BACKEND` env var. See `docs/kafka-eventbus.md` and `docs/jetstream-eventbus.md` (added in Phase 7) for details.
 
 **Access:** Productpage http://localhost:8080, Webhooks POST http://localhost:8080/v1/* (method-based CQRS routing), Grafana http://localhost:3000, Prometheus http://localhost:9090, Headlamp http://localhost:4466
 

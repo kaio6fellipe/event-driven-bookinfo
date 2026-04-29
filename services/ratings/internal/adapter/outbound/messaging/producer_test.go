@@ -2,42 +2,38 @@ package messaging_test
 
 import (
 	"context"
-	"encoding/json"
-	"sync"
+	"errors"
 	"testing"
 
-	"github.com/twmb/franz-go/pkg/kgo"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
 	kafkaadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/messaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/core/domain"
 )
 
-type fakeClient struct {
-	mu      sync.Mutex
-	records []*kgo.Record
+// fakePub captures the last Publish call for assertion.
+type fakePub struct {
+	last events.Descriptor
+	key  string
+	idem string
+	body any
+	err  error
 }
 
-func (f *fakeClient) ProduceSync(_ context.Context, rs ...*kgo.Record) kgo.ProduceResults {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	var results kgo.ProduceResults
-	for _, r := range rs {
-		f.records = append(f.records, r)
-		results = append(results, kgo.ProduceResult{Record: r})
-	}
-	return results
+func (f *fakePub) Publish(_ context.Context, d events.Descriptor, payload any, recordKey, idempotencyKey string) error {
+	f.last = d
+	f.key = recordKey
+	f.idem = idempotencyKey
+	f.body = payload
+	return f.err
 }
 
-func (f *fakeClient) Close() {}
+func (f *fakePub) Close() {}
 
 func TestPublishRatingSubmitted(t *testing.T) {
 	t.Parallel()
 
-	fc := &fakeClient{}
-	p := kafkaadapter.NewProducerWithClient(fc, "bookinfo_ratings_events")
+	fp := &fakePub{}
+	p := kafkaadapter.NewProducer(fp)
 
 	evt := domain.RatingSubmittedEvent{
 		ID: "rat_1", ProductID: "prod-42", Reviewer: "alice", Stars: 5,
@@ -47,62 +43,45 @@ func TestPublishRatingSubmitted(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	fc.mu.Lock()
-	defer fc.mu.Unlock()
-	if len(fc.records) != 1 {
-		t.Fatalf("expected 1 record, got %d", len(fc.records))
+	if fp.last.CEType != "com.bookinfo.ratings.rating-submitted" {
+		t.Errorf("ce_type = %q", fp.last.CEType)
 	}
-	r := fc.records[0]
-
-	headers := map[string]string{}
-	for _, h := range r.Headers {
-		headers[h.Key] = string(h.Value)
+	if fp.last.CESource != "ratings" {
+		t.Errorf("ce_source = %q", fp.last.CESource)
 	}
-	if headers["ce_type"] != "com.bookinfo.ratings.rating-submitted" {
-		t.Errorf("ce_type = %q", headers["ce_type"])
+	if fp.key != evt.ProductID {
+		t.Errorf("record key = %q, want %q", fp.key, evt.ProductID)
 	}
-	if headers["ce_source"] != "ratings" {
-		t.Errorf("ce_source = %q", headers["ce_source"])
+	if fp.idem != evt.IdempotencyKey {
+		t.Errorf("idempotency key = %q, want %q", fp.idem, evt.IdempotencyKey)
 	}
 
-	var body map[string]interface{}
-	_ = json.Unmarshal(r.Value, &body)
-	if body["product_id"] != "prod-42" {
-		t.Errorf("product_id = %v", body["product_id"])
+	body, ok := fp.body.(kafkaadapter.RatingSubmittedPayload)
+	if !ok {
+		t.Fatalf("payload type = %T, want RatingSubmittedPayload", fp.body)
 	}
-	if body["stars"].(float64) != 5 {
-		t.Errorf("stars = %v", body["stars"])
+	if body.ProductID != evt.ProductID {
+		t.Errorf("product_id = %q, want %q", body.ProductID, evt.ProductID)
+	}
+	if body.Stars != evt.Stars {
+		t.Errorf("stars = %d, want %d", body.Stars, evt.Stars)
 	}
 }
 
-func TestPublishRatingSubmitted_InjectsTraceparent(t *testing.T) {
+func TestPublishRatingSubmitted_ProduceError(t *testing.T) {
 	t.Parallel()
 
-	otel.SetTracerProvider(sdktrace.NewTracerProvider())
-	otel.SetTextMapPropagator(propagation.TraceContext{})
-	ctx, span := otel.Tracer("test").Start(context.Background(), "parent")
-	defer span.End()
+	wantErr := errors.New("backend unavailable")
+	fp := &fakePub{err: wantErr}
+	p := kafkaadapter.NewProducer(fp)
 
-	fc := &fakeClient{}
-	p := kafkaadapter.NewProducerWithClient(fc, "bookinfo_ratings_events")
-
-	if err := p.PublishRatingSubmitted(ctx, domain.RatingSubmittedEvent{
+	err := p.PublishRatingSubmitted(context.Background(), domain.RatingSubmittedEvent{
 		ID: "rt1", ProductID: "p", Reviewer: "u", Stars: 5, IdempotencyKey: "k1",
-	}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
-
-	fc.mu.Lock()
-	defer fc.mu.Unlock()
-	headers := map[string]string{}
-	for _, h := range fc.records[0].Headers {
-		headers[h.Key] = string(h.Value)
-	}
-	if headers["traceparent"] == "" {
-		t.Fatal("expected traceparent header, got none")
-	}
-	want := span.SpanContext().TraceID().String()
-	if got := headers["traceparent"]; len(got) < 35 || got[3:35] != want {
-		t.Errorf("traceparent = %q, want embedded trace_id %q", got, want)
+	if !errors.Is(err, wantErr) {
+		t.Errorf("err = %v, want to wrap %v", err, wantErr)
 	}
 }

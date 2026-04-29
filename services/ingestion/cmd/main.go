@@ -80,6 +80,7 @@ func main() {
 	outboundClient := &http.Client{Timeout: 30 * time.Second}
 	fetcher := openlibrary.NewClient(outboundClient)
 
+	// ingestion has no no-op fallback in either backend — it must be wired to a real broker.
 	backend := os.Getenv("EVENT_BACKEND")
 	var publisher *messagingadapter.Producer
 	switch backend {
@@ -95,6 +96,7 @@ func main() {
 		}
 		publisher = messagingadapter.NewProducer(kPub)
 	case "jetstream":
+		// No no-op fallback for jetstream: it is k8s-only; missing NATS_URL is a config error, not a degraded mode.
 		natsURL := os.Getenv("NATS_URL")
 		if natsURL == "" {
 			logger.Error("NATS_URL must be set when EVENT_BACKEND=jetstream")
@@ -104,7 +106,7 @@ func main() {
 		d := events.Find(messagingadapter.Exposed, "book-added")
 		np, err := natspub.NewProducer(ctx, natsURL, token, d.Topic, d.Topic)
 		if err != nil {
-			logger.Error("init nats producer", "err", err)
+			logger.Error("failed to create NATS producer", "error", err)
 			os.Exit(1)
 		}
 		publisher = messagingadapter.NewProducer(np)

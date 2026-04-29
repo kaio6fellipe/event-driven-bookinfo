@@ -115,11 +115,7 @@ func main() {
 	ratingsURL := envOrDefault("RATINGS_SERVICE_URL", "http://localhost:8080")
 	ratingsClient := ratingshttp.NewRatingsClient(ratingsURL)
 
-	topic := cfg.KafkaTopic
-	if topic == "" {
-		topic = "bookinfo_reviews_events"
-	}
-	publisher, closePublisher := buildPublisher(ctx, cfg, logger, topic)
+	publisher, closePublisher := buildPublisher(ctx, cfg, logger)
 	defer closePublisher()
 
 	svc := service.NewReviewService(repo, ratingsClient, idemStore, publisher)
@@ -137,7 +133,7 @@ func main() {
 
 // buildPublisher selects a publisher based on EVENT_BACKEND. It returns
 // the publisher and a cleanup function to release underlying resources.
-func buildPublisher(ctx context.Context, cfg *config.Config, logger *slog.Logger, topic string) (port.EventPublisher, func()) {
+func buildPublisher(ctx context.Context, cfg *config.Config, logger *slog.Logger) (port.EventPublisher, func()) {
 	backend := os.Getenv("EVENT_BACKEND")
 	switch backend {
 	case "kafka", "":
@@ -145,15 +141,17 @@ func buildPublisher(ctx context.Context, cfg *config.Config, logger *slog.Logger
 			logger.Info("kafka publisher disabled — using no-op")
 			return reviewsmessaging.NewNoopPublisher(), func() {}
 		}
-		kPub, err := kafkapub.NewProducer(ctx, cfg.KafkaBrokers, topic)
+		d := events.Find(reviewsmessaging.Exposed, "review-submitted")
+		kPub, err := kafkapub.NewProducer(ctx, cfg.KafkaBrokers, d.Topic)
 		if err != nil {
 			logger.Error("failed to create Kafka producer", "error", err)
 			os.Exit(1)
 		}
 		kProd := reviewsmessaging.NewProducer(kPub)
-		logger.Info("kafka publisher enabled", "topic", topic)
+		logger.Info("kafka publisher enabled", "topic", d.Topic)
 		return kProd, kProd.Close
 	case "jetstream":
+		// No no-op fallback for jetstream: it is k8s-only; missing NATS_URL is a config error, not a degraded mode.
 		natsURL := os.Getenv("NATS_URL")
 		if natsURL == "" {
 			logger.Error("NATS_URL must be set when EVENT_BACKEND=jetstream")
@@ -163,7 +161,7 @@ func buildPublisher(ctx context.Context, cfg *config.Config, logger *slog.Logger
 		d := events.Find(reviewsmessaging.Exposed, "review-submitted")
 		np, err := natspub.NewProducer(ctx, natsURL, token, d.Topic, d.Topic)
 		if err != nil {
-			logger.Error("init nats producer", "err", err)
+			logger.Error("failed to create NATS producer", "error", err)
 			os.Exit(1)
 		}
 		nProd := reviewsmessaging.NewProducer(np)

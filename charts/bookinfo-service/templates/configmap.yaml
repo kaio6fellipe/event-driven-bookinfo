@@ -23,6 +23,13 @@ data:
   {{- with .Values.observability.pyroscopeAddress }}
   PYROSCOPE_SERVER_ADDRESS: {{ . | quote }}
   {{- end }}
+  EVENT_BACKEND: {{ .Values.events.bus.type | quote }}
+  {{- if eq .Values.events.bus.type "kafka" }}
   {{- with .Values.events.kafka.broker }}
   KAFKA_BROKERS: {{ . | quote }}
+  {{- end }}
+  {{- else if eq .Values.events.bus.type "jetstream" }}
+  {{- with .Values.events.jetstream.url }}
+  NATS_URL: {{ . | quote }}
+  {{- end }}
   {{- end }}

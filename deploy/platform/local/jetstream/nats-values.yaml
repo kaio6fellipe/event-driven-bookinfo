@@ -4,9 +4,12 @@
 # Single-replica JetStream for local dev. Token auth via the
 # nats-client-token secret (created separately by k8s-platform).
 #
-# Storage is on emptyDir to keep cluster-tear-down clean — restart of
-# the NATS pod loses all stream data, which is the right local-dev
-# behaviour.
+# Storage notes: fileStore is enabled with pvc.enabled=false, which means
+# the chart does NOT mount any volume at /data — JetStream writes into
+# the container's writable layer. On k3d that's the host's containerd
+# scratch space and gets wiped when the cluster is torn down, which is
+# the right local-dev behaviour. For any non-local environment, switch
+# to pvc.enabled=true (or memoryStore) and re-evaluate.
 config:
   cluster:
     enabled: false

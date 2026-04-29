@@ -9,8 +9,8 @@ import (
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/inbound/http"
-	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/messaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/memory"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/adapter/outbound/messaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/core/service"
 )
 

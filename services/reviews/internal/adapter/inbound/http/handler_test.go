@@ -12,8 +12,8 @@ import (
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/inbound/http"
-	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/messaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/memory"
+	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/adapter/outbound/messaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/domain"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/reviews/internal/core/service"
 )

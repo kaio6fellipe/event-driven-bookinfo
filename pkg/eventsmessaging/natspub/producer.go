@@ -21,10 +21,17 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 )
 
+// JetStream is the subset of nats.JetStreamContext used by Producer.
+// Defined locally so tests can inject a stub via NewProducerWithJetStream
+// without spinning up a real JetStream server for every error-path test.
+type JetStream interface {
+	PublishMsg(*nats.Msg, ...nats.PubOpt) (*nats.PubAck, error)
+}
+
 // Producer publishes CloudEvents-binary messages to a JetStream stream.
 type Producer struct {
 	nc      *nats.Conn
-	js      nats.JetStreamContext
+	js      JetStream
 	subject string
 }
 
@@ -37,10 +44,17 @@ var _ eventsmessaging.Publisher = (*Producer)(nil)
 // streamName is the JetStream stream name. subject is the publish target;
 // for current usage they are the same string (e.g. "raw_books_details").
 // token is optional — empty string skips token auth (local-dev mode).
+// When ctx carries a deadline, that remaining duration is used as the
+// NATS connection timeout so the parameter has real semantics.
 func NewProducer(ctx context.Context, url, token, streamName, subject string) (*Producer, error) {
 	opts := []nats.Option{nats.Name("event-driven-bookinfo")}
 	if token != "" {
 		opts = append(opts, nats.Token(token))
+	}
+	if d, ok := ctx.Deadline(); ok {
+		if remaining := time.Until(d); remaining > 0 {
+			opts = append(opts, nats.Timeout(remaining))
+		}
 	}
 	nc, err := nats.Connect(url, opts...)
 	if err != nil {
@@ -51,11 +65,17 @@ func NewProducer(ctx context.Context, url, token, streamName, subject string) (*
 		nc.Close()
 		return nil, fmt.Errorf("acquiring JetStream context: %w", err)
 	}
-	if err := ensureStream(js, streamName, subject); err != nil {
+	if err := ensureStream(ctx, js, streamName, subject); err != nil {
 		nc.Close()
 		return nil, fmt.Errorf("ensuring stream %q: %w", streamName, err)
 	}
 	return &Producer{nc: nc, js: js, subject: subject}, nil
+}
+
+// NewProducerWithJetStream wires Producer with an injected JetStream
+// (for tests). nc may be nil; Close() guards against it.
+func NewProducerWithJetStream(js JetStream, subject string) *Producer {
+	return &Producer{js: js, subject: subject}
 }
 
 // Publish marshals payload to JSON and emits a NATS JetStream message
@@ -109,7 +129,10 @@ func (p *Producer) Close() {
 	}
 }
 
-func ensureStream(js nats.JetStreamContext, name, subject string) error {
+func ensureStream(ctx context.Context, js nats.JetStreamContext, name, subject string) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("context cancelled before AddStream: %w", err)
+	}
 	_, err := js.AddStream(&nats.StreamConfig{
 		Name:     name,
 		Subjects: []string{subject},

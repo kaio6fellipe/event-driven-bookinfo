@@ -2,10 +2,11 @@ package natspub_test
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/nats-io/nats-server/v2/server"
 	natstest "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
 
@@ -13,7 +14,7 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging/natspub"
 )
 
-func runJetStreamServer(t *testing.T) (*server.Server, string) {
+func runJetStreamServer(t *testing.T) string {
 	t.Helper()
 	opts := natstest.DefaultTestOptions
 	opts.Port = -1 // random port
@@ -21,12 +22,11 @@ func runJetStreamServer(t *testing.T) (*server.Server, string) {
 	opts.StoreDir = t.TempDir()
 	s := natstest.RunServer(&opts)
 	t.Cleanup(s.Shutdown)
-	return s, s.ClientURL()
+	return s.ClientURL()
 }
 
 func TestProducer_PublishCreatesStreamAndDelivers(t *testing.T) {
-	s, url := runJetStreamServer(t)
-	_ = s
+	url := runJetStreamServer(t)
 
 	d := events.Descriptor{
 		Name:        "book-added",
@@ -77,7 +77,7 @@ func TestProducer_PublishCreatesStreamAndDelivers(t *testing.T) {
 }
 
 func TestProducer_StreamEnsureIdempotent(t *testing.T) {
-	_, url := runJetStreamServer(t)
+	url := runJetStreamServer(t)
 
 	for i := 0; i < 2; i++ {
 		p, err := natspub.NewProducer(context.Background(), url, "", "raw_books_details", "raw_books_details")
@@ -92,7 +92,7 @@ func TestProducer_StreamEnsureIdempotent(t *testing.T) {
 // publishes successfully and sets an empty ce-subject header (mirroring
 // kafkapub's behaviour where the empty string is used as-is for ce_subject).
 func TestProducer_Publish_EmptyRecordKey(t *testing.T) {
-	_, url := runJetStreamServer(t)
+	url := runJetStreamServer(t)
 
 	d := events.Descriptor{
 		Name:        "book-added",
@@ -135,4 +135,29 @@ func TestProducer_Publish_EmptyRecordKey(t *testing.T) {
 	if got := msg.Header.Get("ce-subject"); got != "" {
 		t.Errorf("ce-subject header = %q, want empty string", got)
 	}
+}
+
+func TestProducer_Publish_WrapsProduceError(t *testing.T) {
+	fake := &errJetStream{err: errors.New("boom")}
+	p := natspub.NewProducerWithJetStream(fake, "subject.test")
+
+	d := events.Descriptor{Name: "x", CEType: "ce.x", CESource: "src", Version: "1.0", ContentType: "application/json"}
+	err := p.Publish(context.Background(), d, struct{}{}, "k", "ik")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "publishing to JetStream subject \"subject.test\":") {
+		t.Errorf("error not wrapped with subject context: %v", err)
+	}
+	if !errors.Is(err, fake.err) {
+		t.Errorf("error chain does not contain sentinel: %v", err)
+	}
+}
+
+type errJetStream struct {
+	err error
+}
+
+func (e *errJetStream) PublishMsg(*nats.Msg, ...nats.PubOpt) (*nats.PubAck, error) {
+	return nil, e.err
 }

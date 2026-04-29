@@ -1,0 +1,27 @@
+# charts/bookinfo-service/ci/values-ratings-jetstream.yaml
+# ct install test: CQRS + EventSource + Sensor + DLQ on jetstream bus
+serviceName: ratings
+fullnameOverride: ratings
+image:
+  repository: event-driven-bookinfo/ratings
+  tag: latest
+
+cqrs:
+  enabled: true
+  endpoints:
+    rating-submitted:
+      method: POST
+      endpoint: /v1/ratings
+
+sensor:
+  dlq:
+    url: "http://dlq-eventsource-svc:12004/v1/events"
+
+events:
+  bus:
+    type: jetstream
+  jetstream:
+    url: "nats://nats.platform.svc.cluster.local:4222"
+    tokenSecret:
+      name: nats-client-token
+      key: token

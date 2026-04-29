@@ -1,0 +1,39 @@
+# deploy/platform/local/jetstream/nats-values.yaml
+#
+# Values for the official nats-io/nats Helm chart (charts.nats.io).
+# Single-replica JetStream for local dev. Token auth via the
+# nats-client-token secret (created separately by k8s-platform).
+#
+# Storage is on emptyDir to keep cluster-tear-down clean — restart of
+# the NATS pod loses all stream data, which is the right local-dev
+# behaviour.
+config:
+  cluster:
+    enabled: false
+  jetstream:
+    enabled: true
+    fileStore:
+      enabled: true
+      pvc:
+        enabled: false
+        size: 1Gi
+  merge:
+    authorization:
+      token: $TOKEN
+container:
+  image:
+    repository: nats
+    tag: 2.10-alpine
+  env:
+    TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: nats-client-token
+          key: token
+service:
+  enabled: true
+  ports:
+    nats:
+      enabled: true
+podTemplate:
+  topologySpreadConstraints: {}

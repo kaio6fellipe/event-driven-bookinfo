@@ -12,7 +12,9 @@ import (
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/config"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging/kafkapub"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging/natspub"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/metrics"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/profiling"
@@ -93,8 +95,19 @@ func main() {
 		}
 		publisher = messagingadapter.NewProducer(kPub)
 	case "jetstream":
-		logger.Error("EVENT_BACKEND=jetstream not yet wired (phase 2)")
-		os.Exit(1)
+		natsURL := os.Getenv("NATS_URL")
+		if natsURL == "" {
+			logger.Error("NATS_URL must be set when EVENT_BACKEND=jetstream")
+			os.Exit(1)
+		}
+		token := os.Getenv("NATS_TOKEN")
+		d := events.Find(messagingadapter.Exposed, "book-added")
+		np, err := natspub.NewProducer(ctx, natsURL, token, d.Topic, d.Topic)
+		if err != nil {
+			logger.Error("init nats producer", "err", err)
+			os.Exit(1)
+		}
+		publisher = messagingadapter.NewProducer(np)
 	default:
 		logger.Error("unknown EVENT_BACKEND", "value", backend)
 		os.Exit(1)

@@ -1,18 +1,15 @@
-// Package messaging implements the EventPublisher port using a native Kafka producer.
+// Package messaging implements the EventPublisher port using a backend
+// chosen at startup (kafka or jetstream).
 package messaging
 
 import (
 	"context"
 
-	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging/kafkapub"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/details/internal/core/domain"
 )
 
-// Client re-exports kafkapub.Client so tests in this package can use
-// kafka.Client without importing pkg/eventsmessaging/kafkapub directly.
-type Client = kafkapub.Client
-
-// BookAddedPayload is the marshaled Kafka record value for a book-added
+// BookAddedPayload is the marshaled record value for a book-added
 // CloudEvent. Exported because the events.Descriptor in exposed.go
 // references it as a JSONSchema source for tools/specgen.
 type BookAddedPayload struct {
@@ -29,30 +26,22 @@ type BookAddedPayload struct {
 	IdempotencyKey string `json:"idempotency_key"`
 }
 
-// Producer wraps kafkapub.Producer with service-specific typed
-// methods. The shared Publish, Close, and constructors come from the
-// embedded type.
+// Producer wraps an eventsmessaging.Publisher with service-specific
+// typed methods. The Publisher impl is chosen by cmd/main.go.
 type Producer struct {
-	*kafkapub.Producer
+	pub eventsmessaging.Publisher
 }
 
-// NewProducer connects to the brokers and ensures the topic exists.
-func NewProducer(ctx context.Context, brokers, topic string) (*Producer, error) {
-	inner, err := kafkapub.NewProducer(ctx, brokers, topic)
-	if err != nil {
-		return nil, err
-	}
-	return &Producer{Producer: inner}, nil
+// NewProducer builds a Producer from a Publisher. main.go decides which
+// concrete impl to pass.
+func NewProducer(pub eventsmessaging.Publisher) *Producer {
+	return &Producer{pub: pub}
 }
 
-// NewProducerWithClient creates a Producer with an injected client (for tests).
-func NewProducerWithClient(client Client, topic string) *Producer {
-	return &Producer{Producer: kafkapub.NewProducerWithClient(client, topic)}
-}
+// Close releases the underlying publisher.
+func (p *Producer) Close() { p.pub.Close() }
 
-// PublishBookAdded sends a book-added CloudEvent to Kafka.
-// Thin typed wrapper around Publish; the descriptor is the single source
-// of truth for CE headers (exposed.go).
+// PublishBookAdded sends a book-added CloudEvent to the configured backend.
 func (p *Producer) PublishBookAdded(ctx context.Context, evt domain.BookAddedEvent) error {
 	body := BookAddedPayload{
 		ID:             evt.ID,
@@ -67,5 +56,5 @@ func (p *Producer) PublishBookAdded(ctx context.Context, evt domain.BookAddedEve
 		ISBN13:         evt.ISBN13,
 		IdempotencyKey: evt.IdempotencyKey,
 	}
-	return p.Publish(ctx, Exposed[0], body, evt.IdempotencyKey, evt.IdempotencyKey)
+	return p.pub.Publish(ctx, Exposed[0], body, evt.IdempotencyKey, evt.IdempotencyKey)
 }

@@ -99,12 +99,12 @@ func TestLoadEndpoints_RealRatingsService(t *testing.T) {
 // pkg/events.Descriptor for the same reasons as the endpoints variant.
 func TestLoadExposed_RealRatingsService(t *testing.T) {
 	repoRoot := realRepoRoot(t)
-	if _, err := os.Stat(filepath.Join(repoRoot, "services", "ratings", "internal", "adapter", "outbound", "kafka", "exposed.go")); err != nil {
-		t.Skip("services/ratings/internal/adapter/outbound/kafka/exposed.go not present")
+	if _, err := os.Stat(filepath.Join(repoRoot, "services", "ratings", "internal", "adapter", "outbound", "messaging", "exposed.go")); err != nil {
+		t.Skip("services/ratings/internal/adapter/outbound/messaging/exposed.go not present")
 	}
 
 	exposed, err := walker.LoadExposed(repoRoot,
-		realModulePath+"/services/ratings/internal/adapter/outbound/kafka")
+		realModulePath+"/services/ratings/internal/adapter/outbound/messaging")
 	if err != nil {
 		t.Fatalf("LoadExposed: %v", err)
 	}

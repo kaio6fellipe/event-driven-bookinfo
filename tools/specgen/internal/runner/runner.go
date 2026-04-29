@@ -19,7 +19,7 @@ type Service struct {
 	Name        string
 	Root        string
 	HTTPPkg     string // import path of internal/adapter/inbound/http
-	KafkaPkg    string // import path of internal/adapter/outbound/kafka
+	KafkaPkg    string // import path of internal/adapter/outbound/messaging
 	HasHTTPPkg  bool
 	HasKafkaPkg bool
 }
@@ -28,7 +28,7 @@ const modulePath = "github.com/kaio6fellipe/event-driven-bookinfo"
 
 // DiscoverServices returns every service under <repoRoot>/services/ that has
 // migrated: either internal/adapter/inbound/http/endpoints.go (HTTP) or
-// internal/adapter/outbound/kafka/exposed.go (Kafka) must exist.
+// internal/adapter/outbound/messaging/exposed.go (messaging) must exist.
 func DiscoverServices(repoRoot string) ([]Service, error) {
 	entries, err := os.ReadDir(filepath.Join(repoRoot, "services"))
 	if err != nil {
@@ -48,10 +48,10 @@ func DiscoverServices(repoRoot string) ([]Service, error) {
 			svc.HasHTTPPkg = true
 			svc.HTTPPkg = modulePath + "/services/" + e.Name() + "/internal/adapter/inbound/http"
 		}
-		kafkaExposed := filepath.Join(root, "internal/adapter/outbound/kafka/exposed.go")
+		kafkaExposed := filepath.Join(root, "internal/adapter/outbound/messaging/exposed.go")
 		if _, err := os.Stat(kafkaExposed); err == nil {
 			svc.HasKafkaPkg = true
-			svc.KafkaPkg = modulePath + "/services/" + e.Name() + "/internal/adapter/outbound/kafka"
+			svc.KafkaPkg = modulePath + "/services/" + e.Name() + "/internal/adapter/outbound/messaging"
 		}
 
 		if svc.HasHTTPPkg || svc.HasKafkaPkg {

@@ -185,7 +185,7 @@ func Build(in Input) ([]byte, error) {
 		buf.WriteString("#   services/" + in.ServiceName + "/internal/adapter/inbound/http/endpoints.go\n")
 	}
 	if len(in.Exposed) > 0 {
-		buf.WriteString("#   services/" + in.ServiceName + "/internal/adapter/outbound/kafka/exposed.go\n")
+		buf.WriteString("#   services/" + in.ServiceName + "/internal/adapter/outbound/messaging/exposed.go\n")
 	}
 	buf.WriteString("# Run `make generate-specs` to refresh.\n")
 

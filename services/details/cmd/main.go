@@ -109,24 +109,34 @@ func main() {
 		idemStore = idempotency.NewMemoryStore()
 	}
 
+	backend := os.Getenv("EVENT_BACKEND")
 	var publisher port.EventPublisher
-	if cfg.KafkaBrokers != "" {
-		kafkaTopic := cfg.KafkaTopic
-		if kafkaTopic == "" {
-			kafkaTopic = "bookinfo_details_events"
+	switch backend {
+	case "kafka", "":
+		if cfg.KafkaBrokers == "" {
+			publisher = messagingadapter.NewNoopPublisher()
+			logger.Info("kafka publisher disabled — using no-op")
+		} else {
+			kafkaTopic := cfg.KafkaTopic
+			if kafkaTopic == "" {
+				kafkaTopic = "bookinfo_details_events"
+			}
+			kPub, err := kafkapub.NewProducer(ctx, cfg.KafkaBrokers, kafkaTopic)
+			if err != nil {
+				logger.Error("failed to create Kafka producer", "error", err)
+				os.Exit(1)
+			}
+			kProd := messagingadapter.NewProducer(kPub)
+			defer kProd.Close()
+			publisher = kProd
+			logger.Info("kafka publisher enabled", "topic", kafkaTopic)
 		}
-		kPub, err := kafkapub.NewProducer(ctx, cfg.KafkaBrokers, kafkaTopic)
-		if err != nil {
-			logger.Error("failed to create Kafka producer", "error", err)
-			os.Exit(1)
-		}
-		kProd := messagingadapter.NewProducer(kPub)
-		defer kProd.Close()
-		publisher = kProd
-		logger.Info("kafka publisher enabled", "topic", kafkaTopic)
-	} else {
-		publisher = messagingadapter.NewNoopPublisher()
-		logger.Info("kafka publisher disabled — using no-op")
+	case "jetstream":
+		logger.Error("EVENT_BACKEND=jetstream not yet wired (phase 2)")
+		os.Exit(1)
+	default:
+		logger.Error("unknown EVENT_BACKEND", "value", backend)
+		os.Exit(1)
 	}
 
 	svc := service.NewDetailService(repo, idemStore, publisher)

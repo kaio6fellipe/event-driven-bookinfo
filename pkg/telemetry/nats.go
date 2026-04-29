@@ -6,6 +6,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -23,17 +24,23 @@ func (c natsHeaderCarrier) Keys() []string {
 	return keys
 }
 
+var _ propagation.TextMapCarrier = natsHeaderCarrier(nil)
+
 // StartNATSProducerSpan opens a producer span around a JetStream publish
-// following OTel messaging semantic conventions. The caller must call
-// span.End() when the publish completes (typically via defer).
+// following OTel messaging semantic conventions. Span name is
+// "<subject> publish"; SpanKind is Producer. The caller must End() the
+// span (use defer). The idempotency_key attribute is a project-local
+// extension to the OTel messaging semconv (mirrors the kafka helper's
+// messaging.kafka.message.key but carries dedup intent rather than
+// partition routing).
 func StartNATSProducerSpan(ctx context.Context, subject, idempotencyKey string) (context.Context, trace.Span) {
-	tracer := otel.Tracer("eventsmessaging/natspub")
-	return tracer.Start(ctx, "jetstream.publish",
+	return otel.Tracer("nats-producer").Start(ctx,
+		subject+" publish",
 		trace.WithSpanKind(trace.SpanKindProducer),
 		trace.WithAttributes(
 			attribute.String("messaging.system", "jetstream"),
 			attribute.String("messaging.destination.name", subject),
-			attribute.String("messaging.operation", "publish"),
+			attribute.String("messaging.operation.type", "publish"),
 			attribute.String("messaging.message.idempotency_key", idempotencyKey),
 		),
 	)

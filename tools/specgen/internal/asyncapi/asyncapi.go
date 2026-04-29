@@ -24,17 +24,18 @@ type Input struct {
 // SpecMetadata is the subset of runner.SpecMetadata the asyncapi builder needs.
 // Defined here (not imported from runner) to avoid an import cycle.
 type SpecMetadata struct {
-	OrgName        string
-	OrgURL         string
-	OrgEmail       string
-	LicenseName    string
-	LicenseURL     string
-	AsyncAPIServer ServerEntry
+	OrgName         string
+	OrgURL          string
+	OrgEmail        string
+	LicenseName     string
+	LicenseURL      string
+	AsyncAPIServers map[string]ServerEntry
 }
 
 // ServerEntry mirrors runner.ServerEntry.
 type ServerEntry struct {
 	URL         string
+	Protocol    string
 	Description string
 }
 
@@ -313,12 +314,21 @@ func Build(in Input) ([]byte, error) {
 	yamlutil.AddMapping(docNode, "info", infoNode)
 
 	// servers — AsyncAPI 3.x servers is a mapping (not a list like OpenAPI).
+	// Iterate sorted by name for deterministic output (Go map iteration is randomised).
 	serversNode := yamlutil.Mapping()
-	kafkaServerNode := yamlutil.Mapping()
-	yamlutil.AddScalar(kafkaServerNode, "host", in.Metadata.AsyncAPIServer.URL)
-	yamlutil.AddScalar(kafkaServerNode, "protocol", "kafka")
-	yamlutil.AddScalar(kafkaServerNode, "description", in.Metadata.AsyncAPIServer.Description)
-	yamlutil.AddMapping(serversNode, "kafka", kafkaServerNode)
+	serverNames := make([]string, 0, len(in.Metadata.AsyncAPIServers))
+	for name := range in.Metadata.AsyncAPIServers {
+		serverNames = append(serverNames, name)
+	}
+	sort.Strings(serverNames)
+	for _, name := range serverNames {
+		srv := in.Metadata.AsyncAPIServers[name]
+		serverNode := yamlutil.Mapping()
+		yamlutil.AddScalar(serverNode, "host", srv.URL)
+		yamlutil.AddScalar(serverNode, "protocol", srv.Protocol)
+		yamlutil.AddScalar(serverNode, "description", srv.Description)
+		yamlutil.AddMapping(serversNode, name, serverNode)
+	}
 	yamlutil.AddMapping(docNode, "servers", serversNode)
 
 	// channels — one per ExposureKey group.

@@ -4,18 +4,19 @@ package runner
 // Repo-internal: services do not override these. Adjust here when the
 // org/license/server URL changes.
 type SpecMetadata struct {
-	OrgName        string
-	OrgURL         string
-	OrgEmail       string
-	LicenseName    string
-	LicenseURL     string
-	OpenAPIServer  ServerEntry
-	AsyncAPIServer ServerEntry
+	OrgName         string
+	OrgURL          string
+	OrgEmail        string
+	LicenseName     string
+	LicenseURL      string
+	OpenAPIServer   ServerEntry
+	AsyncAPIServers map[string]ServerEntry
 }
 
 // ServerEntry models one OpenAPI/AsyncAPI servers entry.
 type ServerEntry struct {
 	URL         string
+	Protocol    string // AsyncAPI only ("kafka" or "nats"); ignored for OpenAPI
 	Description string
 }
 
@@ -30,8 +31,16 @@ var Metadata = SpecMetadata{
 		URL:         "http://localhost:8080",
 		Description: "Local k3d gateway",
 	},
-	AsyncAPIServer: ServerEntry{
-		URL:         "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092",
-		Description: "Local Kafka bootstrap",
+	AsyncAPIServers: map[string]ServerEntry{
+		"kafka": {
+			URL:         "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092",
+			Protocol:    "kafka",
+			Description: "Local Kafka bootstrap (kafka cluster)",
+		},
+		"jetstream": {
+			URL:         "nats://nats.platform.svc.cluster.local:4222",
+			Protocol:    "nats",
+			Description: "Local NATS JetStream (jetstream cluster)",
+		},
 	},
 }

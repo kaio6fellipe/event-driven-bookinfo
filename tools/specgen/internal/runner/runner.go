@@ -95,6 +95,27 @@ func writeFile(path string, data []byte) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
+// buildAsyncMetadata converts the global Metadata into asyncapi.SpecMetadata,
+// copying the multi-server map so the asyncapi package stays import-cycle free.
+func buildAsyncMetadata() asyncapi.SpecMetadata {
+	servers := make(map[string]asyncapi.ServerEntry, len(Metadata.AsyncAPIServers))
+	for name, srv := range Metadata.AsyncAPIServers {
+		servers[name] = asyncapi.ServerEntry{
+			URL:         srv.URL,
+			Protocol:    srv.Protocol,
+			Description: srv.Description,
+		}
+	}
+	return asyncapi.SpecMetadata{
+		OrgName:         Metadata.OrgName,
+		OrgURL:          Metadata.OrgURL,
+		OrgEmail:        Metadata.OrgEmail,
+		LicenseName:     Metadata.LicenseName,
+		LicenseURL:      Metadata.LicenseURL,
+		AsyncAPIServers: servers,
+	}
+}
+
 func generateOne(repoRoot string, svc Service) error {
 	apiDir := filepath.Join(repoRoot, "services", svc.Name, "api")
 	deployDir := filepath.Join(repoRoot, "deploy", svc.Name)
@@ -155,17 +176,7 @@ func generateOne(repoRoot string, svc Service) error {
 			ServiceName: svc.Name,
 			Version:     version, // ok if empty when only AsyncAPI side present
 			Exposed:     exposed,
-			Metadata: asyncapi.SpecMetadata{
-				OrgName:     Metadata.OrgName,
-				OrgURL:      Metadata.OrgURL,
-				OrgEmail:    Metadata.OrgEmail,
-				LicenseName: Metadata.LicenseName,
-				LicenseURL:  Metadata.LicenseURL,
-				AsyncAPIServer: asyncapi.ServerEntry{
-					URL:         Metadata.AsyncAPIServer.URL,
-					Description: Metadata.AsyncAPIServer.Description,
-				},
-			},
+			Metadata:    buildAsyncMetadata(),
 		})
 		if err != nil {
 			return fmt.Errorf("building AsyncAPI: %w", err)

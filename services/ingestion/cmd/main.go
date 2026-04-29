@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/config"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging/kafkapub"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/metrics"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/profiling"
@@ -77,11 +78,12 @@ func main() {
 	outboundClient := &http.Client{Timeout: 30 * time.Second}
 	fetcher := openlibrary.NewClient(outboundClient)
 
-	publisher, err := messagingadapter.NewProducer(ctx, cfg.KafkaBrokers, cfg.KafkaTopic)
+	kPub, err := kafkapub.NewProducer(ctx, cfg.KafkaBrokers, cfg.KafkaTopic)
 	if err != nil {
 		logger.Error("failed to create Kafka producer", "error", err)
 		os.Exit(1)
 	}
+	publisher := messagingadapter.NewProducer(kPub)
 	defer publisher.Close()
 
 	svc := service.NewIngestionService(fetcher, publisher, cfg.SearchQueries, cfg.MaxResultsPerQuery)

@@ -33,13 +33,13 @@ func TestPublishBookAdded(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		book        domain.Book
-		wantKey     string
-		wantISBN10  string
-		wantISBN13  string
-		wantCEType  string
-		wantAuthor  string
+		name       string
+		book       domain.Book
+		wantKey    string
+		wantISBN10 string
+		wantISBN13 string
+		wantCEType string
+		wantAuthor string
 	}{
 		{
 			name: "valid book with ISBN-13",

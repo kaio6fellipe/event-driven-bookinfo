@@ -199,6 +199,11 @@ clean: ##@Cleanup Remove build output directories
 
 # ─── Kubernetes (local) ──────────────────────────────────────────────────────
 
+# Accept both `make ... eventbus=jetstream` (lowercase, user-friendly) and
+# `EVENTBUS=jetstream make ...` (uppercase env-var convention).
+ifdef eventbus
+EVENTBUS := $(eventbus)
+endif
 EVENTBUS       ?= kafka
 ifeq ($(filter $(EVENTBUS),kafka jetstream),)
 $(error EVENTBUS must be 'kafka' or 'jetstream', got '$(EVENTBUS)')

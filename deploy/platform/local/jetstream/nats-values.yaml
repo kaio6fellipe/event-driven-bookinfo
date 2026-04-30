@@ -10,6 +10,13 @@
 # scratch space and gets wiped when the cluster is torn down, which is
 # the right local-dev behaviour. For any non-local environment, switch
 # to pvc.enabled=true (or memoryStore) and re-evaluate.
+# Auth note: the chart serialises config.merge to JSON, which means
+# any "$TOKEN" reference becomes a literal quoted string ("$TOKEN")
+# rather than an env-var substitution (NATS only resolves $VAR
+# outside quoted strings). So the server-side token is hardcoded
+# here — it must match the value in nats-token-secret.yaml, which
+# the EventBus accessSecret + pod NATS_TOKEN consume client-side.
+# Local-dev only.
 config:
   cluster:
     enabled: false
@@ -22,17 +29,11 @@ config:
         size: 1Gi
   merge:
     authorization:
-      token: $TOKEN
+      token: local-dev-token
 container:
   image:
     repository: nats
     tag: 2.10-alpine
-  env:
-    TOKEN:
-      valueFrom:
-        secretKeyRef:
-          name: nats-client-token
-          key: token
 service:
   enabled: true
   ports:

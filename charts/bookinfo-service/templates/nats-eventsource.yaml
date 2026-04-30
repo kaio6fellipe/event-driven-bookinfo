@@ -1,4 +1,11 @@
-{{/* charts/bookinfo-service/templates/jetstream-eventsource.yaml */}}
+{{/* charts/bookinfo-service/templates/nats-eventsource.yaml */}}
+{{/*
+  Argo Events does not have a 'jetstream:' EventSource type — JetStream
+  subjects are consumed via the 'nats:' EventSource (NATS pub/sub
+  subscription on the JetStream subject). The EventBus itself is
+  jetstreamExotic, but the bridge from a JetStream subject into the
+  EventBus is a 'nats' EventSource.
+*/}}
 {{- if eq .Values.events.bus.type "jetstream" }}
 {{- range $eventName, $event := .Values.events.exposed }}
 ---
@@ -24,13 +31,23 @@ spec:
         - name: OTEL_SERVICE_NAME
           value: {{ printf "%s-%s-eventsource" (include "bookinfo-service.fullname" $) $eventName | quote }}
     {{- end }}
-  jetstream:
+  nats:
     {{ $eventName }}:
       url: {{ required "events.jetstream.url must be set when bus.type=jetstream and events.exposed is defined" $.Values.events.jetstream.url | quote }}
-      accessSecret:
-        name: {{ $.Values.events.jetstream.tokenSecret.name | quote }}
-        key:  {{ $.Values.events.jetstream.tokenSecret.authKey | quote }}
-      subject: {{ required (printf "events.exposed.%s.topic is required (used as JetStream subject)" $eventName) $event.topic | quote }}
+      subject: {{ required (printf "events.exposed.%s.topic is required (used as NATS subject)" $eventName) $event.topic | quote }}
       jsonBody: true
+      auth:
+        basic:
+          username:
+            name: {{ $.Values.events.jetstream.tokenSecret.name | quote }}
+            key:  {{ $.Values.events.jetstream.tokenSecret.userKey | quote }}
+          password:
+            name: {{ $.Values.events.jetstream.tokenSecret.name | quote }}
+            key:  {{ $.Values.events.jetstream.tokenSecret.passwordKey | quote }}
+      {{- if $.Values.events.jetstream.tlsInsecure }}
+      tls:
+        enabled: true
+        insecureSkipVerify: true
+      {{- end }}
 {{- end }}
 {{- end }}

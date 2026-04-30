@@ -31,7 +31,6 @@
         "enabled": { "type": "boolean" },
         "read": { "type": "object" },
         "write": { "type": "object" },
-        "eventBusName": { "type": "string" },
         "endpoints": { "type": "object" }
       }
     },
@@ -154,10 +153,32 @@
     "events": {
       "type": "object",
       "properties": {
+        "bus": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["kafka", "jetstream"] }
+          }
+        },
         "kafka": {
           "type": "object",
           "properties": {
             "broker": { "type": "string" }
+          }
+        },
+        "jetstream": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" },
+            "tlsInsecure": { "type": "boolean" },
+            "tokenSecret": {
+              "type": "object",
+              "properties": {
+                "name":        { "type": "string" },
+                "userKey":     { "type": "string" },
+                "passwordKey": { "type": "string" },
+                "authKey":     { "type": "string" }
+              }
+            }
           }
         },
         "exposed": {
@@ -166,8 +187,8 @@
             "type": "object",
             "properties": {
               "topic": { "type": "string" },
-              "eventBusName": { "type": "string" },
-              "contentType": { "type": "string" }
+              "contentType": { "type": "string" },
+              "eventTypes": { "type": "array", "items": { "type": "string" } }
             },
             "required": ["topic"]
           }

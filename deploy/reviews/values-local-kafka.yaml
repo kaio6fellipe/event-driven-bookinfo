@@ -1,0 +1,52 @@
+# deploy/reviews/values-local-kafka.yaml
+serviceName: reviews
+fullnameOverride: reviews
+image:
+  repository: event-driven-bookinfo/reviews
+  tag: local
+
+postgresql:
+  enabled: true
+  auth:
+    database: "bookinfo_reviews"
+
+config:
+  LOG_LEVEL: "debug"
+  EVENT_BACKEND: "kafka"
+  RATINGS_SERVICE_URL: "http://ratings.bookinfo.svc.cluster.local"
+  KAFKA_BROKERS: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
+  KAFKA_TOPIC: "bookinfo_reviews_events"
+
+observability:
+  otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+  pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"
+
+cqrs:
+  enabled: true
+  read:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  write:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+sensor:
+  dlq:
+    url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"
+
+gateway:
+  name: default-gw
+  namespace: platform
+  sectionName: web
+
+events:
+  bus:
+    type: kafka
+  kafka:
+    broker: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"

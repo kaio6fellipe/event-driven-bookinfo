@@ -22,7 +22,7 @@ flowchart LR
     subgraph "Command Side"
         subgraph "Argo Events"
             Webhook[Webhook]
-            Kafka[[Kafka EventBus]]
+            Kafka[[EventBus<br/>kafka or jetstream]]
             Sensor[Sensor]
         end
         WriteSvc[Write Services]
@@ -307,7 +307,7 @@ make stop         # Stop and remove containers
 | `make e2e` | Run E2E tests via docker-compose |
 | `make clean` | Remove `bin/` and `dist/` directories |
 | `make help` | List all available targets |
-| `make run-k8s` | Full local k8s setup (cluster, platform, observability, deploy, seed) |
+| `make run-k8s` | Full local k8s setup (cluster, platform, observability, deploy, seed). Pass `eventbus=jetstream` to use the NATS JetStream cluster instead of Kafka. |
 | `make stop-k8s` | Delete k3d cluster and all resources |
 | `make k8s-rebuild` | Fast iteration: rebuild images, reimport, rollout restart |
 | `make k8s-status` | Show pod status across all namespaces + access URLs |
@@ -507,6 +507,15 @@ Each backend service deploys as two separate Deployments sharing the same image 
 
 > `ingestion` deploys as a single stateless deployment with no CQRS split — it is a pure event producer and is omitted from the table above.
 
+### Choosing an EventBus
+
+This repo supports two interchangeable EventBus implementations:
+
+- **Kafka** (default): `make run-k8s eventbus=kafka` (or just `make run-k8s`). Strimzi operator + Kafka KRaft single-node. See [`docs/kafka-eventbus.md`](docs/kafka-eventbus.md).
+- **NATS JetStream**: `make run-k8s eventbus=jetstream`. cert-manager + standalone NATS Helm chart with JetStream + TLS, EventBus uses `jetstreamExotic`. See [`docs/jetstream-eventbus.md`](docs/jetstream-eventbus.md).
+
+The two clusters (`bookinfo-kafka-local`, `bookinfo-jetstream-local`) are mutually exclusive — start one, `make stop-k8s` it before starting the other. The runtime image is identical; backend selection happens at pod startup via the `EVENT_BACKEND` env var.
+
 ### Usage
 
 ```bash
@@ -573,6 +582,10 @@ A background poll loop ticks every `POLL_INTERVAL` (default 5m). For each query 
 The Helm chart creates a Kafka EventSource (`ingestion-raw-books-details`) that reads from the topic and makes it available on the EventBus. Downstream services (like `details`) declare `events.consumed` in their Helm values to create a Consumer Sensor with triggers, independently of the CQRS webhook Sensor.
 
 Configuration via `KAFKA_BROKERS`, `KAFKA_TOPIC`, `POLL_INTERVAL`, `SEARCH_QUERIES`, and `MAX_RESULTS_PER_QUERY` environment variables. The topic is auto-created on startup if it doesn't exist. Because idempotency is enforced at the write service, replays and overlapping cycles are safe.
+
+### AsyncAPI specs
+
+Each producer service ships a generated `services/<svc>/api/asyncapi.yaml` (produced by `tools/specgen`). The spec declares both a `kafka` server (`protocol: kafka`, pointing at the Strimzi bootstrap) and a `jetstream` server (`protocol: nats`, pointing at the NATS cluster), reflecting the two interchangeable EventBus implementations. Both servers reference the same channels — the spec describes the event contract independently of which bus is active at runtime.
 
 ---
 

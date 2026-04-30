@@ -1,0 +1,141 @@
+# deploy/notification/values-local-jetstream.yaml
+serviceName: notification
+fullnameOverride: notification
+image:
+  repository: event-driven-bookinfo/notification
+  tag: local
+
+postgresql:
+  enabled: true
+  auth:
+    database: "bookinfo_notification"
+
+config:
+  LOG_LEVEL: "debug"
+  EVENT_BACKEND: "jetstream"
+  NATS_URL: "nats://nats.platform.svc.cluster.local:4222"
+
+observability:
+  otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+  pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"
+
+events:
+  bus:
+    type: jetstream
+  jetstream:
+    url: "nats://nats.platform.svc.cluster.local:4222"
+    tlsInsecure: true
+    tokenSecret:
+      name: nats-client-token
+      userKey:     username
+      passwordKey: password
+      authKey:  auth.yaml
+  consumed:
+    book-added:
+      eventSourceName: details-events
+      eventName: events
+      filter:
+        ceType: com.bookinfo.details.book-added
+      triggers:
+        - name: notify-book-added
+          url: self
+          path: /v1/notifications
+          method: POST
+          payload:
+            - src:
+                dependencyName: book-added-dep
+                dataKey: body.title
+              dest: subject
+            - src:
+                value: "New book added"
+              dest: body
+            - src:
+                value: "system@bookinfo"
+              dest: recipient
+            - src:
+                value: "email"
+              dest: channel
+      dlq:
+        enabled: true
+        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"
+    review-submitted:
+      eventSourceName: reviews-events
+      eventName: events
+      filter:
+        ceType: com.bookinfo.reviews.review-submitted
+      triggers:
+        - name: notify-review-submitted
+          url: self
+          path: /v1/notifications
+          method: POST
+          payload:
+            - src:
+                dependencyName: review-submitted-dep
+                dataKey: body.product_id
+              dest: subject
+            - src:
+                value: "New review submitted"
+              dest: body
+            - src:
+                value: "system@bookinfo"
+              dest: recipient
+            - src:
+                value: "email"
+              dest: channel
+      dlq:
+        enabled: true
+        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"
+    review-deleted:
+      eventSourceName: reviews-events
+      eventName: events
+      filter:
+        ceType: com.bookinfo.reviews.review-deleted
+      triggers:
+        - name: notify-review-deleted
+          url: self
+          path: /v1/notifications
+          method: POST
+          payload:
+            - src:
+                dependencyName: review-deleted-dep
+                dataKey: body.review_id
+              dest: subject
+            - src:
+                value: "Review deleted"
+              dest: body
+            - src:
+                value: "system@bookinfo"
+              dest: recipient
+            - src:
+                value: "email"
+              dest: channel
+      dlq:
+        enabled: true
+        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"
+    rating-submitted:
+      eventSourceName: ratings-events
+      eventName: events
+      filter:
+        ceType: com.bookinfo.ratings.rating-submitted
+      triggers:
+        - name: notify-rating-submitted
+          url: self
+          path: /v1/notifications
+          method: POST
+          payload:
+            - src:
+                dependencyName: rating-submitted-dep
+                dataKey: body.product_id
+              dest: subject
+            - src:
+                value: "New rating submitted"
+              dest: body
+            - src:
+                value: "system@bookinfo"
+              dest: recipient
+            - src:
+                value: "email"
+              dest: channel
+      dlq:
+        enabled: true
+        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"

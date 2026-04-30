@@ -1,0 +1,57 @@
+package telemetry
+
+import (
+	"context"
+
+	"github.com/nats-io/nats.go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
+)
+
+// natsHeaderCarrier adapts nats.Header to propagation.TextMapCarrier for
+// W3C trace context propagation over JetStream message headers.
+type natsHeaderCarrier nats.Header
+
+func (c natsHeaderCarrier) Get(key string) string { return nats.Header(c).Get(key) }
+func (c natsHeaderCarrier) Set(key, val string)   { nats.Header(c).Set(key, val) }
+func (c natsHeaderCarrier) Keys() []string {
+	keys := make([]string, 0, len(c))
+	for k := range c {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+var _ propagation.TextMapCarrier = natsHeaderCarrier(nil)
+
+// StartNATSProducerSpan opens a producer span around a JetStream publish
+// following OTel messaging semantic conventions. Span name is
+// "<subject> publish"; SpanKind is Producer. The caller must End() the
+// span (use defer). The idempotency_key attribute is a project-local
+// extension to the OTel messaging semconv (mirrors the kafka helper's
+// messaging.kafka.message.key but carries dedup intent rather than
+// partition routing).
+func StartNATSProducerSpan(ctx context.Context, subject, idempotencyKey string) (context.Context, trace.Span) {
+	return otel.Tracer("nats-producer").Start(ctx,
+		subject+" publish",
+		trace.WithSpanKind(trace.SpanKindProducer),
+		trace.WithAttributes(
+			attribute.String("messaging.system", "jetstream"),
+			attribute.String("messaging.destination.name", subject),
+			attribute.String("messaging.operation.type", "publish"),
+			attribute.String("messaging.message.idempotency_key", idempotencyKey),
+		),
+	)
+}
+
+// InjectTraceContextNATS writes the active span context from ctx into
+// msg.Header using the configured global TextMapPropagator. No-op when
+// ctx carries no active span. Initialises msg.Header if nil.
+func InjectTraceContextNATS(ctx context.Context, msg *nats.Msg) {
+	if msg.Header == nil {
+		msg.Header = nats.Header{}
+	}
+	otel.GetTextMapPropagator().Inject(ctx, natsHeaderCarrier(msg.Header))
+}

@@ -14,6 +14,9 @@ import (
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/config"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/database"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging/kafkapub"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging/natspub"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/idempotency"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/metrics"
@@ -21,8 +24,8 @@ import (
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/server"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/inbound/http"
-	kafkaadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/kafka"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/memory"
+	messagingadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/messaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/adapter/outbound/postgres"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/core/port"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ratings/internal/core/service"
@@ -108,24 +111,8 @@ func main() {
 		idemStore = idempotency.NewMemoryStore()
 	}
 
-	var publisher port.EventPublisher
-	if cfg.KafkaBrokers != "" {
-		topic := cfg.KafkaTopic
-		if topic == "" {
-			topic = "bookinfo_ratings_events"
-		}
-		kProd, err := kafkaadapter.NewProducer(ctx, cfg.KafkaBrokers, topic)
-		if err != nil {
-			logger.Error("failed to create Kafka producer", "error", err)
-			os.Exit(1)
-		}
-		defer kProd.Close()
-		publisher = kProd
-		logger.Info("kafka publisher enabled", "topic", topic)
-	} else {
-		publisher = kafkaadapter.NewNoopPublisher()
-		logger.Info("kafka publisher disabled — using no-op")
-	}
+	publisher, closePublisher := buildPublisher(ctx, cfg, logger)
+	defer closePublisher()
 
 	svc := service.NewRatingService(repo, idemStore, publisher)
 	h := handler.NewHandler(svc)
@@ -138,4 +125,49 @@ func main() {
 		logger.Error("server error", "error", err)
 		os.Exit(1)
 	}
+}
+
+// buildPublisher selects a publisher based on EVENT_BACKEND. It returns
+// the publisher and a cleanup function to release underlying resources.
+func buildPublisher(ctx context.Context, cfg *config.Config, logger *slog.Logger) (port.EventPublisher, func()) {
+	backend := os.Getenv("EVENT_BACKEND")
+	switch backend {
+	case "kafka", "":
+		if cfg.KafkaBrokers == "" {
+			logger.Info("kafka publisher disabled — using no-op")
+			return messagingadapter.NewNoopPublisher(), func() {}
+		}
+		d := events.Find(messagingadapter.Exposed, "rating-submitted")
+		kPub, err := kafkapub.NewProducer(ctx, cfg.KafkaBrokers, d.Topic)
+		if err != nil {
+			logger.Error("failed to create Kafka producer", "error", err)
+			os.Exit(1)
+		}
+		kProd := messagingadapter.NewProducer(kPub)
+		logger.Info("kafka publisher enabled", "topic", d.Topic)
+		return kProd, kProd.Close
+	case "jetstream":
+		// No no-op fallback for jetstream: it is k8s-only; missing NATS_URL is a config error, not a degraded mode.
+		natsURL := os.Getenv("NATS_URL")
+		if natsURL == "" {
+			logger.Error("NATS_URL must be set when EVENT_BACKEND=jetstream")
+			os.Exit(1)
+		}
+		user := os.Getenv("NATS_USER")
+		password := os.Getenv("NATS_PASSWORD")
+		tlsInsecure := os.Getenv("NATS_TLS_INSECURE") == "true"
+		d := events.Find(messagingadapter.Exposed, "rating-submitted")
+		np, err := natspub.NewProducer(ctx, natsURL, user, password, tlsInsecure, d.Topic, d.Topic)
+		if err != nil {
+			logger.Error("failed to create NATS producer", "error", err)
+			os.Exit(1)
+		}
+		nProd := messagingadapter.NewProducer(np)
+		logger.Info("jetstream publisher enabled", "topic", d.Topic)
+		return nProd, nProd.Close
+	default:
+		logger.Error("unknown EVENT_BACKEND", "value", backend)
+		os.Exit(1)
+	}
+	return nil, func() {} // unreachable
 }

@@ -9,7 +9,7 @@ metadata:
   labels:
     {{- include "bookinfo-service.labels" . | nindent 4 }}
 spec:
-  eventBusName: {{ .Values.events.busName }}
+  eventBusName: default
   {{- with .Values.observability.otelEndpoint }}
   template:
     container:

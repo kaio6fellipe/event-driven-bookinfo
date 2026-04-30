@@ -1,0 +1,18 @@
+# deploy/platform/local/jetstream/eventbus-jetstream.yaml
+#
+# Argo Events EventBus pointing at the standalone NATS deployment
+# (jetstreamExotic, not jetstream — we manage the NATS server
+# ourselves via the nats-io/nats Helm chart instead of letting
+# Argo Events provision an embedded one).
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: default
+  namespace: bookinfo
+spec:
+  jetstreamExotic:
+    url: nats://nats.platform.svc.cluster.local:4222
+    accessSecret:
+      name: nats-client-token
+      key: auth.yaml
+    streamConfig: ""

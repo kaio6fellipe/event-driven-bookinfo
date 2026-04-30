@@ -1,0 +1,11 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: default
+  namespace: bookinfo
+spec:
+  kafka:
+    url: bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092
+    topic: argo-events
+    version: "4.2.0"
+    consumerBatchMaxWait: "0"

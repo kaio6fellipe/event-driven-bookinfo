@@ -26,9 +26,17 @@ func TestBuild_FixtureMatchesGolden(t *testing.T) {
 			OrgEmail:    "noreply@bookinfo.local",
 			LicenseName: "Apache-2.0",
 			LicenseURL:  "https://www.apache.org/licenses/LICENSE-2.0",
-			AsyncAPIServer: asyncapi.ServerEntry{
-				URL:         "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092",
-				Description: "Local Kafka bootstrap",
+			AsyncAPIServers: map[string]asyncapi.ServerEntry{
+				"kafka": {
+					URL:         "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092",
+					Protocol:    "kafka",
+					Description: "Local Kafka bootstrap (kafka cluster)",
+				},
+				"jetstream": {
+					URL:         "nats://nats.platform.svc.cluster.local:4222",
+					Protocol:    "nats",
+					Description: "Local NATS JetStream (jetstream cluster)",
+				},
 			},
 		},
 	})

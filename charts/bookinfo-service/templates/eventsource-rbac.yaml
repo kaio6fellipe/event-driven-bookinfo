@@ -1,0 +1,29 @@
+{{/* charts/bookinfo-service/templates/eventsource-rbac.yaml */}}
+{{- if .Values.events.exposed }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "bookinfo-service.fullname" . }}-eventsource-leader-election
+  labels:
+    {{- include "bookinfo-service.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "create", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "bookinfo-service.fullname" . }}-eventsource-leader-election
+  labels:
+    {{- include "bookinfo-service.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "bookinfo-service.fullname" . }}-eventsource-leader-election
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "bookinfo-service.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

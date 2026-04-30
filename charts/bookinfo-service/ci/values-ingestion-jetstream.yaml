@@ -1,0 +1,29 @@
+# charts/bookinfo-service/ci/values-ingestion-jetstream.yaml
+# ct install test: NATS JetStream producer + EventSource (no CQRS)
+serviceName: ingestion
+fullnameOverride: ingestion
+image:
+  repository: event-driven-bookinfo/ingestion
+  tag: latest
+
+config:
+  LOG_LEVEL: "debug"
+  POLL_INTERVAL: "5m"
+  SEARCH_QUERIES: "programming"
+  MAX_RESULTS_PER_QUERY: "5"
+
+events:
+  bus:
+    type: jetstream
+  jetstream:
+    url: "nats://nats.platform.svc.cluster.local:4222"
+    tlsInsecure: true
+    tokenSecret:
+      name: nats-client-token
+      userKey:     username
+      passwordKey: password
+      authKey:  auth.yaml
+  exposed:
+    raw-books-details:
+      topic: raw_books_details
+      contentType: application/json

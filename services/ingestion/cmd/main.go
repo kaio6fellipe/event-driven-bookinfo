@@ -12,13 +12,16 @@ import (
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/config"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/events"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging/kafkapub"
+	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/eventsmessaging/natspub"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/logging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/metrics"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/profiling"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/server"
 	"github.com/kaio6fellipe/event-driven-bookinfo/pkg/telemetry"
 	handler "github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/adapter/inbound/http"
-	kafkaadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/adapter/outbound/kafka"
+	messagingadapter "github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/adapter/outbound/messaging"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/adapter/outbound/openlibrary"
 	"github.com/kaio6fellipe/event-driven-bookinfo/services/ingestion/internal/core/service"
 )
@@ -77,9 +80,40 @@ func main() {
 	outboundClient := &http.Client{Timeout: 30 * time.Second}
 	fetcher := openlibrary.NewClient(outboundClient)
 
-	publisher, err := kafkaadapter.NewProducer(ctx, cfg.KafkaBrokers, cfg.KafkaTopic)
-	if err != nil {
-		logger.Error("failed to create Kafka producer", "error", err)
+	// ingestion has no no-op fallback in either backend — it must be wired to a real broker.
+	backend := os.Getenv("EVENT_BACKEND")
+	var publisher *messagingadapter.Producer
+	switch backend {
+	case "kafka", "":
+		if cfg.KafkaBrokers == "" {
+			logger.Error("KAFKA_BROKERS is required for ingestion service")
+			os.Exit(1)
+		}
+		kPub, err := kafkapub.NewProducer(ctx, cfg.KafkaBrokers, cfg.KafkaTopic)
+		if err != nil {
+			logger.Error("failed to create Kafka producer", "error", err)
+			os.Exit(1)
+		}
+		publisher = messagingadapter.NewProducer(kPub)
+	case "jetstream":
+		// No no-op fallback for jetstream: it is k8s-only; missing NATS_URL is a config error, not a degraded mode.
+		natsURL := os.Getenv("NATS_URL")
+		if natsURL == "" {
+			logger.Error("NATS_URL must be set when EVENT_BACKEND=jetstream")
+			os.Exit(1)
+		}
+		user := os.Getenv("NATS_USER")
+		password := os.Getenv("NATS_PASSWORD")
+		tlsInsecure := os.Getenv("NATS_TLS_INSECURE") == "true"
+		d := events.Find(messagingadapter.Exposed, "book-added")
+		np, err := natspub.NewProducer(ctx, natsURL, user, password, tlsInsecure, d.Topic, d.Topic)
+		if err != nil {
+			logger.Error("failed to create NATS producer", "error", err)
+			os.Exit(1)
+		}
+		publisher = messagingadapter.NewProducer(np)
+	default:
+		logger.Error("unknown EVENT_BACKEND", "value", backend)
 		os.Exit(1)
 	}
 	defer publisher.Close()

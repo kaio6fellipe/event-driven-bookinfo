@@ -1,0 +1,48 @@
+# deploy/productpage/values-local-jetstream.yaml
+serviceName: productpage
+fullnameOverride: productpage
+image:
+  repository: event-driven-bookinfo/productpage
+  tag: local
+
+config:
+  LOG_LEVEL: "debug"
+  EVENT_BACKEND: "jetstream"
+  NATS_URL: "nats://nats.platform.svc.cluster.local:4222"
+  STORAGE_BACKEND: "memory"
+  DETAILS_SERVICE_URL: "http://gateway.envoy-gateway-system.svc.cluster.local"
+  REVIEWS_SERVICE_URL: "http://gateway.envoy-gateway-system.svc.cluster.local"
+  RATINGS_SERVICE_URL: "http://gateway.envoy-gateway-system.svc.cluster.local"
+  REDIS_URL: "redis://redis-master.bookinfo.svc.cluster.local:6379"
+  TEMPLATE_DIR: "/templates"
+
+observability:
+  otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+  pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"
+
+events:
+  bus:
+    type: jetstream
+  jetstream:
+    url: "nats://nats.platform.svc.cluster.local:4222"
+    tlsInsecure: true
+    tokenSecret:
+      name: nats-client-token
+      userKey:     username
+      passwordKey: password
+      authKey:  auth.yaml
+
+gateway:
+  name: default-gw
+  namespace: platform
+  sectionName: web
+
+routes:
+  - name: productpage
+    path: /
+    pathType: PathPrefix
+    method: GET
+  - name: productpage-partials
+    path: /partials
+    pathType: PathPrefix
+    method: POST

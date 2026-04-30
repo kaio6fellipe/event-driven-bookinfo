@@ -152,36 +152,31 @@ routes: []
   #   pathType: PathPrefix     # PathPrefix or Exact
   #   method: GET              # HTTP method
 
-# -- Kafka event pipeline (independent of CQRS)
+# -- Event pipeline (independent of CQRS)
 events:
-  # -- Default Argo Events EventBus name. Used by EventSource (CQRS webhook),
-  # kafka EventSource (exposed events), and Sensor (CQRS + consumer).
-  busName: kafka
+  # -- Bus selection. Templates branch on bus.type to render the right
+  # EventSource (kafka or jetstream). EventBus CR name is hardcoded
+  # to "default" inside the chart — only one EventBus per cluster.
+  bus:
+    type: kafka              # kafka | jetstream
   kafka:
-    broker: ""
+    broker: ""               # bootstrap host:port; injected as KAFKA_BROKERS
+  jetstream:
+    url: ""                  # nats://host:port; injected as NATS_URL
+    tlsInsecure: false       # client TLS InsecureSkipVerify (local-dev with self-signed certs)
+    tokenSecret:
+      name: nats-client-token
+      userKey: username      # mounted as NATS_USER env in app pods
+      passwordKey: password  # mounted as NATS_PASSWORD env in app pods
+      authKey: auth.yaml     # YAML auth file; consumed by Argo Events accessSecret
   exposed: {}
     # event-name:
-    #   topic: kafka_topic_name
+    #   topic: kafka_topic_or_nats_subject
     #   contentType: application/json
-    #   eventTypes:                        # optional, rendered as bookinfo.io/emitted-ce-types annotation on the EventSource
+    #   eventTypes:
     #     - com.bookinfo.<service>.<event>
   consumed: {}
-    # event-name:
-    #   eventSourceName: producer-event-name
-    #   eventName: event-name
-    #   filter:                             # optional
-    #     ceType: com.bookinfo.<service>.<event>   # matches Argo Events filters.context.type
-    #   triggers:
-    #     - name: trigger-name
-    #       url: self
-    #       path: /v1/endpoint             # required when url is "self"
-    #       method: POST
-    #       payload:
-    #         - passthrough
-    #   retryStrategy: {}
-    #   dlq:
-    #     enabled: true
-    #     url: ""
+    # (unchanged shape; documented in deploy/<svc>/values-local-*.yaml examples)
 
 # -- PostgreSQL (Bitnami subchart)
 postgresql:

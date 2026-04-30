@@ -95,6 +95,7 @@ docker-build-all: ##@Docker Build Docker images for all 5 services
 # Colors
 GREEN  := \033[0;32m
 RED    := \033[0;31m
+YELLOW := \033[0;33m
 CYAN   := \033[0;36m
 BOLD   := \033[1m
 NC     := \033[0m
@@ -198,7 +199,16 @@ clean: ##@Cleanup Remove build output directories
 
 # ─── Kubernetes (local) ──────────────────────────────────────────────────────
 
-K8S_CLUSTER    := bookinfo-local
+# Accept both `make ... eventbus=jetstream` (lowercase, user-friendly) and
+# `EVENTBUS=jetstream make ...` (uppercase env-var convention).
+ifdef eventbus
+EVENTBUS := $(eventbus)
+endif
+EVENTBUS       ?= kafka
+ifeq ($(filter $(EVENTBUS),kafka jetstream),)
+$(error EVENTBUS must be 'kafka' or 'jetstream', got '$(EVENTBUS)')
+endif
+K8S_CLUSTER    := bookinfo-$(EVENTBUS)-local
 K8S_CONTEXT    := k3d-$(K8S_CLUSTER)
 K8S_NS_PLATFORM     := platform
 K8S_NS_OBSERVABILITY := observability
@@ -249,31 +259,18 @@ stop-k8s: ##@Kubernetes Delete k3d cluster and all resources
 	fi
 
 .PHONY: k8s-platform
-k8s-platform: ##@Kubernetes Install platform: Envoy Gateway, Strimzi, Kafka, Argo Events, EventBus
+k8s-platform: ##@Kubernetes Install platform: Envoy Gateway, $(EVENTBUS) bus, Argo Events, EventBus
 	$(k8s-guard)
-	@printf "\n$(BOLD)═══ Platform Layer ═══$(NC)\n\n"
+	@printf "\n$(BOLD)═══ Platform Layer ($(EVENTBUS)) ═══$(NC)\n\n"
 	@$(KUBECTL) create namespace $(K8S_NS_PLATFORM) --dry-run=client -o yaml | $(KUBECTL) apply -f -
-	@printf "$(BOLD)[1/6] Installing Envoy Gateway...$(NC)\n"
+	@printf "$(BOLD)[1/5] Installing Envoy Gateway...$(NC)\n"
 	@$(HELM) upgrade --install eg oci://docker.io/envoyproxy/gateway-helm \
 		--version v1.7.0 \
 		-n envoy-gateway-system --create-namespace \
 		--wait --timeout 120s
 	@printf "  $(GREEN)Envoy Gateway controller ready.$(NC)\n"
-	@printf "$(BOLD)[2/6] Installing Strimzi operator...$(NC)\n"
-	@$(HELM) repo add strimzi https://strimzi.io/charts/ --force-update 2>/dev/null || true
-	@$(HELM) upgrade --install strimzi strimzi/strimzi-kafka-operator \
-		-n $(K8S_NS_PLATFORM) \
-		-f deploy/platform/local/strimzi-values.yaml \
-		--wait --timeout 120s
-	@printf "  $(GREEN)Strimzi operator ready.$(NC)\n"
-	@printf "$(BOLD)[3/6] Deploying Kafka cluster (KRaft)...$(NC)\n"
-	@$(KUBECTL) apply -f deploy/platform/local/kafka-nodepool.yaml
-	@$(KUBECTL) apply -f deploy/platform/local/kafka-cluster.yaml
-	@printf "  Waiting for Kafka cluster to be ready (this takes ~60-90s)...\n"
-	@$(KUBECTL) wait kafka/bookinfo-kafka -n $(K8S_NS_PLATFORM) \
-		--for=condition=Ready --timeout=300s
-	@printf "  $(GREEN)Kafka cluster ready.$(NC)\n"
-	@printf "$(BOLD)[4/6] Installing Argo Events controller...$(NC)\n"
+	@$(MAKE) --no-print-directory k8s-platform-$(EVENTBUS)
+	@printf "$(BOLD)[3/5] Installing Argo Events controller...$(NC)\n"
 	@$(HELM) repo add argo https://argoproj.github.io/argo-helm --force-update 2>/dev/null || true
 	@$(HELM) upgrade --install argo-events argo/argo-events \
 		-n $(K8S_NS_PLATFORM) \
@@ -284,17 +281,71 @@ k8s-platform: ##@Kubernetes Install platform: Envoy Gateway, Strimzi, Kafka, Arg
 	@curl -sL https://github.com/kaio6fellipe/event-driven-bookinfo/releases/download/argo-events-prs-3961-3983/argoproj.io_eventsources.yaml | $(KUBECTL) apply --server-side --force-conflicts -f -
 	@curl -sL https://github.com/kaio6fellipe/event-driven-bookinfo/releases/download/argo-events-prs-3961-3983/argoproj.io_sensors.yaml | $(KUBECTL) apply --server-side --force-conflicts -f -
 	@printf "  $(GREEN)Argo Events controller ready (custom CRDs applied).$(NC)\n"
-	@printf "$(BOLD)[5/6] Deploying EventBus...$(NC)\n"
+	@printf "$(BOLD)[4/5] Deploying EventBus ($(EVENTBUS))...$(NC)\n"
 	@$(KUBECTL) create namespace $(K8S_NS_BOOKINFO) --dry-run=client -o yaml | $(KUBECTL) apply -f -
-	@$(KUBECTL) apply -f deploy/platform/local/eventbus.yaml
+	@$(MAKE) --no-print-directory k8s-eventbus-$(EVENTBUS)
 	@printf "  $(GREEN)EventBus applied.$(NC)\n"
-	@printf "$(BOLD)[6/6] Applying Gateway default-gw...$(NC)\n"
+	@printf "$(BOLD)[5/5] Applying Gateway default-gw...$(NC)\n"
 	@$(KUBECTL) apply -k deploy/gateway/base/
 	@printf "  Waiting for Gateway to be programmed...\n"
 	@$(KUBECTL) wait gateway/default-gw -n $(K8S_NS_PLATFORM) \
 		--for=condition=Programmed --timeout=10s || \
 		printf "  $(YELLOW)Gateway not yet programmed (will reconcile after observability stack is deployed).$(NC)\n"
 	@printf "\n$(GREEN)$(BOLD)Platform layer complete.$(NC)\n\n"
+
+.PHONY: k8s-platform-kafka
+k8s-platform-kafka:
+	@printf "$(BOLD)[2/5] Installing Strimzi + Kafka...$(NC)\n"
+	@$(HELM) repo add strimzi https://strimzi.io/charts/ --force-update 2>/dev/null || true
+	@$(HELM) upgrade --install strimzi strimzi/strimzi-kafka-operator \
+		-n $(K8S_NS_PLATFORM) \
+		-f deploy/platform/local/strimzi-values.yaml \
+		--wait --timeout 120s
+	@printf "  $(GREEN)Strimzi operator ready.$(NC)\n"
+	@$(KUBECTL) apply -f deploy/platform/local/kafka-nodepool.yaml
+	@$(KUBECTL) apply -f deploy/platform/local/kafka-cluster.yaml
+	@printf "  Waiting for Kafka cluster to be ready (this takes ~60-90s)...\n"
+	@$(KUBECTL) wait kafka/bookinfo-kafka -n $(K8S_NS_PLATFORM) \
+		--for=condition=Ready --timeout=300s
+	@printf "  $(GREEN)Kafka cluster ready.$(NC)\n"
+
+.PHONY: k8s-platform-jetstream
+k8s-platform-jetstream:
+	@printf "$(BOLD)[2/5] Installing cert-manager + NATS (JetStream)...$(NC)\n"
+	@$(HELM) repo add jetstack https://charts.jetstack.io --force-update 2>/dev/null || true
+	@$(HELM) upgrade --install cert-manager jetstack/cert-manager \
+		-n cert-manager --create-namespace \
+		--version v1.16.2 \
+		--set crds.enabled=true \
+		--wait --timeout 180s
+	@printf "  $(GREEN)cert-manager ready.$(NC)\n"
+	@# Token secret has copies in both platform and bookinfo namespaces.
+	@# Ensure bookinfo exists before applying — the platform target's
+	@# bookinfo-ns creation in step [4/5] runs after this sub-target.
+	@$(KUBECTL) create namespace $(K8S_NS_BOOKINFO) --dry-run=client -o yaml | $(KUBECTL) apply -f -
+	@$(KUBECTL) apply -f deploy/platform/local/jetstream/nats-token-secret.yaml
+	@# Issue NATS TLS cert via cert-manager. Argo Events' jetstreamExotic
+	@# driver always wraps the connection in nats.Secure(InsecureSkipVerify),
+	@# so the server side must speak TLS. Cert is local-dev self-signed.
+	@$(KUBECTL) apply -f deploy/platform/local/jetstream/nats-tls.yaml
+	@printf "  Waiting for NATS TLS cert to be issued...\n"
+	@$(KUBECTL) wait certificate/nats-server-tls -n $(K8S_NS_PLATFORM) \
+		--for=condition=Ready --timeout=60s
+	@printf "  $(GREEN)NATS TLS cert ready.$(NC)\n"
+	@$(HELM) repo add nats https://nats-io.github.io/k8s/helm/charts/ --force-update 2>/dev/null || true
+	@$(HELM) upgrade --install nats nats/nats \
+		-n $(K8S_NS_PLATFORM) \
+		-f deploy/platform/local/jetstream/nats-values.yaml \
+		--wait --timeout 180s
+	@printf "  $(GREEN)NATS JetStream ready.$(NC)\n"
+
+.PHONY: k8s-eventbus-kafka
+k8s-eventbus-kafka:
+	@$(KUBECTL) apply -f deploy/platform/local/eventbus-kafka.yaml
+
+.PHONY: k8s-eventbus-jetstream
+k8s-eventbus-jetstream:
+	@$(KUBECTL) apply -f deploy/platform/local/jetstream/eventbus-jetstream.yaml
 
 .PHONY: k8s-observability
 k8s-observability: ##@Kubernetes Install observability: Prometheus, Grafana, Tempo, Loki, Pyroscope, Alloy, Headlamp
@@ -382,7 +433,7 @@ k8s-deploy: ##@Kubernetes Build images, import to k3d, deploy apps + HTTPRoutes
 		$(HELM) upgrade --install $$svc charts/bookinfo-service \
 			--namespace $(K8S_NS_BOOKINFO) \
 			$$gen \
-			-f deploy/$$svc/values-local.yaml || exit 1; \
+			-f deploy/$$svc/values-local-$(EVENTBUS).yaml || exit 1; \
 	done
 	@printf "\n$(BOLD)Waiting for deployments...$(NC)\n"
 	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write ingestion; do \
@@ -406,9 +457,17 @@ k8s-seed: ##@Kubernetes Seed databases in k8s PostgreSQL
 	@printf "\n"
 
 .PHONY: run-k8s
-run-k8s: ##@Kubernetes Full local k8s setup: cluster -> platform -> observability -> deploy
+run-k8s: ##@Kubernetes Full local k8s setup: cluster -> platform -> observability -> deploy. Pass eventbus=jetstream to use NATS instead of Kafka.
+	@other=$$([ "$(EVENTBUS)" = "kafka" ] && echo "bookinfo-jetstream-local" || echo "bookinfo-kafka-local"); \
+	otherbus=$$([ "$(EVENTBUS)" = "kafka" ] && echo "jetstream" || echo "kafka"); \
+	if k3d cluster list $$other >/dev/null 2>&1; then \
+		printf "$(BOLD)$(YELLOW)Refusing to start: cluster '%s' is running.$(NC)\n" "$$other"; \
+		printf "Run: $(CYAN)make stop-k8s EVENTBUS=%s$(NC)\n" "$$otherbus"; \
+		exit 1; \
+	fi
 	@printf "\n$(BOLD)$(CYAN)════════════════════════════════════════$(NC)\n"
 	@printf "$(BOLD)$(CYAN)  Bookinfo Local Kubernetes Environment  $(NC)\n"
+	@printf "$(BOLD)$(CYAN)  EventBus: %-29s$(NC)\n" "$(EVENTBUS)"
 	@printf "$(BOLD)$(CYAN)════════════════════════════════════════$(NC)\n\n"
 	@$(MAKE) --no-print-directory k8s-cluster
 	@$(MAKE) --no-print-directory k8s-platform
@@ -434,7 +493,7 @@ k8s-rebuild: ##@Kubernetes Fast iteration: rebuild images, reimport, rollout res
 		$(HELM) upgrade --install $$svc charts/bookinfo-service \
 			--namespace $(K8S_NS_BOOKINFO) \
 			$$gen \
-			-f deploy/$$svc/values-local.yaml || exit 1; \
+			-f deploy/$$svc/values-local-$(EVENTBUS).yaml || exit 1; \
 	done
 	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write ingestion; do \
 		$(KUBECTL) rollout restart deployment/$$dep -n $(K8S_NS_BOOKINFO) 2>/dev/null || true; \
@@ -448,6 +507,7 @@ k8s-rebuild: ##@Kubernetes Fast iteration: rebuild images, reimport, rollout res
 .PHONY: k8s-status
 k8s-status: ##@Kubernetes Show pod status and access URLs
 	$(k8s-guard)
+	@printf "\n$(BOLD)Cluster:$(NC) $(K8S_CLUSTER) (eventbus=$(EVENTBUS))\n"
 	@printf "\n$(BOLD)Pod Status:$(NC)\n\n"
 	@$(KUBECTL) get pods -n $(K8S_NS_BOOKINFO) -o wide 2>/dev/null || true
 	@printf "\n$(BOLD)Platform:$(NC)\n\n"
@@ -459,6 +519,9 @@ k8s-status: ##@Kubernetes Show pod status and access URLs
 	@printf "  $(CYAN)Grafana:$(NC)      http://localhost:3000  (admin/admin)\n"
 	@printf "  $(CYAN)Prometheus:$(NC)   http://localhost:9090\n"
 	@printf "  $(CYAN)Headlamp:$(NC)     http://localhost:4466\n"
+	@if [ "$(EVENTBUS)" = "jetstream" ]; then \
+		printf "  $(CYAN)NATS:$(NC)         kubectl --context=$(K8S_CONTEXT) port-forward -n $(K8S_NS_PLATFORM) svc/nats 4222:4222\n"; \
+	fi
 	@printf "\n  $(BOLD)Headlamp token:$(NC) $(KUBECTL) create token headlamp -n $(K8S_NS_OBSERVABILITY)\n"
 	@printf "\n$(BOLD)Webhooks (via Gateway CQRS routing):$(NC)\n\n"
 	@printf "  $(CYAN)book-added:$(NC)         curl -X POST http://localhost:8080/v1/details -H 'Content-Type: application/json' -d '{...}'\n"
@@ -550,9 +613,9 @@ helm-lint: ##@Helm Lint the bookinfo-service chart
 	helm dependency build charts/bookinfo-service
 	helm lint charts/bookinfo-service
 	@for svc in $(SERVICES); do \
-		if [ -f deploy/$$svc/values-local.yaml ]; then \
+		if [ -f deploy/$$svc/values-local-$(EVENTBUS).yaml ]; then \
 			printf "  Linting with $$svc values...\n"; \
-			helm lint charts/bookinfo-service -f deploy/$$svc/values-local.yaml || exit 1; \
+			helm lint charts/bookinfo-service -f deploy/$$svc/values-local-$(EVENTBUS).yaml || exit 1; \
 		fi; \
 	done
 	@printf "$(GREEN)All lints passed.$(NC)\n"
@@ -564,7 +627,7 @@ ifndef SERVICE
 endif
 	helm dependency build charts/bookinfo-service
 	helm template $(SERVICE) charts/bookinfo-service \
-		-f deploy/$(SERVICE)/values-local.yaml \
+		-f deploy/$(SERVICE)/values-local-$(EVENTBUS).yaml \
 		--namespace $(K8S_NS_BOOKINFO)
 
 # ─── API specs ─────────────────────────────────────────────────────────────

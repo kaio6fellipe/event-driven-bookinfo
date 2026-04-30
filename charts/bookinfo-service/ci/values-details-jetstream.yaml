@@ -1,0 +1,44 @@
+# charts/bookinfo-service/ci/values-details-jetstream.yaml
+# ct install test: CQRS + consumed events + DLQ on jetstream bus
+serviceName: details
+fullnameOverride: details
+image:
+  repository: event-driven-bookinfo/details
+  tag: latest
+
+cqrs:
+  enabled: true
+  endpoints:
+    book-added:
+      method: POST
+      endpoint: /v1/details
+
+sensor:
+  dlq:
+    url: "http://dlq-eventsource-svc:12004/v1/events"
+
+events:
+  bus:
+    type: jetstream
+  jetstream:
+    url: "nats://nats.platform.svc.cluster.local:4222"
+    tlsInsecure: true
+    tokenSecret:
+      name: nats-client-token
+      userKey:     username
+      passwordKey: password
+      authKey:  auth.yaml
+  consumed:
+    raw-books-details:
+      eventSourceName: ingestion-raw-books-details
+      eventName: raw-books-details
+      triggers:
+        - name: ingest-book-detail
+          url: self
+          path: /v1/details
+          method: POST
+          payload:
+            - passthrough
+      dlq:
+        enabled: true
+        url: "http://dlq-eventsource-svc:12004/v1/events"

@@ -418,7 +418,7 @@ k8s-deploy: ##@Kubernetes Build images, import to k3d, deploy apps + HTTPRoutes
 		$(HELM) upgrade --install $$svc charts/bookinfo-service \
 			--namespace $(K8S_NS_BOOKINFO) \
 			$$gen \
-			-f deploy/$$svc/values-local.yaml || exit 1; \
+			-f deploy/$$svc/values-local-$(EVENTBUS).yaml || exit 1; \
 	done
 	@printf "\n$(BOLD)Waiting for deployments...$(NC)\n"
 	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write ingestion; do \
@@ -478,7 +478,7 @@ k8s-rebuild: ##@Kubernetes Fast iteration: rebuild images, reimport, rollout res
 		$(HELM) upgrade --install $$svc charts/bookinfo-service \
 			--namespace $(K8S_NS_BOOKINFO) \
 			$$gen \
-			-f deploy/$$svc/values-local.yaml || exit 1; \
+			-f deploy/$$svc/values-local-$(EVENTBUS).yaml || exit 1; \
 	done
 	@for dep in productpage details details-write reviews reviews-write ratings ratings-write notification dlqueue dlqueue-write ingestion; do \
 		$(KUBECTL) rollout restart deployment/$$dep -n $(K8S_NS_BOOKINFO) 2>/dev/null || true; \
@@ -598,9 +598,9 @@ helm-lint: ##@Helm Lint the bookinfo-service chart
 	helm dependency build charts/bookinfo-service
 	helm lint charts/bookinfo-service
 	@for svc in $(SERVICES); do \
-		if [ -f deploy/$$svc/values-local.yaml ]; then \
+		if [ -f deploy/$$svc/values-local-$(EVENTBUS).yaml ]; then \
 			printf "  Linting with $$svc values...\n"; \
-			helm lint charts/bookinfo-service -f deploy/$$svc/values-local.yaml || exit 1; \
+			helm lint charts/bookinfo-service -f deploy/$$svc/values-local-$(EVENTBUS).yaml || exit 1; \
 		fi; \
 	done
 	@printf "$(GREEN)All lints passed.$(NC)\n"
@@ -612,7 +612,7 @@ ifndef SERVICE
 endif
 	helm dependency build charts/bookinfo-service
 	helm template $(SERVICE) charts/bookinfo-service \
-		-f deploy/$(SERVICE)/values-local.yaml \
+		-f deploy/$(SERVICE)/values-local-$(EVENTBUS).yaml \
 		--namespace $(K8S_NS_BOOKINFO)
 
 # ─── API specs ─────────────────────────────────────────────────────────────

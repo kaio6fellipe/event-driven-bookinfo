@@ -1,4 +1,4 @@
-# deploy/notification/values-local.yaml
+# deploy/notification/values-local-kafka.yaml
 serviceName: notification
 fullnameOverride: notification
 image:
@@ -12,12 +12,15 @@ postgresql:
 
 config:
   LOG_LEVEL: "debug"
+  EVENT_BACKEND: "kafka"
 
 observability:
   otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
   pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"
 
 events:
+  bus:
+    type: kafka
   kafka:
     broker: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
   consumed:

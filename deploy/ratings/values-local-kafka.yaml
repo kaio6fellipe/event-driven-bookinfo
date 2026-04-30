@@ -1,4 +1,4 @@
-# deploy/ratings/values-local.yaml
+# deploy/ratings/values-local-kafka.yaml
 serviceName: ratings
 fullnameOverride: ratings
 image:
@@ -12,6 +12,7 @@ postgresql:
 
 config:
   LOG_LEVEL: "debug"
+  EVENT_BACKEND: "kafka"
   KAFKA_BROKERS: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
   KAFKA_TOPIC: "bookinfo_ratings_events"
 
@@ -20,6 +21,8 @@ observability:
   pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"
 
 events:
+  bus:
+    type: kafka
   kafka:
     broker: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
 

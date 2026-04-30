@@ -1,20 +1,20 @@
-# deploy/reviews/values-local.yaml
-serviceName: reviews
-fullnameOverride: reviews
+# deploy/details/values-local-kafka.yaml
+serviceName: details
+fullnameOverride: details
 image:
-  repository: event-driven-bookinfo/reviews
+  repository: event-driven-bookinfo/details
   tag: local
 
 postgresql:
   enabled: true
   auth:
-    database: "bookinfo_reviews"
+    database: "bookinfo_details"
 
 config:
   LOG_LEVEL: "debug"
-  RATINGS_SERVICE_URL: "http://ratings.bookinfo.svc.cluster.local"
+  EVENT_BACKEND: "kafka"
   KAFKA_BROKERS: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
-  KAFKA_TOPIC: "bookinfo_reviews_events"
+  KAFKA_TOPIC: "bookinfo_details_events"
 
 observability:
   otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
@@ -45,5 +45,21 @@ gateway:
   sectionName: web
 
 events:
+  bus:
+    type: kafka
   kafka:
     broker: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
+  consumed:
+    raw-books-details:
+      eventSourceName: ingestion-raw-books-details
+      eventName: raw-books-details
+      triggers:
+        - name: ingest-book-detail
+          url: self
+          path: /v1/details
+          method: POST
+          payload:
+            - passthrough
+      dlq:
+        enabled: true
+        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"

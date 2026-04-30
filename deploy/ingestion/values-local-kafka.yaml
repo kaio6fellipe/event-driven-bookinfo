@@ -1,4 +1,4 @@
-# deploy/ingestion/values-local.yaml
+# deploy/ingestion/values-local-kafka.yaml
 serviceName: ingestion
 fullnameOverride: ingestion
 image:
@@ -7,11 +7,14 @@ image:
 
 config:
   LOG_LEVEL: "debug"
+  EVENT_BACKEND: "kafka"
   POLL_INTERVAL: "5m"
   SEARCH_QUERIES: "programming,golang,kubernetes,python,devops"
   MAX_RESULTS_PER_QUERY: "10"
 
 events:
+  bus:
+    type: kafka
   kafka:
     broker: "bookinfo-kafka-kafka-bootstrap.platform.svc.cluster.local:9092"
 

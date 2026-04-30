@@ -2,7 +2,7 @@ apiVersion: v2
 name: bookinfo-service
 description: Reusable Helm chart for event-driven-bookinfo microservices
 type: application
-version: 0.5.0
+version: 0.6.0
 appVersion: "0.0.0"
 maintainers:
   - name: kaio6fellipe

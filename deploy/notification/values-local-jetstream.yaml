@@ -26,7 +26,8 @@ events:
     url: "nats://nats.platform.svc.cluster.local:4222"
     tokenSecret:
       name: nats-client-token
-      key: token
+      tokenKey: token
+      authKey:  auth.yaml
   consumed:
     book-added:
       eventSourceName: details-events

@@ -165,7 +165,8 @@ events:
     url: ""                  # nats://host:port; injected as NATS_URL
     tokenSecret:
       name: nats-client-token
-      key: token             # mounted as NATS_TOKEN env via valueFrom.secretKeyRef
+      tokenKey: token        # raw token; mounted as NATS_TOKEN env in app pods
+      authKey:  auth.yaml    # YAML auth file; consumed by Argo Events accessSecret
   exposed: {}
     # event-name:
     #   topic: kafka_topic_or_nats_subject

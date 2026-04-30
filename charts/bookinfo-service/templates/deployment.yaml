@@ -93,7 +93,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.events.jetstream.tokenSecret.name | quote }}
-                  key:  {{ .Values.events.jetstream.tokenSecret.key  | quote }}
+                  key:  {{ .Values.events.jetstream.tokenSecret.tokenKey | quote }}
             {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}

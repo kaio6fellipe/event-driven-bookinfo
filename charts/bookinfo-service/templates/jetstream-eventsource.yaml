@@ -29,7 +29,7 @@ spec:
       url: {{ required "events.jetstream.url must be set when bus.type=jetstream and events.exposed is defined" $.Values.events.jetstream.url | quote }}
       accessSecret:
         name: {{ $.Values.events.jetstream.tokenSecret.name | quote }}
-        key:  {{ $.Values.events.jetstream.tokenSecret.key  | quote }}
+        key:  {{ $.Values.events.jetstream.tokenSecret.authKey | quote }}
       subject: {{ required (printf "events.exposed.%s.topic is required (used as JetStream subject)" $eventName) $event.topic | quote }}
       jsonBody: true
 {{- end }}

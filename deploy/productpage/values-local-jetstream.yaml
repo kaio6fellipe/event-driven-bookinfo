@@ -27,7 +27,8 @@ events:
     url: "nats://nats.platform.svc.cluster.local:4222"
     tokenSecret:
       name: nats-client-token
-      tokenKey: token
+      userKey:     username
+      passwordKey: password
       authKey:  auth.yaml
 
 gateway:

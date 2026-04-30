@@ -172,9 +172,10 @@
             "tokenSecret": {
               "type": "object",
               "properties": {
-                "name":     { "type": "string" },
-                "tokenKey": { "type": "string" },
-                "authKey":  { "type": "string" }
+                "name":        { "type": "string" },
+                "userKey":     { "type": "string" },
+                "passwordKey": { "type": "string" },
+                "authKey":     { "type": "string" }
               }
             }
           }

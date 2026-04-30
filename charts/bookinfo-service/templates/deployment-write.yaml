@@ -80,11 +80,16 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             {{- if eq .Values.events.bus.type "jetstream" }}
-            - name: NATS_TOKEN
+            - name: NATS_USER
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.events.jetstream.tokenSecret.name | quote }}
-                  key:  {{ .Values.events.jetstream.tokenSecret.tokenKey | quote }}
+                  key:  {{ .Values.events.jetstream.tokenSecret.userKey | quote }}
+            - name: NATS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.events.jetstream.tokenSecret.name | quote }}
+                  key:  {{ .Values.events.jetstream.tokenSecret.passwordKey | quote }}
             {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}

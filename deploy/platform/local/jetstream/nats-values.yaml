@@ -10,13 +10,18 @@
 # scratch space and gets wiped when the cluster is torn down, which is
 # the right local-dev behaviour. For any non-local environment, switch
 # to pvc.enabled=true (or memoryStore) and re-evaluate.
-# Auth note: the chart serialises config.merge to JSON, which means
-# any "$TOKEN" reference becomes a literal quoted string ("$TOKEN")
-# rather than an env-var substitution (NATS only resolves $VAR
-# outside quoted strings). So the server-side token is hardcoded
-# here — it must match the value in nats-token-secret.yaml, which
-# the EventBus accessSecret + pod NATS_TOKEN consume client-side.
-# Local-dev only.
+# Auth note: basic auth (user/password) instead of token because
+# Argo Events' jetstreamExotic driver hardcodes AuthStrategyBasic
+# whenever an accessSecret is configured (see argo-events
+# pkg/eventbus/driver.go GetAuth). Single global creds shared by
+# the EventBus, EventSource pods, and application producers — all
+# read the same values from nats-client-token in two formats
+# (raw user/password keys + auth.yaml YAML for argo-events).
+#
+# Server-side creds hardcoded here because the chart serialises
+# config.merge to JSON, which prevents NATS env-var substitution
+# from resolving $VAR references inside quoted strings. They MUST
+# match the values in nats-token-secret.yaml. Local-dev only.
 config:
   cluster:
     enabled: false
@@ -29,7 +34,8 @@ config:
         size: 1Gi
   merge:
     authorization:
-      token: local-dev-token
+      user: bookinfo
+      password: local-dev-secret
 container:
   image:
     repository: nats

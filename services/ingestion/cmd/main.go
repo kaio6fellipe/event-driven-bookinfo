@@ -102,9 +102,10 @@ func main() {
 			logger.Error("NATS_URL must be set when EVENT_BACKEND=jetstream")
 			os.Exit(1)
 		}
-		token := os.Getenv("NATS_TOKEN")
+		user := os.Getenv("NATS_USER")
+		password := os.Getenv("NATS_PASSWORD")
 		d := events.Find(messagingadapter.Exposed, "book-added")
-		np, err := natspub.NewProducer(ctx, natsURL, token, d.Topic, d.Topic)
+		np, err := natspub.NewProducer(ctx, natsURL, user, password, d.Topic, d.Topic)
 		if err != nil {
 			logger.Error("failed to create NATS producer", "error", err)
 			os.Exit(1)

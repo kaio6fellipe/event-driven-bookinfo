@@ -43,13 +43,19 @@ var _ eventsmessaging.Publisher = (*Producer)(nil)
 //
 // streamName is the JetStream stream name. subject is the publish target;
 // for current usage they are the same string (e.g. "raw_books_details").
-// token is optional — empty string skips token auth (local-dev mode).
+// user/password are optional — empty strings skip auth (local-dev mode).
+// Basic auth is used because Argo Events' jetstreamExotic driver
+// (pkg/eventbus/driver.go GetAuth) hardcodes AuthStrategyBasic when an
+// accessSecret is present, so the NATS server must accept user/password
+// for the EventBus and EventSource pods. The application producers use
+// the same credentials so a single authorization stanza on the server
+// covers everyone.
 // When ctx carries a deadline, that remaining duration is used as the
 // NATS connection timeout so the parameter has real semantics.
-func NewProducer(ctx context.Context, url, token, streamName, subject string) (*Producer, error) {
+func NewProducer(ctx context.Context, url, user, password, streamName, subject string) (*Producer, error) {
 	opts := []nats.Option{nats.Name("event-driven-bookinfo")}
-	if token != "" {
-		opts = append(opts, nats.Token(token))
+	if user != "" || password != "" {
+		opts = append(opts, nats.UserInfo(user, password))
 	}
 	if d, ok := ctx.Deadline(); ok {
 		if remaining := time.Until(d); remaining > 0 {

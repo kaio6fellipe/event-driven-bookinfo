@@ -36,10 +36,25 @@ spec:
       {{- with .ceType }}
       filters:
         data:
+          {{- /*
+            Header path differs by bus:
+            - kafka EventSource serialises headers as map[string]string
+              under "headers" — path is headers.ce_type (kafka header convention).
+            - nats EventSource serialises nats.Header as map[string][]string
+              under "header" — path is header.ce-type.0 (first element of the
+              dash-keyed multi-value header).
+          */}}
+          {{- if eq $.Values.events.bus.type "jetstream" }}
+          - path: header.ce-type.0
+            type: string
+            value:
+              - {{ . | quote }}
+          {{- else }}
           - path: headers.ce_type
             type: string
             value:
               - {{ . | quote }}
+          {{- end }}
       {{- end }}
       {{- end }}
     {{- end }}

@@ -1,0 +1,27 @@
+# deploy/ingestion/values-local-jetstream.yaml
+serviceName: ingestion
+fullnameOverride: ingestion
+image:
+  repository: event-driven-bookinfo/ingestion
+  tag: local
+
+config:
+  LOG_LEVEL: "debug"
+  EVENT_BACKEND: "jetstream"
+  NATS_URL: "nats://nats.platform.svc.cluster.local:4222"
+  POLL_INTERVAL: "5m"
+  SEARCH_QUERIES: "programming,golang,kubernetes,python,devops"
+  MAX_RESULTS_PER_QUERY: "10"
+
+events:
+  bus:
+    type: jetstream
+  jetstream:
+    url: "nats://nats.platform.svc.cluster.local:4222"
+    tokenSecret:
+      name: nats-client-token
+      key: token
+
+observability:
+  otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+  pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"

@@ -1,0 +1,67 @@
+# deploy/details/values-local-jetstream.yaml
+serviceName: details
+fullnameOverride: details
+image:
+  repository: event-driven-bookinfo/details
+  tag: local
+
+postgresql:
+  enabled: true
+  auth:
+    database: "bookinfo_details"
+
+config:
+  LOG_LEVEL: "debug"
+  EVENT_BACKEND: "jetstream"
+  NATS_URL: "nats://nats.platform.svc.cluster.local:4222"
+
+observability:
+  otelEndpoint: "http://alloy-metrics-traces.observability.svc.cluster.local:4317"
+  pyroscopeAddress: "http://pyroscope.observability.svc.cluster.local:4040"
+
+cqrs:
+  enabled: true
+  read:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  write:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+sensor:
+  dlq:
+    url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"
+
+gateway:
+  name: default-gw
+  namespace: platform
+  sectionName: web
+
+events:
+  bus:
+    type: jetstream
+  jetstream:
+    url: "nats://nats.platform.svc.cluster.local:4222"
+    tokenSecret:
+      name: nats-client-token
+      key: token
+  consumed:
+    raw-books-details:
+      eventSourceName: ingestion-raw-books-details
+      eventName: raw-books-details
+      triggers:
+        - name: ingest-book-detail
+          url: self
+          path: /v1/details
+          method: POST
+          payload:
+            - passthrough
+      dlq:
+        enabled: true
+        url: "http://dlq-event-received-eventsource-svc.bookinfo.svc.cluster.local:12000/v1/events"

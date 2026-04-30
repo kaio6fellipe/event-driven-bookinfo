@@ -166,9 +166,9 @@ events:
     tlsInsecure: false       # client TLS InsecureSkipVerify (local-dev with self-signed certs)
     tokenSecret:
       name: nats-client-token
-      userKey:     username   # mounted as NATS_USER env in app pods
-      passwordKey: password   # mounted as NATS_PASSWORD env in app pods
-      authKey:     auth.yaml  # YAML auth file; consumed by Argo Events accessSecret
+      userKey: username      # mounted as NATS_USER env in app pods
+      passwordKey: password  # mounted as NATS_PASSWORD env in app pods
+      authKey: auth.yaml     # YAML auth file; consumed by Argo Events accessSecret
   exposed: {}
     # event-name:
     #   topic: kafka_topic_or_nats_subject

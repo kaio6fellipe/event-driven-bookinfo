@@ -104,8 +104,9 @@ func main() {
 		}
 		user := os.Getenv("NATS_USER")
 		password := os.Getenv("NATS_PASSWORD")
+		tlsInsecure := os.Getenv("NATS_TLS_INSECURE") == "true"
 		d := events.Find(messagingadapter.Exposed, "book-added")
-		np, err := natspub.NewProducer(ctx, natsURL, user, password, d.Topic, d.Topic)
+		np, err := natspub.NewProducer(ctx, natsURL, user, password, tlsInsecure, d.Topic, d.Topic)
 		if err != nil {
 			logger.Error("failed to create NATS producer", "error", err)
 			os.Exit(1)

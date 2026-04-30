@@ -311,13 +311,28 @@ k8s-platform-kafka:
 
 .PHONY: k8s-platform-jetstream
 k8s-platform-jetstream:
-	@printf "$(BOLD)[2/5] Installing NATS (JetStream)...$(NC)\n"
-	@$(HELM) repo add nats https://nats-io.github.io/k8s/helm/charts/ --force-update 2>/dev/null || true
+	@printf "$(BOLD)[2/5] Installing cert-manager + NATS (JetStream)...$(NC)\n"
+	@$(HELM) repo add jetstack https://charts.jetstack.io --force-update 2>/dev/null || true
+	@$(HELM) upgrade --install cert-manager jetstack/cert-manager \
+		-n cert-manager --create-namespace \
+		--version v1.16.2 \
+		--set crds.enabled=true \
+		--wait --timeout 180s
+	@printf "  $(GREEN)cert-manager ready.$(NC)\n"
 	@# Token secret has copies in both platform and bookinfo namespaces.
 	@# Ensure bookinfo exists before applying — the platform target's
 	@# bookinfo-ns creation in step [4/5] runs after this sub-target.
 	@$(KUBECTL) create namespace $(K8S_NS_BOOKINFO) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 	@$(KUBECTL) apply -f deploy/platform/local/jetstream/nats-token-secret.yaml
+	@# Issue NATS TLS cert via cert-manager. Argo Events' jetstreamExotic
+	@# driver always wraps the connection in nats.Secure(InsecureSkipVerify),
+	@# so the server side must speak TLS. Cert is local-dev self-signed.
+	@$(KUBECTL) apply -f deploy/platform/local/jetstream/nats-tls.yaml
+	@printf "  Waiting for NATS TLS cert to be issued...\n"
+	@$(KUBECTL) wait certificate/nats-server-tls -n $(K8S_NS_PLATFORM) \
+		--for=condition=Ready --timeout=60s
+	@printf "  $(GREEN)NATS TLS cert ready.$(NC)\n"
+	@$(HELM) repo add nats https://nats-io.github.io/k8s/helm/charts/ --force-update 2>/dev/null || true
 	@$(HELM) upgrade --install nats nats/nats \
 		-n $(K8S_NS_PLATFORM) \
 		-f deploy/platform/local/jetstream/nats-values.yaml \

@@ -163,6 +163,7 @@ events:
     broker: ""               # bootstrap host:port; injected as KAFKA_BROKERS
   jetstream:
     url: ""                  # nats://host:port; injected as NATS_URL
+    tlsInsecure: false       # client TLS InsecureSkipVerify (local-dev with self-signed certs)
     tokenSecret:
       name: nats-client-token
       userKey:     username   # mounted as NATS_USER env in app pods

@@ -48,6 +48,7 @@ events:
     type: jetstream
   jetstream:
     url: "nats://nats.platform.svc.cluster.local:4222"
+    tlsInsecure: true
     tokenSecret:
       name: nats-client-token
       userKey:     username

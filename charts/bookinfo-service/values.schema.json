@@ -169,6 +169,7 @@
           "type": "object",
           "properties": {
             "url": { "type": "string" },
+            "tlsInsecure": { "type": "boolean" },
             "tokenSecret": {
               "type": "object",
               "properties": {

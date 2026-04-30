@@ -99,6 +99,8 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.events.jetstream.tokenSecret.name | quote }}
                   key:  {{ .Values.events.jetstream.tokenSecret.passwordKey | quote }}
+            - name: NATS_TLS_INSECURE
+              value: {{ .Values.events.jetstream.tlsInsecure | default false | quote }}
             {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}

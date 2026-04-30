@@ -37,7 +37,7 @@ func TestProducer_PublishCreatesStreamAndDelivers(t *testing.T) {
 		ContentType: "application/json",
 	}
 
-	p, err := natspub.NewProducer(context.Background(), url, "", "" /*no auth*/, d.Topic, d.Topic)
+	p, err := natspub.NewProducer(context.Background(), url, "", "", false /*no auth, plaintext*/, d.Topic, d.Topic)
 	if err != nil {
 		t.Fatalf("new producer: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestProducer_StreamEnsureIdempotent(t *testing.T) {
 	url := runJetStreamServer(t)
 
 	for i := 0; i < 2; i++ {
-		p, err := natspub.NewProducer(context.Background(), url, "", "", "raw_books_details", "raw_books_details")
+		p, err := natspub.NewProducer(context.Background(), url, "", "", false, "raw_books_details", "raw_books_details")
 		if err != nil {
 			t.Fatalf("new producer iter %d: %v", i, err)
 		}
@@ -103,7 +103,7 @@ func TestProducer_Publish_EmptyRecordKey(t *testing.T) {
 		ContentType: "application/json",
 	}
 
-	p, err := natspub.NewProducer(context.Background(), url, "", "", d.Topic, d.Topic)
+	p, err := natspub.NewProducer(context.Background(), url, "", "", false, d.Topic, d.Topic)
 	if err != nil {
 		t.Fatalf("new producer: %v", err)
 	}

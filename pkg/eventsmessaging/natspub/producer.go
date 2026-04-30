@@ -6,6 +6,7 @@ package natspub
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,18 +45,24 @@ var _ eventsmessaging.Publisher = (*Producer)(nil)
 // streamName is the JetStream stream name. subject is the publish target;
 // for current usage they are the same string (e.g. "raw_books_details").
 // user/password are optional — empty strings skip auth (local-dev mode).
-// Basic auth is used because Argo Events' jetstreamExotic driver
-// (pkg/eventbus/driver.go GetAuth) hardcodes AuthStrategyBasic when an
-// accessSecret is present, so the NATS server must accept user/password
-// for the EventBus and EventSource pods. The application producers use
-// the same credentials so a single authorization stanza on the server
-// covers everyone.
+// tlsInsecure enables TLS with InsecureSkipVerify; required when the
+// NATS server speaks TLS but the client does not need to verify the
+// server cert (local-dev with self-signed certs). Basic auth is used
+// because Argo Events' jetstreamExotic driver (pkg/eventbus/driver.go
+// GetAuth) hardcodes AuthStrategyBasic when an accessSecret is present,
+// so the NATS server must accept user/password for the EventBus and
+// EventSource pods. The application producers use the same credentials
+// so a single authorization stanza on the server covers everyone.
 // When ctx carries a deadline, that remaining duration is used as the
 // NATS connection timeout so the parameter has real semantics.
-func NewProducer(ctx context.Context, url, user, password, streamName, subject string) (*Producer, error) {
+func NewProducer(ctx context.Context, url, user, password string, tlsInsecure bool, streamName, subject string) (*Producer, error) {
 	opts := []nats.Option{nats.Name("event-driven-bookinfo")}
 	if user != "" || password != "" {
 		opts = append(opts, nats.UserInfo(user, password))
+	}
+	if tlsInsecure {
+		// Local-dev self-signed cert; production must provide a CA.
+		opts = append(opts, nats.Secure(&tls.Config{InsecureSkipVerify: true})) //nolint:gosec
 	}
 	if d, ok := ctx.Deadline(); ok {
 		if remaining := time.Until(d); remaining > 0 {

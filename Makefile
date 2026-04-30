@@ -313,6 +313,10 @@ k8s-platform-kafka:
 k8s-platform-jetstream:
 	@printf "$(BOLD)[2/5] Installing NATS (JetStream)...$(NC)\n"
 	@$(HELM) repo add nats https://nats-io.github.io/k8s/helm/charts/ --force-update 2>/dev/null || true
+	@# Token secret has copies in both platform and bookinfo namespaces.
+	@# Ensure bookinfo exists before applying — the platform target's
+	@# bookinfo-ns creation in step [4/5] runs after this sub-target.
+	@$(KUBECTL) create namespace $(K8S_NS_BOOKINFO) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 	@$(KUBECTL) apply -f deploy/platform/local/jetstream/nats-token-secret.yaml
 	@$(HELM) upgrade --install nats nats/nats \
 		-n $(K8S_NS_PLATFORM) \

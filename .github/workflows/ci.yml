@@ -169,7 +169,7 @@ jobs:
         run: make docker-build-all
 
       - name: Install Trivy
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 — pinned by SHA due to March 2026 supply chain attack
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.35.0 — pinned by SHA due to March 2026 supply chain attack
         with:
           scan-type: image
           image-ref: event-driven-bookinfo/productpage:latest
@@ -177,7 +177,7 @@ jobs:
           exit-code: 1
 
       - name: Scan details image
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 — pinned by SHA due to March 2026 supply chain attack
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.35.0 — pinned by SHA due to March 2026 supply chain attack
         with:
           scan-type: image
           image-ref: event-driven-bookinfo/details:latest
@@ -185,7 +185,7 @@ jobs:
           exit-code: 1
 
       - name: Scan reviews image
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 — pinned by SHA due to March 2026 supply chain attack
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.35.0 — pinned by SHA due to March 2026 supply chain attack
         with:
           scan-type: image
           image-ref: event-driven-bookinfo/reviews:latest
@@ -193,7 +193,7 @@ jobs:
           exit-code: 1
 
       - name: Scan ratings image
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 — pinned by SHA due to March 2026 supply chain attack
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.35.0 — pinned by SHA due to March 2026 supply chain attack
         with:
           scan-type: image
           image-ref: event-driven-bookinfo/ratings:latest
@@ -201,7 +201,7 @@ jobs:
           exit-code: 1
 
       - name: Scan notification image
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 — pinned by SHA due to March 2026 supply chain attack
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.35.0 — pinned by SHA due to March 2026 supply chain attack
         with:
           scan-type: image
           image-ref: event-driven-bookinfo/notification:latest
